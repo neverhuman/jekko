@@ -4,4 +4,4 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
-rtk cargo run -p xtask -- pr-compliance
+cargo run -p xtask -- pr-compliance
