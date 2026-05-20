@@ -15,6 +15,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Check PR standards
         run: bash ops/ci/pr-standards.sh
 
@@ -28,5 +29,6 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Check PR template compliance
         run: bash ops/ci/pr-compliance.sh
