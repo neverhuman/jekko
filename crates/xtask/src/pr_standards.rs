@@ -99,11 +99,11 @@ pub fn run() -> Result<()> {
     }
 
     if issues.is_empty() {
-        gh_api([
+        let _ = gh_api([
             "--method",
             "DELETE",
             &format!("/repos/{repo}/issues/{number}/labels/needs:issue"),
-        ])?;
+        ]);
         return Ok(());
     }
 
