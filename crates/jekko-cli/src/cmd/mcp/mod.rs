@@ -19,6 +19,8 @@ use jekko_runtime::mcp::{
 
 use crate::cli::GlobalOpts;
 
+pub mod presets;
+
 #[derive(Args, Debug)]
 pub struct McpArgs {
     #[command(subcommand)]
@@ -35,6 +37,40 @@ pub enum McpCommand {
     Detach(McpDetachArgs),
     /// Probe a configured server: spawn, handshake, list its tools.
     Status(McpStatusArgs),
+    /// Manage built-in MCP server presets.
+    Preset(McpPresetArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct McpPresetArgs {
+    #[command(subcommand)]
+    pub command: McpPresetCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum McpPresetCommand {
+    /// List built-in presets.
+    List,
+    /// Add a built-in preset to the active config.
+    Add(McpPresetAddArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct McpPresetAddArgs {
+    #[command(flatten)]
+    pub config: McpConfigOpt,
+
+    /// Preset name (see `jekko mcp preset list`).
+    pub name: String,
+
+    /// Override the server name written into `mcp.toml`. Defaults to the
+    /// preset's own name.
+    #[arg(long = "as", value_name = "NAME")]
+    pub rename: Option<String>,
+
+    /// Overwrite an existing entry with the same server name.
+    #[arg(long)]
+    pub force: bool,
 }
 
 /// Shared flag for selecting the config file.
@@ -129,7 +165,80 @@ pub fn run(_global: &GlobalOpts, args: &McpArgs) -> Result<()> {
                 .context("build tokio runtime for mcp status")?;
             rt.block_on(status(&p, &a.name, a.timeout))
         }
+        McpCommand::Preset(p) => match &p.command {
+            McpPresetCommand::List => preset_list(),
+            McpPresetCommand::Add(a) => {
+                let path = resolve_config_path(a.config.config_path.as_deref())?;
+                preset_add(&path, a)
+            }
+        },
     }
+}
+
+fn preset_list() -> Result<()> {
+    use presets::PRESETS;
+    println!("{:<14} {:<54} ENV", "NAME", "DESCRIPTION");
+    for p in PRESETS {
+        let env_summary = if p.required_env.is_empty() {
+            String::from("—")
+        } else {
+            p.required_env.join(",")
+        };
+        println!(
+            "{:<14} {:<54} {}",
+            p.name,
+            summary(p.description, 54),
+            env_summary
+        );
+    }
+    println!();
+    println!("Add one with: jekko mcp preset add <name> [--as <server-name>]");
+    Ok(())
+}
+
+fn preset_add(config_path: &std::path::Path, args: &McpPresetAddArgs) -> Result<()> {
+    let preset = presets::find_preset(&args.name).ok_or_else(|| {
+        anyhow!(
+            "unknown preset `{}`; run `jekko mcp preset list` to see available presets",
+            args.name
+        )
+    })?;
+    let server_name = args
+        .rename
+        .clone()
+        .unwrap_or_else(|| preset.name.to_string());
+    validate_server_name(&server_name).map_err(map_mcp_err)?;
+
+    // Warn (don't fail) when the user is missing required env vars: the
+    // server itself will reject without them, but we let the user attach
+    // first and supply the env later.
+    let missing: Vec<&&str> = preset
+        .required_env
+        .iter()
+        .filter(|var| std::env::var(var).is_err())
+        .collect();
+    if !missing.is_empty() {
+        eprintln!(
+            "note: preset `{}` references env vars not currently set: {}",
+            preset.name,
+            missing.iter().map(|s| **s).collect::<Vec<_>>().join(", ")
+        );
+        eprintln!(
+            "      (the config stores `${{VAR}}` placeholders; set the values before `jekko mcp status {}`)",
+            server_name
+        );
+    }
+
+    let server_cfg = preset.to_server_config();
+    write_server_entry(config_path, &server_name, &server_cfg, args.force).map_err(map_mcp_err)?;
+    println!(
+        "attached preset `{}` as mcp server `{}` to {}",
+        preset.name,
+        server_name,
+        config_path.display()
+    );
+    println!("  homepage: {}", preset.homepage);
+    Ok(())
 }
 
 fn resolve_config_path(override_path: Option<&std::path::Path>) -> Result<PathBuf> {
