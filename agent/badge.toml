@@ -7,8 +7,10 @@ score = "agent/repo-score.json"
 svg = "agent/jankurai-badge.svg"
 json = "agent/jankurai-badge.json"
 readme = "README.md"
-# Point README at the GitHub file page so clicks resolve to a stable page,
-# while the image still renders from the committed artifact.
-link = "https://github.com/neverhuman/jekko/blob/main/agent/jankurai-badge.svg"
+# Point README at the committed ratchet baseline (the actual score report
+# this badge summarises). Same pattern the upstream jankurai repo uses.
+# GitHub renders the file natively as JSON; clicking the badge surfaces the
+# full audit input for the displayed score.
+link = "agent/baselines/main.repo-score.json"
 update_readme = true
 label = "jankurai"

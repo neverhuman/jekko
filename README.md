@@ -1,7 +1,7 @@
 # Jekko
 
 <!-- jankurai-badge:start -->
-[![Jankurai score: 95/100](agent/jankurai-badge.svg)](https://github.com/neverhuman/jekko/blob/main/agent/jankurai-badge.svg)
+[![Jankurai score: 95/100](agent/jankurai-badge.svg)](agent/baselines/main.repo-score.json)
 <!-- jankurai-badge:end -->
 
 The open source AI coding agent, rebuilt in Rust. Jekko is a terminal-first
