@@ -28,11 +28,19 @@ jobs:
         run: bash ops/ci/security.sh
 
       - name: Secret scanning (trufflehog)
+        # Skip on workflow_dispatch: there is no inherent base/head pair to
+        # diff against, and TruffleHog refuses to scan when base == head.
+        if: github.event_name != 'workflow_dispatch'
         uses: trufflesecurity/trufflehog@ba0a524d6e51744d9d4e306bc57ac5d6ca5173ea # main
         with:
           path: .
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
+          # On pull_request use the PR's actual base/head SHAs.
+          # On push use the commits the push moved between (before -> after).
+          # The previous config used `base: main, head: HEAD`, which on
+          # push:main resolves to the same commit and made TruffleHog error
+          # with "BASE and HEAD commits are the same. TruffleHog won't scan".
+          base: ${{ github.event.pull_request.base.sha || github.event.before }}
+          head: ${{ github.event.pull_request.head.sha || github.event.after }}
           extra_args: --debug --only-verified
 
       - name: Dependency scanning (syft + grype)
