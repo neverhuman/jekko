@@ -187,6 +187,11 @@ collect_changed_args() {
   })
   if (( ${#changed_args[@]} > 0 )); then
     printf '%s\n' "${changed_args[@]}"
+  else
+    # On push:main, HEAD == origin/main so the diff above is empty. jankurai
+    # proof and proofbind require at least one --changed/--changed-from arg,
+    # so fall back to the previous commit on main.
+    printf '%s\n%s\n' '--changed-from' 'HEAD~1'
   fi
 }
 
