@@ -10,7 +10,7 @@ fn jekko() -> Command {
 }
 
 #[test]
-fn preset_list_shows_nine_canonical_presets() {
+fn preset_list_shows_eight_canonical_presets() {
     let out = jekko()
         .args(["mcp", "preset", "list"])
         .output()
@@ -18,7 +18,6 @@ fn preset_list_shows_nine_canonical_presets() {
     let stdout = String::from_utf8(out.stdout).unwrap();
     for name in [
         "aws",
-        "claude",
         "gdrive",
         "github",
         "huggingface",
@@ -32,6 +31,11 @@ fn preset_list_shows_nine_canonical_presets() {
             "preset `{name}` missing from list output:\n{stdout}"
         );
     }
+    // `claude` is intentionally absent — no canonical Claude MCP server.
+    assert!(
+        !stdout.lines().any(|l| l.starts_with("claude ")),
+        "claude must not appear as a preset row:\n{stdout}"
+    );
     assert!(stdout.contains("NAME"));
     assert!(stdout.contains("DESCRIPTION"));
     assert!(stdout.contains("ENV"));
