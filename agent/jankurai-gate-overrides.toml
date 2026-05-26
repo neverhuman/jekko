@@ -30,3 +30,9 @@ rule = "HLT-001-DEAD-MARKER"
 evidence = "unwrap_or_default"
 reason = "Rust idiom: `.unwrap_or_default()` is what clippy's manual_unwrap_or_default lint actively asks callers to use, and 42 such calls already exist in product code (verified at PR #29). Migrating every one to an explicit match is unsustainable and adversarial to Rust style. Other HLT-001 subrules (stub markers in product code, etc.) still fail the gate; only the .unwrap_or_default() evidence is waived here."
 expires = "2099-01-01"
+
+[[allow]]
+rule = "HLT-001-DEAD-MARKER"
+evidence = ".ok_or_else(|| anyhow!"
+reason = "Rust+anyhow idiom: `.ok_or_else(|| anyhow!(...))?` is the canonical way to turn an Option that must be Some at this point into a typed error with a human-readable message. It's an explicit failure path with provenance, not fallback soup. Jankurai 1.5.1's HLT-001 detector pattern-matches the `.ok_or_else` token without inspecting the closure body. Other HLT-001 evidence (stub markers, .unwrap_or(0), etc.) still fail the gate."
+expires = "2099-01-01"
