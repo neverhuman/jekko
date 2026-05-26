@@ -48,18 +48,35 @@ validate:
 	just fast
 
 # Workspace-wide fast lane composed from narrow proof targets.
-# `fmt-check-fast` and `clippy-check-fast` run first so format / lint
-# violations fail fast before the heavier typecheck/build/test lanes
-# burn time. The `parity` GitHub workflow runs `cargo fmt --all --check`
-# AND `cargo clippy --all-targets -- -D warnings` and rejects PRs that
-# drift; mirroring them here closes the local-CI parity gap.
+# `fmt-check-fast`, `clippy-check-fast`, and the xtask parity checks
+# (cli-help-parity / tool-schema-parity / etc.) run first so they fail
+# fast before the heavier typecheck/build/test lanes burn time. Plus the
+# jankurai audit gate at the tail. This mirrors the remote workflows so
+# `just fast` green ⇔ remote `parity` + `jankurai` jobs pass — no more
+# local-CI parity gaps.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
 workspace-fast:
 	just fmt-check-fast
 	just clippy-check-fast
+	just xtask-parity-fast
 	just workspace-typecheck-fast
 	just workspace-build-fast
 	just workspace-test-fast
+	just audit-gate-fast
+
+# Narrow lane: the xtask parity checks that the remote `parity` workflow
+# runs (cli-help / tool-schema / session-fixture / openapi / httpapi).
+# These catch CLI snapshot drift, generated-API drift, and contract drift
+# that only fmt + clippy + tests don't surface. Excludes the heavier
+# `baseline-diff` (TUI screenshot lane); that lives in `tui-ci`.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true
+xtask-parity-fast:
+	cargo run -p xtask --locked -- db-migration-smoke
+	cargo run -p xtask --locked -- cli-help-parity --strict
+	cargo run -p xtask --locked -- tool-schema-parity --strict
+	cargo run -p xtask --locked -- session-fixture-parity --strict
+	cargo run -p xtask --locked -- openapi-check --strict
+	cargo run -p xtask --locked -- httpapi-parity
 
 # Narrow lane: rustfmt --check across the workspace AND the standalone
 # jnoccio-fusion package. Mirrors what the GitHub `parity` workflow runs
@@ -846,7 +863,25 @@ ci-local-audit:
 	mkdir -p {{jankurai_artifact_root}}
 	bash ops/ci/jankurai.sh --setup-only
 	jankurai audit . --mode advisory --json {{jankurai_artifact_root}}/repo-score.json --md {{jankurai_artifact_root}}/repo-score.md
+	cargo run -p xtask --locked -- jankurai-gate --score {{jankurai_artifact_root}}/repo-score.json
 	bash ops/ci/jankurai-badge.sh
+
+# Narrow audit lane: just `jankurai audit` + the gate. Mirrors the
+# remote `jankurai` workflow's two-step gate exactly so `just fast`
+# can include it without paying for the full ci-local-audit lane.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true
+audit-gate-fast:
+	mkdir -p {{jankurai_artifact_root}}
+	jankurai audit . --mode advisory --json {{jankurai_artifact_root}}/repo-score.json --md {{jankurai_artifact_root}}/repo-score.md
+	cargo run -p xtask --locked -- jankurai-gate --score {{jankurai_artifact_root}}/repo-score.json
+
+# Narrow parity lane: just the cargo-fmt, clippy, and xtask parity
+# checks the remote `parity` workflow runs. Heavier than fmt-check-fast
+# + clippy-check-fast but matches `ops/ci/parity.sh` 1:1, so `just fast`
+# now passing means `parity` workflow will also pass.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true
+parity-fast:
+	bash ops/ci/parity.sh
 
 # CI step 2: proof routing + evidence index regeneration.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true

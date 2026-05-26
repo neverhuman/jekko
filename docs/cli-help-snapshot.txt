@@ -25,6 +25,7 @@ Commands:
   mcp        Manage MCP (Model Context Protocol) servers
   acp        ACP (Agent Client Protocol) integration
   jankurai   Jankurai integration commands
+  jnoccio    Manage local Jnoccio Fusion unlock and status
   daemon     Manage the background daemon
   plugin     Manage plugins
   debug      Diagnostic and debug utilities
@@ -36,6 +37,8 @@ Commands:
   db         Database tools
   upgrade    Upgrade Jekko in place
   uninstall  Uninstall Jekko and remove data directories
+  watch      Tail a ZYAL run's NDJSON event stream and emit per-tick snapshot + remediation actions
+  port-run   Drive a 12-stage ZYAL SuperWorkflow run (compile -> seed -> walk waves). Phase H scaffold; the per-phase body is a stub until `jankurai-runner` is wired in
 
 Arguments:
   [PATH]
@@ -54,14 +57,14 @@ Options:
       --headless
           Run without entering raw mode / alt-screen (PTY tests, headless smoke)
 
-  -j, --jankurai
-          Run one jankurai cycle headlessly (audit → fix → verify) and exit. Equivalent to `jekko jankurai --once`
-
       --cwd <PATH>
           Override the working directory before any I/O is performed
 
   -c, --continue
           Resume the last session
+
+  -j, --jankurai
+          Run one jankurai cycle headlessly (audit → fix → verify) and exit. Equivalent to `jekko jankurai --once`
 
   -s <SESSION_ID>
           Open a specific session by id
