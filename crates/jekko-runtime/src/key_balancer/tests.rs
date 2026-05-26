@@ -70,6 +70,70 @@ mod tests {
     }
 
     #[test]
+    fn pick_reserves_attempt_so_next_pick_uses_next_user() {
+        let tmp = TempDir::new().unwrap();
+        write_env(tmp.path(), "user_1", "JNOCCIO_DEVELOPER_KEY=ka\n");
+        write_env(tmp.path(), "user_2", "JNOCCIO_DEVELOPER_KEY=kb\n");
+        let mut bal = KeyBalancer::with_root(tmp.path().to_path_buf(), true)
+            .with_pool_ttl(Duration::from_secs(0));
+
+        let first = bal.pick("jnoccio", "jnoccio-router").expect("first pick");
+        let second = bal.pick("jnoccio", "jnoccio-router").expect("second pick");
+
+        assert_ne!(
+            first.user_id, second.user_id,
+            "pick-time reservation should rotate across equal healthy candidates"
+        );
+    }
+
+    #[test]
+    fn round_robin_ignores_old_attempt_skew() {
+        let tmp = TempDir::new().unwrap();
+        write_env(tmp.path(), "user_1", "JNOCCIO_DEVELOPER_KEY=ka\n");
+        write_env(tmp.path(), "user_2", "JNOCCIO_DEVELOPER_KEY=kb\n");
+        let mut bal = KeyBalancer::with_root(tmp.path().to_path_buf(), true)
+            .with_pool_ttl(Duration::from_secs(0));
+
+        for _ in 0..20 {
+            bal.record_success("jnoccio", "user_1", "jnoccio-router");
+        }
+
+        let first = bal.pick("jnoccio", "jnoccio-router").expect("first pick");
+        let second = bal.pick("jnoccio", "jnoccio-router").expect("second pick");
+
+        assert_eq!(first.user_id, "user_1");
+        assert_eq!(second.user_id, "user_2");
+    }
+
+    #[test]
+    fn jnoccio_selection_ignores_outer_cooldown_state() {
+        let tmp = TempDir::new().unwrap();
+        write_env(tmp.path(), "user_1", "JNOCCIO_DEVELOPER_KEY=ka\n");
+        write_env(tmp.path(), "user_2", "JNOCCIO_DEVELOPER_KEY=kb\n");
+        let mut bal = KeyBalancer::with_root(tmp.path().to_path_buf(), true)
+            .with_pool_ttl(Duration::from_secs(0));
+
+        bal.record_failure(
+            "jnoccio",
+            "user_1",
+            "jnoccio-router",
+            FailureKind::AuthFailed,
+        );
+        bal.record_failure(
+            "jnoccio",
+            "user_2",
+            "jnoccio-router",
+            FailureKind::RateLimited,
+        );
+
+        let first = bal.pick("jnoccio", "jnoccio-router").expect("first pick");
+        let second = bal.pick("jnoccio", "jnoccio-router").expect("second pick");
+
+        assert_eq!(first.user_id, "user_1");
+        assert_eq!(second.user_id, "user_2");
+    }
+
+    #[test]
     fn auth_failure_excludes_key_from_pool() {
         let tmp = TempDir::new().unwrap();
         write_env(tmp.path(), "user", "OPENAI_API_KEY=ka\n");

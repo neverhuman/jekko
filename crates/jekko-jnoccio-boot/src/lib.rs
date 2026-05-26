@@ -19,6 +19,7 @@
 
 pub mod health;
 pub mod poller;
+pub mod secret_unlock;
 pub mod spawn;
 pub mod unlock;
 

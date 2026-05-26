@@ -56,6 +56,11 @@ impl JekkoRuntimeModelClient {
     }
 
     /// Return the selected provider/model route for a task kind.
+    ///
+    /// When nothing is explicitly routed (no constructor override, no
+    /// per-policy selection), this returns an empty `ModelRouteRecord` and the
+    /// runtime omits `--provider` / `--model` from the spawned `jekko run`
+    /// invocation — jnoccio-fusion picks the slot at request time.
     pub fn selected_route(&self, kind: ModelTaskKind) -> ModelRouteRecord {
         let policy_route = self.policy.select(kind);
         ModelRouteRecord {
@@ -110,8 +115,21 @@ impl ModelClient for JekkoRuntimeModelClient {
     ) -> Result<ModelCallReceipt> {
         let started = Instant::now();
         let mut command = Command::new(jekko_bin());
+        let tool_mode = super::tool_mode::requires_tools(kind);
+        command.env("JEKKO_ZYAL_LANE_ID", kind_label(kind));
+        if tool_mode.disables_tools() {
+            command.env("JEKKO_RUN_DISABLE_TOOLS", "1");
+        } else if let Some(allowlist) = tool_mode.allowlist_env() {
+            command.env("JEKKO_RUN_TOOL_ALLOWLIST", allowlist);
+        }
         command
-            .env("JEKKO_RUN_DISABLE_TOOLS", "1")
+            .env(
+                "JEKKO_RUN_MAX_OUTPUT_TOKENS",
+                std::env::var("JEKKO_RUN_MAX_OUTPUT_TOKENS")
+                    .ok()
+                    .filter(|value| !value.trim().is_empty())
+                    .unwrap_or_else(|| "4096".to_string()),
+            )
             .env(
                 "JEKKO_KEY_SOURCE_POLICY",
                 self.credential_policy.env_value(),
@@ -134,73 +152,88 @@ impl ModelClient for JekkoRuntimeModelClient {
         let result = output_with_timeout(command, model_call_timeout());
         let latency_ms = started.elapsed().as_millis() as u64;
         match result {
-            Ok(Some(output)) if output.status.success() => {
-                let value: serde_json::Value =
-                    serde_json::from_slice(&output.stdout).unwrap_or(serde_json::Value::Null);
+            Ok(Some(output)) => {
+                let value = serde_json::from_slice::<serde_json::Value>(&output.stdout).ok();
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let error_text = value
+                    .as_ref()
+                    .and_then(|value| value.get("error"))
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+                    .or_else(|| {
+                        let trimmed = if stderr.trim().is_empty() {
+                            stdout.trim()
+                        } else {
+                            stderr.trim()
+                        };
+                        if trimmed.is_empty() {
+                            None
+                        } else {
+                            Some(trimmed.to_string())
+                        }
+                    });
+                let provider = value
+                    .as_ref()
+                    .and_then(|value| value.get("provider_id"))
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+                    .or_else(|| route.provider.clone())
+                    .unwrap_or_else(|| "auto".to_string());
+                let model = value
+                    .as_ref()
+                    .and_then(|value| value.get("model_id"))
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+                    .or_else(|| route.model.clone())
+                    .unwrap_or_else(|| "auto".to_string());
+                let selected_credential_user_id = value
+                    .as_ref()
+                    .and_then(|value| {
+                        value
+                            .get("selected_credential_user_id")
+                            .or_else(|| value.get("selectedCredentialUserID"))
+                    })
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string);
+                let credential_user_id = value
+                    .as_ref()
+                    .and_then(|value| {
+                        value
+                            .get("credential_user_id")
+                            .or_else(|| value.get("credentialUserID"))
+                    })
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+                    .or_else(|| selected_credential_user_id.clone());
+                let success = output.status.success() && error_text.is_none();
                 Ok(ModelCallReceipt {
                     id: receipt_id("live"),
                     kind: kind_label(kind).to_string(),
                     task_id: None,
-                    provider: value
-                        .get("provider_id")
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::to_string)
-                        .or_else(|| route.provider.clone())
-                        .unwrap_or_else(|| "auto".to_string()),
-                    model: value
-                        .get("model_id")
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::to_string)
-                        .or_else(|| route.model.clone())
-                        .unwrap_or_else(|| "auto".to_string()),
+                    provider,
+                    model,
                     latency_ms,
-                    success: true,
+                    success,
                     cost_usd: None,
                     response: value
-                        .get("assistant_text")
+                        .as_ref()
+                        .and_then(|value| value.get("assistant_text"))
                         .and_then(serde_json::Value::as_str)
                         .map(str::to_string),
-                    error: None,
+                    error: if success { None } else { error_text },
                     budget_used: None,
                     budget_remaining: None,
                     route: Some(kind_label(kind).to_string()),
                     credential_policy: Some(self.credential_policy.env_value().to_string()),
-                    credential_user_id: value
-                        .get("credential_user_id")
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::to_string),
+                    selected_credential_user_id,
+                    credential_user_id,
                     retry_count: value
-                        .get("retry_count")
+                        .as_ref()
+                        .and_then(|value| value.get("retry_count"))
                         .and_then(serde_json::Value::as_u64)
                         .map(|value| value as usize)
                         .or(Some(0)),
-                })
-            }
-            Ok(Some(output)) => {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let error = if stderr.trim().is_empty() {
-                    stdout.trim().to_string()
-                } else {
-                    stderr.trim().to_string()
-                };
-                Ok(ModelCallReceipt {
-                    id: receipt_id("live"),
-                    kind: kind_label(kind).to_string(),
-                    task_id: None,
-                    provider: route.provider.clone().unwrap_or_else(|| "auto".to_string()),
-                    model: route.model.clone().unwrap_or_else(|| "auto".to_string()),
-                    latency_ms,
-                    success: false,
-                    cost_usd: None,
-                    response: None,
-                    error: Some(error),
-                    budget_used: None,
-                    budget_remaining: None,
-                    route: Some(kind_label(kind).to_string()),
-                    credential_policy: Some(self.credential_policy.env_value().to_string()),
-                    credential_user_id: None,
-                    retry_count: Some(0),
                 })
             }
             Ok(None) => Ok(ModelCallReceipt {
@@ -221,6 +254,7 @@ impl ModelClient for JekkoRuntimeModelClient {
                 budget_remaining: None,
                 route: Some(kind_label(kind).to_string()),
                 credential_policy: Some(self.credential_policy.env_value().to_string()),
+                selected_credential_user_id: None,
                 credential_user_id: None,
                 retry_count: Some(0),
             }),
@@ -239,6 +273,7 @@ impl ModelClient for JekkoRuntimeModelClient {
                 budget_remaining: None,
                 route: Some(kind_label(kind).to_string()),
                 credential_policy: Some(self.credential_policy.env_value().to_string()),
+                selected_credential_user_id: None,
                 credential_user_id: None,
                 retry_count: Some(0),
             }),
@@ -267,7 +302,7 @@ fn model_call_timeout() -> Duration {
     let secs = std::env::var("JEKKO_MODEL_CALL_TIMEOUT_SECS")
         .ok()
         .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(120)
+        .unwrap_or(900)
         .max(5);
     Duration::from_secs(secs)
 }

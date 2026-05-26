@@ -10,6 +10,10 @@ pub(super) fn emit(profile: &Profile, raw: &str) -> Result<(String, String)> {
         Profile::DeclarativeToml { .. } => Ok((emit_toml(raw)?, "# ".into())),
         Profile::Workflow { .. } => Ok((emit_workflow(raw)?, "# ".into())),
         Profile::Daemon { .. } => Err(anyhow!("daemon profiles are validation-only")),
+        // SuperWorkflow emits canonical JSON; JSON has no comment syntax so
+        // the banner is suppressed in `compile_one` and the header prefix is
+        // empty here.
+        Profile::SuperWorkflow { .. } => Ok((emit_superworkflow(raw)?, String::new())),
     }
 }
 
@@ -28,6 +32,54 @@ fn emit_workflow(raw: &str) -> Result<String> {
         serde_yaml::from_str(&body).context("parse workflow YAML body")?;
     let rendered = serde_yaml::to_string(&parsed).context("render workflow YAML")?;
     Ok(rendered)
+}
+
+/// Emit a SuperWorkflow manifest as canonical JSON.
+///
+/// Validation is re-run against the parsed YAML so a direct caller of
+/// `emit_superworkflow` (notably the unit tests) cannot bypass the structural
+/// checks performed by [`super::validation::validate_superworkflow_profile`].
+pub(super) fn emit_superworkflow(raw: &str) -> Result<String> {
+    let body = strip_pragmas(raw);
+    let parsed: serde_yaml::Value =
+        serde_yaml::from_str(&body).context("parse superworkflow YAML body")?;
+    super::validation::validate_superworkflow_value(std::path::Path::new("<memory>"), &parsed)?;
+    // Convert YAML → JSON Value so we can prepend the generated-header
+    // object (jankurai's HLT-002-GENERATED-MUTATION rule expects every
+    // generated zone file to declare its source + regeneration command;
+    // pure JSON has no comment syntax so we surface that header as a
+    // top-level `_generated` object instead).
+    let json_value = serde_json::to_value(&parsed).context("YAML → JSON for SuperWorkflow")?;
+    let stamped = stamp_generated_header(json_value);
+    let rendered = serde_json::to_string_pretty(&stamped).context("render SuperWorkflow JSON")?;
+    Ok(format!("{rendered}\n"))
+}
+
+/// Prepend a `_generated` top-level object to the rendered JSON so the
+/// generated-zone audit (`HLT-002-GENERATED-MUTATION`) can detect that the
+/// file is a tool output rather than hand-authored. Preserves all other
+/// keys in their original serde-defined order.
+fn stamp_generated_header(value: serde_json::Value) -> serde_json::Value {
+    use serde_json::{Map, Value};
+    let stamp = serde_json::json!({
+        "by": "zyalc",
+        "schema": "zyal/superworkflow@1",
+        "do_not_edit_by_hand": true,
+        "regenerate": "cargo run -p zyalc -- compile <source.zyal>",
+    });
+    match value {
+        Value::Object(orig) => {
+            let mut out = Map::with_capacity(orig.len() + 1);
+            out.insert("_generated".to_string(), stamp);
+            for (k, v) in orig {
+                out.insert(k, v);
+            }
+            Value::Object(out)
+        }
+        // Non-object root: leave untouched (the validator would have
+        // rejected this shape upstream, so we shouldn't see it here).
+        other => other,
+    }
 }
 
 pub(super) fn strip_pragmas(raw: &str) -> String {

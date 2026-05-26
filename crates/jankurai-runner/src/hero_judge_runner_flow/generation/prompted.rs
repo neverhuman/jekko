@@ -35,6 +35,7 @@ pub(super) async fn run_prompted_group(
         lanes,
         input.lane_parallelism,
         &prompt,
+        input.require_parsed_live_json,
     )
     .await
 }

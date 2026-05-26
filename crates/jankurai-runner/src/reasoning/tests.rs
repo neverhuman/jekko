@@ -88,6 +88,10 @@ fn permanent_memory_requires_verified_or_rejected_evidence() {
         confidence: 0.8,
         payload_json: json!({}),
         content_hash: "hash".into(),
+        memory_kind: zyal_core::MemoryKind::Semantic,
+        promotion_status: zyal_core::MemoryPromotionStatus::Scratch,
+        claim_text: String::new(),
+        approved_by_role: None,
     };
     assert!(capsule.can_write_permanent());
 }

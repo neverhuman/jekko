@@ -19,21 +19,6 @@ fn score(usage: &KeyUsage, now: i64) -> f64 {
     (health * load * penalty).max(0.0001)
 }
 
-fn pick_weighted_index(weights: &[f64]) -> Option<usize> {
-    let total: f64 = weights.iter().sum();
-    if total <= 0.0 {
-        return None;
-    }
-    let mut draw = rand::thread_rng().gen_range(0.0..total);
-    for (i, w) in weights.iter().enumerate() {
-        if draw < *w {
-            return Some(i);
-        }
-        draw -= *w;
-    }
-    weights.iter().position(|w| *w > 0.0)
-}
-
 fn unix_now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

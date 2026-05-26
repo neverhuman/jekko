@@ -46,15 +46,21 @@ impl KeyBalancer {
             return None;
         }
         let now = unix_now();
-        let mut weights = Vec::with_capacity(candidates.len());
-        for cand in &candidates {
+        let mut eligible = Vec::with_capacity(candidates.len());
+        for (index, cand) in candidates.iter().enumerate() {
             let store = self.store_for(&cand.user_id);
             let usage = stored_usage(store.get(provider_id, model_id));
-            let weight = score(&usage, now);
-            weights.push(weight);
+            let weight = pick_score(provider_id, &usage, now);
+            if weight > 0.0 {
+                eligible.push(index);
+            }
         }
-        let index = pick_weighted_index(&weights)?;
+        let index = self.round_robin_index(provider_id, model_id, &eligible)?;
         let pick = candidates[index].clone();
+        let store = self.store_for(&pick.user_id);
+        let mut usage = stored_usage(store.get(provider_id, model_id));
+        usage.attempts = usage.attempts.saturating_add(1);
+        let _ = store.upsert(provider_id, model_id, &usage);
         Some(KeyPick {
             user_id: pick.user_id,
             env_name: pick.env_name,
@@ -66,7 +72,6 @@ impl KeyBalancer {
     pub fn record_success(&mut self, provider_id: &str, user_id: &str, model_id: &str) {
         let store = self.store_for(user_id);
         let mut usage = stored_usage(store.get(provider_id, model_id));
-        usage.attempts = usage.attempts.saturating_add(1);
         usage.status = KeyHealth::Ready;
         usage.cooldown_until = None;
         let _ = store.upsert(provider_id, model_id, &usage);
@@ -83,7 +88,6 @@ impl KeyBalancer {
         let store = self.store_for(user_id);
         let mut usage = stored_usage(store.get(provider_id, model_id));
         let now = unix_now();
-        usage.attempts = usage.attempts.saturating_add(1);
         usage.failures = usage.failures.saturating_add(1);
         usage.last_failure_at = Some(now);
         usage.cooldown_until = Some(now + kind.cooldown_seconds(usage.failures));
@@ -111,6 +115,74 @@ impl KeyBalancer {
             BalancerStore::new(dir.dir.join(STATE_DB_FILENAME))
         })
     }
+
+    fn round_robin_index(
+        &self,
+        provider_id: &str,
+        model_id: &str,
+        eligible: &[usize],
+    ) -> Option<usize> {
+        if eligible.is_empty() {
+            return None;
+        }
+        if eligible.len() == 1 {
+            return eligible.first().copied();
+        }
+        self.persisted_round_robin_index(provider_id, model_id, eligible)
+            .or_else(|| eligible.first().copied())
+    }
+
+    fn persisted_round_robin_index(
+        &self,
+        provider_id: &str,
+        model_id: &str,
+        eligible: &[usize],
+    ) -> Option<usize> {
+        let db_path = self.users_root.join(".balancer.sqlite");
+        let mut conn = Connection::open(db_path).ok()?;
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS round_robin_cursor (
+               provider TEXT NOT NULL,
+               model TEXT NOT NULL,
+               cursor INTEGER NOT NULL DEFAULT 0,
+               PRIMARY KEY (provider, model)
+             );",
+        )
+        .ok()?;
+        let tx = conn.transaction().ok()?;
+        let cursor: i64 = tx
+            .query_row(
+                "SELECT cursor FROM round_robin_cursor WHERE provider = ?1 AND model = ?2",
+                rusqlite::params![provider_id, model_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .ok()
+            .flatten()
+            .unwrap_or(0);
+        let selected = eligible[cursor.rem_euclid(eligible.len() as i64) as usize];
+        let next_cursor = cursor.saturating_add(1);
+        tx.execute(
+            "INSERT INTO round_robin_cursor (provider, model, cursor)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(provider, model) DO UPDATE SET cursor = excluded.cursor",
+            rusqlite::params![provider_id, model_id, next_cursor],
+        )
+        .ok()?;
+        tx.commit().ok()?;
+        Some(selected)
+    }
+}
+
+fn pick_score(provider_id: &str, usage: &KeyUsage, now: i64) -> f64 {
+    if provider_owns_endpoint_health(provider_id) {
+        return score(&KeyUsage::default(), now);
+    }
+    score(usage, now)
+}
+
+fn provider_owns_endpoint_health(provider_id: &str) -> bool {
+    provider_id == "jnoccio"
 }
 
 #[allow(clippy::manual_unwrap_or_default)]

@@ -42,7 +42,7 @@ advanced_reasoning:
   blind_lanes: true
   strategy_diversity_required: true
   reducer:
-    model: jnoccio/power-winner
+    model: {}
     may_only_combine_verified_artifacts: true
   memory:
     write_positive_after: verifier_approval
@@ -112,8 +112,13 @@ fleet:
     max_instances: 10
 
 model_policy:
-  routine: jnoccio/routine
-  power: jnoccio/power-winner
+  routine: {}
+  power: {}
+  critic: {}
+  verifier: {}
+  meta_judge: {}
+  reproducer: {}
+  memory_curator: {}
   use_routine_for: [frame, stage_brainstorm, phase_brainstorm, hypothesis, verifier, memory_curate, parity_generate]
   use_power_for: [stage_reduce, critic, perf_close, hard_escalation]
   record_reliability: true

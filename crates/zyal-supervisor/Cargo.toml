@@ -1,0 +1,27 @@
+[package]
+name = "zyal-supervisor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Durable supervisor substrate for ambitious ZYAL super-reasoning workflows (Phase F4)"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true, features = ["clock", "serde"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+zyal-core = { path = "../zyal-core" }
+zyal-key-pool = { path = "../zyal-key-pool", optional = true }
+
+[features]
+default = []
+key-pool = ["dep:zyal-key-pool"]
+
+[dev-dependencies]
+tempfile = "3"

@@ -41,6 +41,7 @@ pub(crate) fn replay_source_artifacts(
         headless.claim_ledger_jsonl.clone(),
         headless.unsupported_claims_jsonl.clone(),
         headless.negative_memory_jsonl.clone(),
+        headless.model_receipts_jsonl.clone(),
     ]
 }
 
@@ -249,7 +250,21 @@ fn jankurai_gate(repo: &Path) -> SuperReasoningGateReceipt {
     }
     let evidence = vec![score_path.display().to_string()];
     match classifier::classify(repo) {
-        Ok(result) if result.hard_total == 0 && result.caps_total == 0 => {
+        Ok(result) if result.decision_passed == Some(true) => {
+            let mut evidence = evidence;
+            evidence.push(format!("score={:.0}", result.score));
+            if let Some(status) = result.decision_status {
+                evidence.push(format!("decision_status={status}"));
+            }
+            evidence.push(format!("hard_findings={}", result.hard_total));
+            evidence.push(format!("caps={}", result.caps_total));
+            SuperReasoningGateReceipt::passed(evidence)
+        }
+        Ok(result)
+            if result.decision_passed.is_none()
+                && result.hard_total == 0
+                && result.caps_total == 0 =>
+        {
             let mut evidence = evidence;
             evidence.push(format!("score={:.0}", result.score));
             SuperReasoningGateReceipt::passed(evidence)
@@ -274,6 +289,7 @@ pub(crate) fn validate_completion_artifacts(
         &headless.superreasoning_packet_json,
         &headless.reviewer_packet_json,
         &headless.replay_receipt_json,
+        &headless.model_receipts_jsonl,
         &headless.claim_ledger_jsonl,
         &headless.unsupported_claims_jsonl,
         &headless.negative_memory_jsonl,

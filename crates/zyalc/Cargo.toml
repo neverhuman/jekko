@@ -23,6 +23,7 @@ serde_yaml = "0.9"
 sha2 = "0.10"
 thiserror = "1"
 toml = { version = "0.8", features = ["preserve_order"] }
+zyal-core = { path = "../zyal-core" }
 
 [dev-dependencies]
 assert_cmd = "2"

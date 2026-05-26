@@ -70,8 +70,13 @@ jankurai_gate:
   block_cap_regression: true
 
 model_policy:
-  routine: jnoccio/routine
-  power: jnoccio/power-winner
+  routine: {}
+  power: {}
+  critic: {}
+  verifier: {}
+  meta_judge: {}
+  reproducer: {}
+  memory_curator: {}
   use_power_for: [phase_finalization, stuck_debug, healing, perf_gap_analysis, review]
   record_outcomes: true
 

@@ -123,6 +123,10 @@ pub async fn run_advanced_reasoning_tick_with_db(
         evidence_level: EvidenceLevel::Executable,
         confidence: 0.8,
         payload_json: json!({"source_artifact": master.id}),
+        memory_kind: zyal_core::MemoryKind::Semantic,
+        promotion_status: zyal_core::MemoryPromotionStatus::Scratch,
+        claim_text: "Advanced port plans are generated from evidence per run, not baked target lists.".to_string(),
+        approved_by_role: None,
         content_hash: stable_reasoning_hash(&json!({
             "run_id": run_id,
             "artifact_id": master.id,

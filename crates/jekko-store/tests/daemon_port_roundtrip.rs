@@ -504,6 +504,11 @@ fn port_workflow_tables_round_trip() {
             content_hash: "hash-memory-1".into(),
             time_created: 2,
             time_updated: 2,
+            memory_kind: "semantic".into(),
+            promotion_status: "scratch".into(),
+            claim_text: String::new(),
+            approved_by_role: None,
+            embedding: None,
         },
     )
     .unwrap();

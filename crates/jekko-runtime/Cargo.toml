@@ -17,6 +17,7 @@ jekko-provider = { path = "../jekko-provider" }
 jekko-jnoccio-boot = { path = "../jekko-jnoccio-boot" }
 jekko-core = { path = "../jekko-core" }
 jekko-store = { path = "../jekko-store" }
+zyal-core = { path = "../zyal-core" }
 notify = "6"
 portable-pty = "0.8"
 rand = "0.8"

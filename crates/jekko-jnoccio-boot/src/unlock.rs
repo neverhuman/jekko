@@ -82,7 +82,14 @@ pub fn has_plaintext_checkout() -> bool {
 ///
 /// Returns `None` only when both are missing.
 pub fn find_jnoccio_fusion_root() -> Option<PathBuf> {
-    if let Some(repo) = find_repo_root() {
+    let cwd = std::env::current_dir().ok()?;
+    find_jnoccio_fusion_root_from(&cwd)
+}
+
+/// Find the `jnoccio-fusion/` directory root by searching from an explicit
+/// starting path instead of the current process directory.
+pub fn find_jnoccio_fusion_root_from(start: &Path) -> Option<PathBuf> {
+    if let Some(repo) = find_repo_root_from(start) {
         let candidate = repo.join("jnoccio-fusion");
         if candidate.is_dir() {
             return Some(candidate);
@@ -110,7 +117,12 @@ fn xdg_config_home() -> Option<PathBuf> {
 /// Returns the **repo root** (parent of `jnoccio-fusion/`), not the subtree itself.
 pub fn find_repo_root() -> Option<PathBuf> {
     let cwd = std::env::current_dir().ok()?;
-    for ancestor in cwd.ancestors().take(10) {
+    find_repo_root_from(&cwd)
+}
+
+/// Find the repository root from an explicit starting path.
+pub fn find_repo_root_from(start: &Path) -> Option<PathBuf> {
+    for ancestor in start.ancestors().take(10) {
         if ancestor.join("jnoccio-fusion").is_dir() {
             return Some(ancestor.to_path_buf());
         }
@@ -139,7 +151,9 @@ pub fn has_plaintext_signals(repo_root: &Path) -> bool {
     let Ok(config_text) = fs::read_to_string(&config_path) else {
         return false;
     };
-    config_text.contains("\"jnoccio\"") && config_text.contains("\"jnoccio-fusion\"")
+    config_text.contains("\"jnoccio\"")
+        && (config_text.contains("\"jnoccio-fusion\"")
+            || config_text.contains("\"jnoccio/jnoccio-fusion\""))
 }
 
 /// Returns the `.env.jnoccio` path inside the `jnoccio-fusion/` subtree if it
@@ -234,6 +248,21 @@ mod tests {
     fn detects_plaintext_signals() {
         let tmp = TempDir::new().unwrap();
         make_plaintext_signals(tmp.path());
+        assert!(has_plaintext_signals(tmp.path()));
+    }
+
+    #[test]
+    fn detects_namespaced_plaintext_model_signal() {
+        let tmp = TempDir::new().unwrap();
+        make_plaintext_signals(tmp.path());
+        fs::write(
+            tmp.path()
+                .join("jnoccio-fusion")
+                .join("config")
+                .join("server.json"),
+            r#"{"provider":"jnoccio","model":"jnoccio/jnoccio-fusion"}"#,
+        )
+        .unwrap();
         assert!(has_plaintext_signals(tmp.path()));
     }
 

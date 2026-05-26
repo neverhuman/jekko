@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -13,6 +14,7 @@ use super::{ModelCallReceipt, ModelClient};
 pub struct FakeModelClient {
     response: String,
     fail: bool,
+    delay: Option<Duration>,
 }
 
 impl FakeModelClient {
@@ -21,6 +23,7 @@ impl FakeModelClient {
         Self {
             response: response.into(),
             fail: false,
+            delay: None,
         }
     }
 
@@ -29,7 +32,15 @@ impl FakeModelClient {
         Self {
             response: error.into(),
             fail: true,
+            delay: None,
         }
+    }
+
+    /// Inject an artificial per-call delay. Used by the parallel-brainstorm
+    /// wall-time test to verify that lanes actually progress concurrently.
+    pub fn with_delay(mut self, ms: u64) -> Self {
+        self.delay = Some(Duration::from_millis(ms));
+        self
     }
 }
 
@@ -41,6 +52,9 @@ impl ModelClient for FakeModelClient {
         _prompt: &str,
         _cwd: &Path,
     ) -> Result<ModelCallReceipt> {
+        if let Some(delay) = self.delay {
+            tokio::time::sleep(delay).await;
+        }
         if self.fail {
             Ok(ModelCallReceipt {
                 id: receipt_id("fake"),
@@ -57,6 +71,7 @@ impl ModelClient for FakeModelClient {
                 budget_remaining: None,
                 route: Some(kind_label(kind).to_string()),
                 credential_policy: None,
+                selected_credential_user_id: None,
                 credential_user_id: None,
                 retry_count: Some(0),
             })

@@ -28,6 +28,10 @@ pub fn compile_one(source: &Path, out_override: Option<&Path>, check: bool) -> R
         validation::validate_daemon_profile(source, &info.raw)?;
         return Ok(Outcome::Unchanged(source.to_path_buf()));
     }
+    if let Profile::SuperWorkflow { .. } = &info.profile {
+        // Validate before any emission so a bad manifest never produces output.
+        validation::validate_superworkflow_profile(source, &info.raw)?;
+    }
     let target = match out_override {
         Some(p) => p.to_path_buf(),
         None => target::default_target(source, &info.profile),
@@ -42,6 +46,9 @@ pub fn compile_one(source: &Path, out_override: Option<&Path>, check: bool) -> R
     );
     let final_bytes = match info.profile {
         Profile::Runbook => body, // runbook passthrough — sentinels are strict
+        // SuperWorkflow emits canonical JSON; injecting a `# ...` banner would
+        // make the file invalid JSON. Keep the body verbatim.
+        Profile::SuperWorkflow { .. } => body,
         _ => format!("{banner}{body}"),
     };
     if check {
@@ -106,7 +113,8 @@ pub fn inspect(source: &Path) -> Result<InspectInfo> {
     let schema = match &info.profile {
         Profile::DeclarativeToml { schema }
         | Profile::Workflow { schema }
-        | Profile::Daemon { schema } => Some(schema.clone()),
+        | Profile::Daemon { schema }
+        | Profile::SuperWorkflow { schema } => Some(schema.clone()),
         Profile::Runbook => None,
     };
     Ok(InspectInfo {

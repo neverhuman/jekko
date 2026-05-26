@@ -13,6 +13,7 @@ use crate::tool::{ToolContext, ToolOutput};
 use crate::Runtime;
 use jekko_core::project::ProjectId;
 
+use super::provider::select_credential;
 use super::types::{AgentTurnRequest, AgentTurnResult, RunRequest, RunResult};
 
 /// Canonical agent name used when a request omits an explicit agent.
@@ -74,7 +75,19 @@ impl Runtime {
         let provider = request.provider.clone();
         let model = request.model.clone();
 
-        let turn = self
+        let provider_id = provider.clone();
+        let model_id = model.clone();
+        let selected_credential = match (provider_id.as_deref(), model_id.as_deref()) {
+            (Some(provider_id), Some(model_id)) => select_credential(provider_id, model_id)?,
+            _ => None,
+        };
+        let selected_credential_user_id = selected_credential
+            .as_ref()
+            .and_then(|selected| selected.user_id.clone());
+        let credential = selected_credential
+            .as_ref()
+            .map(|selected| selected.credential.clone());
+        let turn_result = self
             .agent_executor
             .execute(AgentTurnRequest {
                 prompt: prompt_text,
@@ -85,11 +98,40 @@ impl Runtime {
                     .map(|s| s.id.to_string())
                     .unwrap_or(session_key),
                 agent,
-                provider,
-                model,
+                provider: provider.clone(),
+                model: model.clone(),
+                credential,
+                selected_credential_user_id: selected_credential_user_id.clone(),
                 ephemeral: request.ephemeral,
             })
-            .await?;
+            .await;
+        let turn = match turn_result {
+            Ok(turn) => turn,
+            Err(err) => {
+                return Ok(RunResult {
+                    parsed_prompt,
+                    session,
+                    message: user_message,
+                    assistant_message: None,
+                    assistant_text: None,
+                    reasoning_text: None,
+                    provider_id,
+                    model_id,
+                    tool_calls: Vec::new(),
+                    credential_source_policy: Some(
+                        super::provider::CredentialSourcePolicy::from_env()
+                            .as_str()
+                            .to_string(),
+                    ),
+                    selected_credential_user_id: selected_credential_user_id.clone(),
+                    credential_user_id: selected_credential_user_id,
+                    router_metadata: None,
+                    accepted: true,
+                    success: false,
+                    error: Some(err.to_string()),
+                });
+            }
+        };
 
         let assistant_message = if let Some(session_info) = &session {
             if turn.assistant_text.trim().is_empty() && turn.tool_calls.is_empty() {
@@ -124,8 +166,12 @@ impl Runtime {
             model_id: Some(turn.model_id),
             tool_calls: turn.tool_calls,
             credential_source_policy: turn.credential_source_policy,
+            selected_credential_user_id: turn.selected_credential_user_id,
             credential_user_id: turn.credential_user_id,
+            router_metadata: turn.router_metadata,
             accepted: true,
+            success: true,
+            error: None,
         })
     }
 }
@@ -138,7 +184,9 @@ fn assistant_payload(turn: &AgentTurnResult) -> Value {
         "model": turn.model_id,
         "toolCalls": turn.tool_calls,
         "credentialSourcePolicy": turn.credential_source_policy,
+        "selectedCredentialUserID": turn.selected_credential_user_id,
         "credentialUserID": turn.credential_user_id,
+        "routerMetadata": turn.router_metadata,
     })
 }
 

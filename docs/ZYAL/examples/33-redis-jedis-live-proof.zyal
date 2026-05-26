@@ -62,8 +62,13 @@ proofs:
   reasoning_benchmark: true
 
 model_policy:
-  routine_model: jnoccio/routine
-  power_model: jnoccio/power-winner
+  routine: {}
+  power: {}
+  critic: {}
+  verifier: {}
+  meta_judge: {}
+  reproducer: {}
+  memory_curator: {}
   allow_power_for_routine_roles: false
 
 parity_lab:

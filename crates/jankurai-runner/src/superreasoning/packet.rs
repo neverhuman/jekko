@@ -25,15 +25,9 @@ pub struct SuperReasoningLanePlan {
     pub required_artifacts: Vec<String>,
 }
 
-/// Required artifact contract.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SuperReasoningArtifactContract {
-    pub required_artifacts: Vec<String>,
-    pub forbidden_content: Vec<String>,
-    pub claim_ledger: String,
-    pub unsupported_claims_ledger: String,
-    pub negative_memory: String,
-}
+/// Required artifact contract. Canonical type lives in `zyal-core`; aliased
+/// here so existing `SuperReasoningArtifactContract` paths keep compiling.
+pub use zyal_core::ArtifactContract as SuperReasoningArtifactContract;
 
 /// Privacy contract.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,17 +96,15 @@ impl SuperReasoningPacket {
                 "superreasoning_packet.json".to_string(),
                 "reviewer_packet.json".to_string(),
                 "replay_receipt.json".to_string(),
+                "model_receipts.jsonl".to_string(),
                 "claim_ledger.jsonl".to_string(),
                 "unsupported_claims.jsonl".to_string(),
                 "negative_memory.jsonl".to_string(),
             ],
-            forbidden_content: vec![
-                "raw_chain_of_thought".to_string(),
-                "fixture_target_values_in_model_visible_artifacts".to_string(),
-                "process_env_credentials".to_string(),
-                ".env.jnoccio_credentials".to_string(),
-                "jnoccio-local".to_string(),
-            ],
+            forbidden_content: zyal_core::FORBIDDEN_ARTIFACT_SHAPE_PATTERNS
+                .iter()
+                .map(|pattern| (*pattern).to_string())
+                .collect(),
             claim_ledger: output_dir.join("claim_ledger.jsonl").display().to_string(),
             unsupported_claims_ledger: output_dir
                 .join("unsupported_claims.jsonl")

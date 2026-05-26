@@ -36,6 +36,7 @@ pub(crate) async fn run_lane_group(
     count: usize,
     max_parallel: usize,
     base_prompt: &str,
+    require_parsed_live_json: bool,
 ) -> Result<Vec<HeroJudgeLaneArtifact>> {
     let mut artifacts = Vec::new();
     let cap = max_parallel
@@ -54,6 +55,7 @@ pub(crate) async fn run_lane_group(
                     db,
                     sink,
                     model_client,
+                    require_parsed_live_json,
                 };
                 let (receipt, value) =
                     complete_hero_json(completion, kind, generation, &prompt).await?;

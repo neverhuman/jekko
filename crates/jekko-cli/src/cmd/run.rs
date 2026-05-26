@@ -81,6 +81,12 @@ pub fn run(_global: &GlobalOpts, args: &RunArgs) -> Result<()> {
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&result)?);
+        if !result.success {
+            bail!(result
+                .error
+                .clone()
+                .unwrap_or_else(|| "run failed".to_string()));
+        }
     } else if let Some(text) = result.assistant_text.as_deref() {
         println!("{text}");
         if let Some(session) = &result.session {
@@ -95,6 +101,12 @@ pub fn run(_global: &GlobalOpts, args: &RunArgs) -> Result<()> {
         if let Some(model) = result.model_id.as_deref() {
             eprintln!("  model: {model}");
         }
+        if !result.success {
+            bail!(result
+                .error
+                .clone()
+                .unwrap_or_else(|| "run failed".to_string()));
+        }
     } else if let Some(session) = &result.session {
         eprintln!(
             "jekko run: session {} ({}) accepted",
@@ -106,8 +118,20 @@ pub fn run(_global: &GlobalOpts, args: &RunArgs) -> Result<()> {
         if let Some(model) = args.model.as_deref() {
             eprintln!("  model: {model}");
         }
+        if !result.success {
+            bail!(result
+                .error
+                .clone()
+                .unwrap_or_else(|| "run failed".to_string()));
+        }
     } else {
         eprintln!("jekko run: ephemeral prompt accepted");
+        if !result.success {
+            bail!(result
+                .error
+                .clone()
+                .unwrap_or_else(|| "run failed".to_string()));
+        }
     }
     Ok(())
 }

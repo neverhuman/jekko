@@ -105,3 +105,73 @@ Before handoff on broad port-runtime work, run the changed-path proof lanes and 
 rtk git diff --check
 rtk jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
 ```
+
+## Super-Agent Mode
+
+`jekko port-run --super <manifest>` is the integration wrapper for the
+Phase F+H super-agent kernel. It ties together the SuperWorkflow profile
+(`zyalc`), the supervisor planner (`zyal-supervisor`), and the durable
+phase store so an operator can drive a 9-12 phase super-workflow from a
+single command.
+
+### Flow
+
+```text
+.zyal manifest
+    | (zyalc compile, Profile::SuperWorkflow)
+    v
+canonical superworkflow JSON
+    | (zyal_supervisor::SuperWorkflow::from_json + validate_manifest)
+    v
+phase DAG (execution_layers / ready_phases)
+    | (SupervisorStore::seed_run, 8 SQLite tables)
+    v
+durable supervisor state at --db path
+    | (wave walker; STUB phase body today, --live follow-up)
+    v
+phase rows marked complete; events emitted to
+target/zyal/runs/<run_id>/events.jsonl
+```
+
+### Flags
+
+| Flag | Meaning |
+|---|---|
+| `--super <MANIFEST>` | Start a new run from a `.zyal` superworkflow manifest. |
+| `--dry-run` | Print the wave plan JSON without touching the supervisor DB. |
+| `--resume <RUN_ID>` | Reopen a run, reset in-flight `Running` phases to ready, and continue. Mutually exclusive with `--super`. |
+| `--status <RUN_ID>` | Print persisted phase + task rows as JSON. Read-only. |
+| `--db <PATH>` | Override the supervisor SQLite path (default `~/.jekko/zyal-supervisor.sqlite`). |
+| `--max-stages <N>` | Cap completed stages; remaining phases land in `Blocked` with `stopped at max_stages`. |
+| `--time-budget-hours <H>` | Stop after the wall-clock budget; remaining phases land in `Blocked` with `stopped at time_budget`. |
+
+### Recipe
+
+Compile + dry-run + execute the canonical 12-stage example:
+
+```bash
+# Compile the manifest (idempotent; --check verifies drift).
+rtk zyalc compile agent/zyal/ambitious-superworkflow.zyal
+
+# Inspect the wave plan without writing state.
+rtk jekko port-run --super agent/zyal/ambitious-superworkflow.zyal --dry-run
+
+# Run end-to-end, capped at the first 4 phases for a smoke.
+rtk jekko port-run --super agent/zyal/ambitious-superworkflow.zyal --max-stages 4
+
+# Tail events live in a second shell.
+rtk jekko watch ambitious-superworkflow-template --format plain
+
+# Show persisted state on demand.
+rtk jekko port-run --status ambitious-superworkflow-template
+```
+
+The example manifest at `agent/zyal/ambitious-superworkflow.zyal` emits
+the canonical 12-stage plan
+(`source_of_truth -> architecture_blueprint -> repo_graph_bootstrap ->
+contracts_and_slices -> parallel_subsystems -> integration_fusion ->
+parity_lab -> parity_gap_closure -> performance_closure ->
+hardening_security -> docs_release_ops -> final_signoff`) to
+`agent/superworkflows/ambitious-superworkflow.superworkflow.json`. See
+`docs/ZYAL/SUPER_REASONING_WORKFLOWS.md` for the live driver subsection
+and per-stage contract.

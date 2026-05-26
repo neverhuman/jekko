@@ -7,6 +7,7 @@
 //! in the orchestrator since they cross-reference each other heavily.
 
 mod context;
+mod fanout;
 mod finalize;
 mod lanes;
 

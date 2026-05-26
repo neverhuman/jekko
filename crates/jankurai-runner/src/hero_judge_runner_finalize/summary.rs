@@ -64,6 +64,7 @@ pub(super) fn build_summary(inputs: SummaryInputs<'_>) -> HeroJudgeRunSummary {
         superreasoning_packet_json: headless.superreasoning_packet_json.clone(),
         superreasoning_packet_sha256: packet_hash,
         replay_receipt_json: headless.replay_receipt_json.clone(),
+        model_receipts_jsonl: headless.model_receipts_jsonl.clone(),
         claim_ledger_jsonl: headless.claim_ledger_jsonl.clone(),
         unsupported_claims_jsonl: headless.unsupported_claims_jsonl.clone(),
         negative_memory_jsonl: headless.negative_memory_jsonl.clone(),

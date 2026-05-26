@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Canonical provider event kind emitted by the streaming layer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -61,6 +62,11 @@ pub enum ProviderEventKind {
         /// Provider-supplied stop reason.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         stop_reason: Option<String>,
+    },
+    /// Out-of-band metadata emitted alongside the stream.
+    Metadata {
+        /// Arbitrary provider metadata payload.
+        metadata: Value,
     },
     /// Provider returned an error mid-stream.
     Error {

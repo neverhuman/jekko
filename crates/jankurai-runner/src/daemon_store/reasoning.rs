@@ -99,6 +99,21 @@ pub fn persist_memory_capsule(db: &Db, run_id: &str, capsule: &MemoryCapsule) ->
             content_hash: capsule.content_hash.clone(),
             time_created: now,
             time_updated: now,
+            memory_kind: serde_json::to_value(capsule.memory_kind)?
+                .as_str()
+                .unwrap_or("semantic")
+                .to_string(),
+            promotion_status: serde_json::to_value(capsule.promotion_status)?
+                .as_str()
+                .unwrap_or("scratch")
+                .to_string(),
+            claim_text: capsule.claim_text.clone(),
+            approved_by_role: capsule.approved_by_role.clone(),
+            // E2 embedding is computed by an Embedder pass over the capsule
+            // summary/claim; the persist path stays embedding-agnostic so the
+            // jankurai-runner orchestrator can either pre-embed (Phase E2) or
+            // skip (E2 stub / cold-start runs).
+            embedding: None,
         },
     )?;
     Ok(())

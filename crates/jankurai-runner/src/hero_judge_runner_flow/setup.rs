@@ -61,7 +61,13 @@ pub async fn run_hero_judge_run_with_db(
     )?;
     sink.emit(
         EventKind::RunStarted,
-        json!({"workflow": "zyal_hero_judge", "generations": generations}),
+        json!({
+            "workflow": "zyal_hero_judge",
+            "generations": generations,
+            "live_model_calls": live_search,
+            "credential_policy": config.super_reasoning.credential_policy.env_value(),
+            "mock_llm_set": std::env::var_os("JEKKO_TUI_TEST_MOCK_LLM").is_some(),
+        }),
     )?;
 
     let evidence = load_hero_judge_evidence(repo, &config)?;
@@ -91,6 +97,7 @@ pub async fn run_hero_judge_run_with_db(
         output_dir: &output_dir,
         generations,
         lane_parallelism,
+        require_parsed_live_json: live_search,
     })
     .await?;
 

@@ -9,6 +9,7 @@ use crate::events::{EventKind, EventSink};
 use crate::hero_judge_eval::{parse_substitute_lane_value, synthetic_lane_value};
 use crate::model_client::{kind_label, ModelCallReceipt, ModelClient};
 use crate::model_policy::ModelTaskKind;
+use crate::reasoning_io::parse_structured_model_json;
 
 #[derive(Clone, Copy)]
 pub(crate) struct HeroJudgeCompletionContext<'a> {
@@ -17,6 +18,7 @@ pub(crate) struct HeroJudgeCompletionContext<'a> {
     pub db: &'a Db,
     pub sink: &'a EventSink,
     pub model_client: &'a dyn ModelClient,
+    pub require_parsed_live_json: bool,
 }
 
 pub(crate) async fn complete_hero_json(
@@ -32,11 +34,23 @@ pub(crate) async fn complete_hero_json(
         )?;
         let receipt = ctx.model_client.complete(kind, prompt, ctx.repo).await?;
         daemon_store::persist_model_receipt(ctx.db, ctx.run_id, &receipt)?;
-        let outcome = classify_hero_completion(kind, generation, attempt, &receipt);
+        let outcome = classify_hero_completion(
+            kind,
+            generation,
+            attempt,
+            &receipt,
+            ctx.require_parsed_live_json,
+        );
         ctx.sink.emit(
-            EventKind::ModelOutcome,
+            EventKind::ModelAttemptOutcome,
             model_outcome_payload(&receipt, attempt, outcome.state_label()),
         )?;
+        if matches!(outcome, HeroCompletionDecision::Parsed(_)) {
+            ctx.sink.emit(
+                EventKind::ModelOutcome,
+                model_outcome_payload(&receipt, attempt, outcome.state_label()),
+            )?;
+        }
         if receipt.budget_used.is_some() || receipt.budget_remaining.is_some() {
             ctx.sink.emit(
                 EventKind::LiveBudget,
@@ -103,21 +117,6 @@ fn timeout_model_error(error: &str) -> bool {
     error.to_ascii_lowercase().contains("timed out")
 }
 
-fn parse_model_json(text: &str) -> serde_json::Result<serde_json::Value> {
-    match serde_json::from_str::<serde_json::Value>(text) {
-        Ok(value) => Ok(value),
-        Err(primary) => {
-            let Some(start) = text.find('{') else {
-                return Err(primary);
-            };
-            let Some(end) = text.rfind('}') else {
-                return Err(primary);
-            };
-            serde_json::from_str::<serde_json::Value>(&text[start..=end])
-        }
-    }
-}
-
 fn model_outcome_payload(
     receipt: &ModelCallReceipt,
     attempt: usize,
@@ -125,10 +124,19 @@ fn model_outcome_payload(
 ) -> serde_json::Value {
     json!({
         "kind": receipt.kind,
+        "provider": receipt.provider,
         "model": receipt.model,
         "success": receipt.success,
         "attempt": attempt,
         "state": state,
+        "latency_ms": receipt.latency_ms,
+        "response_bytes": receipt.response.as_ref().map(|response| response.len()),
+        "credential_policy": receipt.credential_policy,
+        "selected_credential_user_id": receipt.selected_credential_user_id,
+        "credential_user_id": receipt.credential_user_id,
+        "retry_count": receipt.retry_count,
+        "budget_used": receipt.budget_used,
+        "budget_remaining": receipt.budget_remaining,
     })
 }
 
@@ -186,12 +194,16 @@ fn classify_hero_completion(
     generation: usize,
     attempt: usize,
     receipt: &ModelCallReceipt,
+    require_parsed_live_json: bool,
 ) -> HeroCompletionDecision {
     if !receipt.success {
         let error = receipt
             .error
             .clone()
             .unwrap_or_else(|| "unknown model failure".to_string());
+        if require_parsed_live_json && timeout_model_error(&error) {
+            return HeroCompletionDecision::FinalBlock(error);
+        }
         if timeout_model_error(&error) {
             return HeroCompletionDecision::LiveParseSubstitution(parse_substitute_lane_value(
                 kind, generation,
@@ -210,10 +222,18 @@ fn classify_hero_completion(
             HeroCompletionDecision::FinalBlock("missing model response".to_string())
         };
     };
-    match parse_model_json(text) {
+    match parse_structured_model_json(text) {
         Ok(value) => HeroCompletionDecision::Parsed(value),
         Err(_) if receipt.provider == "fake" => HeroCompletionDecision::ProviderSyntheticResponse(
             synthetic_lane_value(kind, generation),
+        ),
+        Err(_) if require_parsed_live_json && attempt < 3 => {
+            HeroCompletionDecision::RetryableFailure(
+                "live model response was not parseable JSON".to_string(),
+            )
+        }
+        Err(_) if require_parsed_live_json => HeroCompletionDecision::FinalBlock(
+            "live model response was not parseable JSON".to_string(),
         ),
         Err(_) if text.trim().is_empty() && attempt < 3 => {
             HeroCompletionDecision::RetryableFailure("empty model response".to_string())

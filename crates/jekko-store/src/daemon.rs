@@ -45,10 +45,11 @@ pub use port::{
 };
 pub use reasoning::{
     get_model_reliability, list_memory_capsules_for_run, list_model_reliability,
-    list_reasoning_artifacts_for_run, list_reasoning_edges_for_run, list_reasoning_lanes_for_run,
-    record_model_reliability_outcome, upsert_memory_capsule, upsert_model_reliability,
-    upsert_reasoning_artifact, upsert_reasoning_edge, upsert_reasoning_lane, MemoryCapsuleRow,
-    ModelReliabilityRow, ReasoningArtifactRow, ReasoningEdgeRow, ReasoningLaneRow,
+    list_promoted_capsules, list_reasoning_artifacts_for_run, list_reasoning_edges_for_run,
+    list_reasoning_lanes_for_run, record_model_reliability_outcome, upsert_memory_capsule,
+    upsert_model_reliability, upsert_reasoning_artifact, upsert_reasoning_edge,
+    upsert_reasoning_lane, MemoryCapsuleRow, ModelReliabilityRow, ReasoningArtifactRow,
+    ReasoningEdgeRow, ReasoningLaneRow,
 };
 pub use run::{delete_run, get_run, list_runs, upsert_run, DaemonRunRow};
 pub use task::{delete_task, get_task, upsert_task, DaemonTaskRow};

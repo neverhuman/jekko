@@ -27,6 +27,23 @@ pub(super) fn default_target(source: &Path, profile: &Profile) -> PathBuf {
         }
         Profile::Runbook => source.with_extension("yml"),
         Profile::Daemon { .. } => source.to_path_buf(),
+        Profile::SuperWorkflow { .. } => {
+            // SuperWorkflow `.zyal` sources live under `agent/zyal/`; the
+            // emitted canonical JSON sits at
+            // `agent/superworkflows/<stem>.superworkflow.json` so downstream
+            // supervisors discover it on a well-known path.
+            let stem = source
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("workflow");
+            if let Some(parent) = source.parent().and_then(|p| p.parent()) {
+                parent
+                    .join("superworkflows")
+                    .join(format!("{stem}.superworkflow.json"))
+            } else {
+                source.with_extension("superworkflow.json")
+            }
+        }
     }
 }
 

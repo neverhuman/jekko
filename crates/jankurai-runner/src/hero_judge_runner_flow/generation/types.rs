@@ -23,6 +23,7 @@ pub(in crate::hero_judge_runner_flow) struct GenerationInputs<'a> {
     pub output_dir: &'a Path,
     pub generations: usize,
     pub lane_parallelism: usize,
+    pub require_parsed_live_json: bool,
 }
 
 pub(in crate::hero_judge_runner_flow) struct GenerationState {

@@ -39,6 +39,7 @@ pub enum EventKind {
     ParityGap,
     ParityManifestGenerated,
     ModelAttempt,
+    ModelAttemptOutcome,
     ModelOutcome,
     LiveBudget,
     BenchmarkResult,
@@ -57,6 +58,20 @@ pub enum EventKind {
     RunFinished,
     BootstrapRequired,
     Heartbeat,
+    /// Watcher detected no progress event from a worker within the stall
+    /// threshold (default 5 minutes).
+    WorkerStall,
+    /// Watcher revoked a worker's task lease after stall; orchestrator should
+    /// reassign the task to a fresh worker.
+    WorkerQuarantine,
+    /// `jekko watch` (or equivalent) started observing this run's events.
+    WatcherStarted,
+    /// Watcher applied a remediation rule (e.g. wrote a Negative-memory
+    /// capsule, escalated to Critique, requested a provider switch).
+    RemediationTriggered,
+    /// Jankurai audit hard-findings count increased mid-run — phase signoff
+    /// should block until cleared.
+    JankuraiRegression,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

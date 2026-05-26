@@ -9,25 +9,10 @@ use crate::model_policy::ModelTaskKind;
 use super::labels::{kind_label, receipt_id};
 
 /// Credential source policy forwarded to live runtime child processes.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum CredentialSourcePolicy {
-    /// Runtime may use its normal credential resolution order.
-    Any,
-    /// Runtime may only use `~/.jekko/users/*/llm.env`.
-    #[default]
-    UsersOnly,
-}
-
-impl CredentialSourcePolicy {
-    /// Environment variable value understood by `jekko-runtime`.
-    pub fn env_value(self) -> &'static str {
-        match self {
-            Self::Any => "any",
-            Self::UsersOnly => "users-only",
-        }
-    }
-}
+///
+/// Canonical definition lives in `zyal-core`; re-exported here so existing
+/// `crate::model_client::CredentialSourcePolicy` paths keep compiling.
+pub use zyal_core::CredentialSourcePolicy;
 
 /// Receipt emitted for every model call attempt.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -68,6 +53,9 @@ pub struct ModelCallReceipt {
     /// Credential source policy used by a live child process.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_policy: Option<String>,
+    /// User folder id selected before router metadata confirms the winner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_credential_user_id: Option<String>,
     /// User folder id for users-only credentials.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_user_id: Option<String>,
@@ -94,6 +82,7 @@ impl ModelCallReceipt {
             budget_remaining: None,
             route: Some(kind_label(kind).to_string()),
             credential_policy: None,
+            selected_credential_user_id: None,
             credential_user_id: None,
             retry_count: Some(0),
         }
@@ -121,6 +110,7 @@ impl ModelCallReceipt {
             budget_remaining: None,
             route: Some(kind_label(kind).to_string()),
             credential_policy: None,
+            selected_credential_user_id: None,
             credential_user_id: None,
             retry_count: Some(0),
         }

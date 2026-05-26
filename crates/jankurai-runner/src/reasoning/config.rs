@@ -75,33 +75,12 @@ pub enum ReasoningRole {
     MemoryCurator,
 }
 
-/// Reasoning artifact kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ReasoningArtifactKind {
-    /// Crystallized request contract.
-    TaskContract,
-    /// Retrieved evidence/context pack.
-    ContextPack,
-    /// Candidate stage plan.
-    StageProposal,
-    /// Critique or objection set.
-    Critique,
-    /// Final master plan decision.
-    MasterPlan,
-    /// Phase-level plan.
-    PhasePlan,
-    /// Worker build receipt.
-    BuildReceipt,
-    /// Verification receipt.
-    VerificationReceipt,
-    /// Parity gap report.
-    ParityGap,
-    /// Baseline-vs-tournament reasoning benchmark.
-    ReasoningBenchmark,
-    /// Durable memory candidate.
-    MemoryCapsule,
-}
+/// Reasoning artifact kind. Canonical enum lives in `zyal-core` and includes
+/// 8 additional variants used by the Phase F super-agent kernel (`MacroPlan`,
+/// `PhaseDag`, `FunctionGraph`, `ParityCase`, `PerfGap`, `SignoffReceipt`,
+/// `Contradiction`, `ReducerDecision`). Aliased here so existing
+/// `ReasoningArtifactKind::TaskContract` paths keep compiling.
+pub use zyal_core::ArtifactKind as ReasoningArtifactKind;
 
 /// Evidence strength. E4+ is executable enough to lift confidence caps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

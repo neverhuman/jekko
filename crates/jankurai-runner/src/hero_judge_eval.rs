@@ -155,6 +155,10 @@ pub(crate) fn persist_knowledge_capsule(
         evidence_level: EvidenceLevel::ExternalGrounding,
         confidence: if entry.status == "verified" { 0.8 } else { 0.6 },
         payload_json: serde_json::to_value(entry)?,
+        memory_kind: zyal_core::MemoryKind::Semantic,
+        promotion_status: zyal_core::MemoryPromotionStatus::Scratch,
+        claim_text: entry.claim.clone(),
+        approved_by_role: None,
         content_hash: stable_reasoning_hash(entry),
     };
     daemon_store::persist_memory_capsule(db, run_id, &memory)?;

@@ -43,7 +43,9 @@ impl AgentExecutor for MockExecutor {
             reasoning_text: "mock reasoning".into(),
             tool_calls: vec![json!({"id":"tool-1","name":"Read","input":{"path":"README.md"}})],
             credential_source_policy: None,
+            selected_credential_user_id: None,
             credential_user_id: None,
+            router_metadata: None,
         })
     }
 }

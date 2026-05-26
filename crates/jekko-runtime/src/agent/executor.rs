@@ -3,6 +3,7 @@
 //! Holds the [`AgentExecutor`] trait, the default [`ProviderAgentExecutor`],
 //! and the streaming tool-call loop that talks to the provider adapter.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -26,9 +27,9 @@ use super::oneshot::{
     build_assistant_tool_message, build_system_prompt, build_tool_result_message, execute_tool,
 };
 use super::provider::{
-    build_model, provider_adapter, record_credential_failure, record_credential_success,
-    select_base_url, select_credential, select_model_id, select_provider_id,
-    CredentialSourcePolicy,
+    build_model, ensure_jnoccio_ready, provider_adapter, record_credential_failure,
+    record_credential_success, select_base_url, select_credential, select_model_id,
+    select_provider_id, CredentialSourcePolicy,
 };
 use super::types::{AgentTurnRequest, AgentTurnResult};
 
@@ -177,7 +178,9 @@ fn mock_agent_turn_result(request: &AgentTurnRequest) -> AgentTurnResult {
         reasoning_text: String::new(),
         tool_calls: Vec::new(),
         credential_source_policy: None,
+        selected_credential_user_id: None,
         credential_user_id: None,
+        router_metadata: None,
     }
 }
 
@@ -207,6 +210,18 @@ fn bounded_max_output_tokens(model: &jekko_core::provider::Model) -> u32 {
     env_limit.min(default_limit)
 }
 
+fn jnoccio_metadata_user_id(metadata: &Value) -> Option<String> {
+    metadata
+        .get("credential_user_id")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_string)
+}
+
+fn is_jnoccio_transport_failure(err: &jekko_provider::ProviderError) -> bool {
+    matches!(err, jekko_provider::ProviderError::Transport(_))
+}
+
 #[async_trait]
 impl AgentExecutor for ProviderAgentExecutor {
     async fn execute(&self, request: AgentTurnRequest) -> RuntimeResult<AgentTurnResult> {
@@ -223,9 +238,17 @@ impl AgentExecutor for ProviderAgentExecutor {
         let model_id = select_model_id(&provider_id, &request)?;
         let model = build_model(&provider_id, &model_id)?;
         let adapter = self.resolver.resolve(&provider_id)?;
-        let selected = select_credential(&provider_id, &model_id)?;
+        let selected = if let Some(credential) = request.credential.clone() {
+            Some(super::provider::SelectedCredential {
+                credential,
+                user_id: request.selected_credential_user_id.clone(),
+            })
+        } else {
+            select_credential(&provider_id, &model_id)?
+        };
         let credential = selected.as_ref().map(|s| s.credential.clone());
-        let credential_user = selected.as_ref().and_then(|s| s.user_id.clone());
+        let selected_credential_user_id = selected.as_ref().and_then(|s| s.user_id.clone());
+        let mut credential_user = selected_credential_user_id.clone();
         let credential_source_policy = CredentialSourcePolicy::from_env().as_str().to_string();
         let base_url = select_base_url(&provider_id);
         let tools_disabled = std::env::var("JEKKO_RUN_DISABLE_TOOLS").as_deref() == Ok("1");
@@ -257,153 +280,252 @@ impl AgentExecutor for ProviderAgentExecutor {
             reasoning_text: String::new(),
             tool_calls: Vec::new(),
             credential_source_policy: Some(credential_source_policy.clone()),
+            selected_credential_user_id: selected_credential_user_id.clone(),
             credential_user_id: credential_user.clone(),
+            router_metadata: None,
         };
         let max_rounds = 2usize;
-        while round < max_rounds {
+        'rounds: while round < max_rounds {
             round += 1;
-            let tools = if tools_disabled {
-                Vec::new()
-            } else {
-                registry
-                    .catalog()
-                    .into_iter()
-                    .map(|tool| jekko_provider::adapter::ProviderTool {
-                        name: tool.id,
-                        description: Some(tool.description),
-                        input_schema: transform_schema(&model, tool.schema),
-                    })
-                    .collect::<Vec<_>>()
-            };
-            let transformed_messages =
-                transform_message(history.clone(), &model, &provider_options);
-            let provider_request = ProviderRequest {
-                model: format!("{provider_id}/{model_id}"),
-                api_model_id: model_id.clone(),
-                session_id: session_seed.clone(),
-                system: vec![],
-                messages: transformed_messages,
-                tools,
-                tool_choice: if tools_disabled {
-                    None
-                } else {
-                    Some("auto".into())
-                },
-                options: provider_options.clone(),
-                headers: Default::default(),
-                max_output_tokens: bounded_max_output_tokens(&model),
-                temperature: transform_temperature(&model),
-                top_p: transform_top_p(&model),
-                top_k: transform_top_k(&model),
-                credential: credential.clone(),
-                base_url: base_url.clone(),
-            };
-
-            let abort = CancellationToken::new();
-            let mut stream = match adapter.stream(provider_request, abort).await {
-                Ok(s) => s,
-                Err(err) => {
-                    if let Some(user) = credential_user.as_deref() {
-                        record_credential_failure(
-                            &provider_id,
-                            user,
-                            &model_id,
-                            http_status_of(&err),
-                        );
-                    }
-                    return Err(err.into());
+            let mut retry_after_boot = false;
+            'attempt: loop {
+                if provider_id == "jnoccio" {
+                    ensure_jnoccio_ready(&request.cwd).await?;
                 }
-            };
+                let tools = if tools_disabled {
+                    Vec::new()
+                } else {
+                    registry
+                        .catalog()
+                        .into_iter()
+                        .map(|tool| jekko_provider::adapter::ProviderTool {
+                            name: tool.id,
+                            description: Some(tool.description),
+                            input_schema: transform_schema(&model, tool.schema),
+                        })
+                        .collect::<Vec<_>>()
+                };
+                let transformed_messages =
+                    transform_message(history.clone(), &model, &provider_options);
+                let headers = runtime_provenance_headers(
+                    &request,
+                    &credential_source_policy,
+                    credential_user.as_deref(),
+                );
+                let provider_request = ProviderRequest {
+                    model: format!("{provider_id}/{model_id}"),
+                    api_model_id: api_model_id_for(&provider_id, &model_id).to_string(),
+                    session_id: session_seed.clone(),
+                    system: vec![],
+                    messages: transformed_messages,
+                    tools,
+                    tool_choice: if tools_disabled {
+                        None
+                    } else {
+                        Some("auto".into())
+                    },
+                    options: provider_options.clone(),
+                    headers,
+                    max_output_tokens: bounded_max_output_tokens(&model),
+                    temperature: transform_temperature(&model),
+                    top_p: transform_top_p(&model),
+                    top_k: transform_top_k(&model),
+                    credential: credential.clone(),
+                    base_url: base_url.clone(),
+                };
 
-            let mut assistant_text = String::new();
-            let mut reasoning_text = String::new();
-            let mut tool_calls = Vec::new();
-            while let Some(item) = stream.next().await {
-                let event = match item {
-                    Ok(ev) => ev,
+                let abort = CancellationToken::new();
+                let mut stream = match adapter.stream(provider_request, abort).await {
+                    Ok(s) => s,
                     Err(err) => {
-                        if let Some(user) = credential_user.as_deref() {
-                            record_credential_failure(
-                                &provider_id,
-                                user,
-                                &model_id,
-                                http_status_of(&err),
-                            );
+                        if provider_id == "jnoccio"
+                            && !retry_after_boot
+                            && is_jnoccio_transport_failure(&err)
+                        {
+                            retry_after_boot = true;
+                            ensure_jnoccio_ready(&request.cwd).await?;
+                            continue 'attempt;
+                        }
+                        if should_record_outer_credential_failure(&provider_id) {
+                            if let Some(user) = credential_user.as_deref() {
+                                record_credential_failure(
+                                    &provider_id,
+                                    user,
+                                    &model_id,
+                                    http_status_of(&err),
+                                );
+                            }
                         }
                         return Err(err.into());
                     }
                 };
-                match event.kind {
-                    ProviderEventKind::TextDelta { text } => assistant_text.push_str(&text),
-                    ProviderEventKind::ReasoningDelta { text } => reasoning_text.push_str(&text),
-                    ProviderEventKind::ToolCallEnd { id, name, input } => {
-                        tool_calls.push(json!({
-                            "id": id,
-                            "name": name,
-                            "input": input,
-                        }));
+
+                let mut assistant_text = String::new();
+                let mut reasoning_text = String::new();
+                let mut tool_calls = Vec::new();
+                let mut router_metadata: Option<Value> = None;
+                while let Some(item) = stream.next().await {
+                    let event = match item {
+                        Ok(ev) => ev,
+                        Err(err) => {
+                            if provider_id == "jnoccio"
+                                && !retry_after_boot
+                                && is_jnoccio_transport_failure(&err)
+                            {
+                                retry_after_boot = true;
+                                ensure_jnoccio_ready(&request.cwd).await?;
+                                continue 'attempt;
+                            }
+                            if should_record_outer_credential_failure(&provider_id) {
+                                if let Some(user) = credential_user.as_deref() {
+                                    record_credential_failure(
+                                        &provider_id,
+                                        user,
+                                        &model_id,
+                                        http_status_of(&err),
+                                    );
+                                }
+                            }
+                            return Err(err.into());
+                        }
+                    };
+                    match event.kind {
+                        ProviderEventKind::TextDelta { text } => assistant_text.push_str(&text),
+                        ProviderEventKind::ReasoningDelta { text } => {
+                            reasoning_text.push_str(&text)
+                        }
+                        ProviderEventKind::ToolCallEnd { id, name, input } => {
+                            tool_calls.push(json!({
+                                "id": id,
+                                "name": name,
+                                "input": input,
+                            }));
+                        }
+                        ProviderEventKind::Metadata { metadata } => {
+                            if provider_id == "jnoccio" {
+                                if let Some(user_id) = jnoccio_metadata_user_id(&metadata) {
+                                    credential_user = Some(user_id);
+                                }
+                                router_metadata = Some(metadata);
+                            }
+                        }
+                        ProviderEventKind::StreamEnd { .. } => break,
+                        ProviderEventKind::Usage { .. }
+                        | ProviderEventKind::StreamStart { .. }
+                        | ProviderEventKind::ToolCallStart { .. }
+                        | ProviderEventKind::ToolCallInputDelta { .. }
+                        | ProviderEventKind::Error { .. } => {}
                     }
-                    ProviderEventKind::StreamEnd { .. } => break,
-                    ProviderEventKind::Usage { .. }
-                    | ProviderEventKind::StreamStart { .. }
-                    | ProviderEventKind::ToolCallStart { .. }
-                    | ProviderEventKind::ToolCallInputDelta { .. }
-                    | ProviderEventKind::Error { .. } => {}
                 }
-            }
-            if let Some(user) = credential_user.as_deref() {
-                record_credential_success(&provider_id, user, &model_id);
-            }
+                if let Some(user) = credential_user.as_deref() {
+                    record_credential_success(&provider_id, user, &model_id);
+                }
 
-            final_result = AgentTurnResult {
-                provider_id: provider_id.clone(),
-                model_id: model_id.clone(),
-                assistant_text: assistant_text.clone(),
-                reasoning_text: reasoning_text.clone(),
-                tool_calls: tool_calls.clone(),
-                credential_source_policy: Some(credential_source_policy.clone()),
-                credential_user_id: credential_user.clone(),
-            };
-
-            if tool_calls.is_empty() {
-                break;
-            }
-
-            history.push(build_assistant_tool_message(
-                &assistant_text,
-                &reasoning_text,
-                &tool_calls,
-            ));
-
-            for tool_call in tool_calls {
-                let tool_name = tool_call
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .unwrap_or("task");
-                let tool_input = tool_call.get("input").cloned().unwrap_or(Value::Null);
-                let tool = registry.get_case_insensitive(tool_name);
-                let output = if let Some(tool) = tool {
-                    execute_tool(
-                        tool.as_ref(),
-                        tool_input,
-                        &request,
-                        &session_seed,
-                        &tool_call,
-                        self.permissions.clone(),
-                        self.sessions.clone(),
-                    )
-                    .await?
-                } else {
-                    ToolOutput::text(
-                        format!("tool {tool_name}"),
-                        format!("ERROR: unknown tool `{tool_name}`"),
-                    )
+                final_result = AgentTurnResult {
+                    provider_id: provider_id.clone(),
+                    model_id: model_id.clone(),
+                    assistant_text: assistant_text.clone(),
+                    reasoning_text: reasoning_text.clone(),
+                    tool_calls: tool_calls.clone(),
+                    credential_source_policy: Some(credential_source_policy.clone()),
+                    selected_credential_user_id: selected_credential_user_id.clone(),
+                    credential_user_id: credential_user.clone(),
+                    router_metadata: router_metadata.clone(),
                 };
-                history.push(build_tool_result_message(&tool_call, &output));
+
+                if tool_calls.is_empty() {
+                    break 'rounds;
+                }
+
+                history.push(build_assistant_tool_message(
+                    &assistant_text,
+                    &reasoning_text,
+                    &tool_calls,
+                ));
+
+                for tool_call in tool_calls {
+                    let tool_name = tool_call
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("task");
+                    let tool_input = tool_call.get("input").cloned().unwrap_or(Value::Null);
+                    let tool = registry.get_case_insensitive(tool_name);
+                    let output = if let Some(tool) = tool {
+                        execute_tool(
+                            tool.as_ref(),
+                            tool_input,
+                            &request,
+                            &session_seed,
+                            &tool_call,
+                            self.permissions.clone(),
+                            self.sessions.clone(),
+                        )
+                        .await?
+                    } else {
+                        ToolOutput::text(
+                            format!("tool {tool_name}"),
+                            format!("ERROR: unknown tool `{tool_name}`"),
+                        )
+                    };
+                    history.push(build_tool_result_message(&tool_call, &output));
+                }
+                break 'attempt;
             }
         }
 
         Ok(final_result)
+    }
+}
+
+fn runtime_provenance_headers(
+    request: &AgentTurnRequest,
+    credential_policy: &str,
+    credential_user_id: Option<&str>,
+) -> BTreeMap<String, String> {
+    let mut headers = BTreeMap::new();
+    headers.insert("x-jekko-client".to_string(), "jekko-runtime".to_string());
+    headers.insert(
+        "x-jekko-run-id".to_string(),
+        std::env::var("JEKKO_ZYAL_RUN_ID")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| request.session_id.clone()),
+    );
+    headers.insert("x-jekko-session".to_string(), request.session_id.clone());
+    headers.insert(
+        "x-jekko-credential-policy".to_string(),
+        credential_policy.to_string(),
+    );
+    if let Some(user_id) = credential_user_id.filter(|value| !value.trim().is_empty()) {
+        headers.insert(
+            "x-jekko-credential-user-id".to_string(),
+            user_id.to_string(),
+        );
+    }
+    for (env_name, header_name) in [
+        ("JEKKO_ZYAL_RUN_ID", "x-jekko-zyal-run-id"),
+        ("JEKKO_ZYAL_LANE_ID", "x-jekko-zyal-lane-id"),
+        ("JEKKO_AGENT_ROLE", "x-jekko-agent-role"),
+        ("JEKKO_PROCESS_ROLE", "x-jekko-process-role"),
+    ] {
+        if let Ok(value) = std::env::var(env_name) {
+            if !value.trim().is_empty() {
+                headers.insert(header_name.to_string(), value);
+            }
+        }
+    }
+    headers
+}
+
+fn should_record_outer_credential_failure(provider_id: &str) -> bool {
+    provider_id != "jnoccio"
+}
+
+fn api_model_id_for<'a>(provider_id: &str, model_id: &'a str) -> &'a str {
+    if provider_id == "jnoccio" && model_id == "jnoccio-router" {
+        "jnoccio-fusion"
+    } else {
+        model_id
     }
 }
 
@@ -508,5 +630,67 @@ mod mock_llm_hook_tests {
 
         let _mock_zero = EnvVarGuard::set(MOCK_LLM_ENV, "0");
         assert!(!mock_llm_enabled());
+    }
+
+    #[test]
+    #[serial(jekko_runtime_provenance_env)]
+    fn runtime_provenance_headers_include_zyal_and_credential_fields() {
+        let _run = EnvVarGuard::set("JEKKO_ZYAL_RUN_ID", "run-123");
+        let _lane = EnvVarGuard::set("JEKKO_ZYAL_LANE_ID", "openqg");
+        let _role = EnvVarGuard::set("JEKKO_AGENT_ROLE", "researcher");
+        let request = AgentTurnRequest {
+            prompt: "hello".to_string(),
+            parsed_prompt: crate::prompt::parse("hello"),
+            cwd: std::path::PathBuf::from("/tmp"),
+            session_id: "session-1".to_string(),
+            agent: None,
+            provider: None,
+            model: None,
+            credential: None,
+            selected_credential_user_id: None,
+            ephemeral: true,
+        };
+
+        let headers = runtime_provenance_headers(&request, "users-only", Some("user_2"));
+
+        assert_eq!(
+            headers.get("x-jekko-client").map(String::as_str),
+            Some("jekko-runtime")
+        );
+        assert_eq!(
+            headers.get("x-jekko-run-id").map(String::as_str),
+            Some("run-123")
+        );
+        assert_eq!(
+            headers.get("x-jekko-zyal-lane-id").map(String::as_str),
+            Some("openqg")
+        );
+        assert_eq!(
+            headers.get("x-jekko-agent-role").map(String::as_str),
+            Some("researcher")
+        );
+        assert_eq!(
+            headers
+                .get("x-jekko-credential-user-id")
+                .map(String::as_str),
+            Some("user_2")
+        );
+        assert_eq!(
+            headers.get("x-jekko-credential-policy").map(String::as_str),
+            Some("users-only")
+        );
+    }
+
+    #[test]
+    fn jnoccio_router_uses_gateway_model_id() {
+        assert_eq!(
+            api_model_id_for("jnoccio", "jnoccio-router"),
+            "jnoccio-fusion"
+        );
+        assert_eq!(api_model_id_for("jnoccio", "custom"), "custom");
+        assert_eq!(
+            api_model_id_for("openrouter", "jnoccio-router"),
+            "jnoccio-router"
+        );
     }
 }

@@ -48,11 +48,60 @@ validate:
 	just fast
 
 # Workspace-wide fast lane composed from narrow proof targets.
+# `fmt-check-fast`, `clippy-check-fast`, and the xtask parity checks
+# (cli-help-parity / tool-schema-parity / etc.) run first so they fail
+# fast before the heavier typecheck/build/test lanes burn time. Plus the
+# jankurai audit gate at the tail. This mirrors the remote workflows so
+# `just fast` green ⇔ remote `parity` + `jankurai` jobs pass — no more
+# local-CI parity gaps.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
 workspace-fast:
+	just fmt-check-fast
+	just clippy-check-fast
+	just xtask-parity-fast
 	just workspace-typecheck-fast
 	just workspace-build-fast
 	just workspace-test-fast
+	just audit-gate-fast
+
+# Narrow lane: the xtask parity checks that the remote `parity` workflow
+# runs (cli-help / tool-schema / session-fixture / openapi / httpapi).
+# These catch CLI snapshot drift, generated-API drift, and contract drift
+# that only fmt + clippy + tests don't surface. Excludes the heavier
+# `baseline-diff` (TUI screenshot lane); that lives in `tui-ci`.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true
+xtask-parity-fast:
+	cargo run -p xtask --locked -- db-migration-smoke
+	cargo run -p xtask --locked -- cli-help-parity --strict
+	cargo run -p xtask --locked -- tool-schema-parity --strict
+	cargo run -p xtask --locked -- session-fixture-parity --strict
+	cargo run -p xtask --locked -- openapi-check --strict
+	cargo run -p xtask --locked -- httpapi-parity
+
+# Narrow lane: rustfmt --check across the workspace AND the standalone
+# jnoccio-fusion package. Mirrors what the GitHub `parity` workflow runs
+# so PRs don't fail remote on a fmt diff that local CI would have caught.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
+fmt-check-fast:
+	cargo fmt --all -- --check
+	cd jnoccio-fusion && cargo fmt --all -- --check
+
+# Narrow lane: clippy with -D warnings across both build trees. Mirrors
+# the GitHub `parity` workflow's rust-parity-gates step.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
+clippy-check-fast:
+	cargo clippy --workspace --all-targets --locked -- -D warnings
+	cd jnoccio-fusion && cargo clippy --all-targets --locked -- -D warnings
+
+# Apply rustfmt + clippy autofix across both build trees. Use before
+# committing if fmt-check-fast or clippy-check-fast fails.
+fmt:
+	cargo fmt --all
+	cd jnoccio-fusion && cargo fmt --all
+
+clippy-fix:
+	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-no-vcs -- -D warnings
+	cd jnoccio-fusion && cargo clippy --all-targets --fix --allow-dirty --allow-no-vcs -- -D warnings
 
 # Narrow lane for workspace typecheck-only feedback.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
@@ -472,6 +521,12 @@ zyal-superreasoning-lint-check:
 zyal-superreasoning-verify-replay run_dir:
 	rtk cargo run --manifest-path crates/zyalc/Cargo.toml --locked --quiet -- verify-replay {{run_dir}} --strict
 
+# Strict live audit for a completed superreasoning run directory.
+# Usage: just zyal-superreasoning-audit-live run_dir=target/zyal/runs/<run_id>
+# jankurai:proof HLT-032-ZYAL-COMPILE-DRIFT parallel=1 cache=cargo-build narrow-targets=true
+zyal-superreasoning-audit-live run_dir:
+	rtk cargo run --manifest-path crates/zyalc/Cargo.toml --locked --quiet -- audit-live-run {{run_dir}} --strict
+
 # Composed superreasoning fast lane: runner packets, key routing, provider selection, and ZYAL lint.
 # jankurai:proof HLT-032-ZYAL-COMPILE-DRIFT parallel=1 cache=cargo-test narrow-targets=true
 zyal-superreasoning-fast:
@@ -498,7 +553,7 @@ zyal-superreasoning-redis-smoke:
 	rtk cargo run --manifest-path crates/zyalc/Cargo.toml --locked --quiet -- lint-super docs/ZYAL/examples/35-rust-redis-replacement-superreasoning.zyal --strict --format json
 
 # Opt-in live local superreasoning proof. Refuses CI and requires users-only credentials.
-zyal-superreasoning-live-local:
+zyal-superreasoning-live-local run_id="superreasoning-live-local" provider="" model="":
 	#!/usr/bin/env bash
 	set -euo pipefail
 	if [ "${CI:-}" = "true" ]; then
@@ -509,7 +564,124 @@ zyal-superreasoning-live-local:
 		echo "set JEKKO_ZYAL_LIVE=1 to run live local proof" >&2
 		exit 1
 	fi
-	JEKKO_KEY_SOURCE_POLICY=users-only rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- --repo . --run-id superreasoning-live-local hero-judge-run --zyal docs/ZYAL/examples/34-superreasoning-openqg-foundry.zyal --live --max-generations 1
+	if [ -z "${JEKKO_BIN:-}" ]; then
+		if [ -x "target/debug/jekko" ]; then
+			export JEKKO_BIN="$PWD/target/debug/jekko"
+		elif [ -x "target/release/jekko" ]; then
+			export JEKKO_BIN="$PWD/target/release/jekko"
+		else
+			echo "set JEKKO_BIN to a built jekko binary before running live proof" >&2
+			exit 1
+		fi
+	fi
+	args=(--repo . --run-id "{{run_id}}" hero-judge-run --zyal docs/ZYAL/examples/34-superreasoning-openqg-foundry.zyal --live --max-generations 1)
+	if [ -n "{{provider}}" ]; then
+		args+=(--provider "{{provider}}")
+	fi
+	if [ -n "{{model}}" ]; then
+		args+=(--model "{{model}}")
+	fi
+	JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- "${args[@]}"
+	rtk just zyal-superreasoning-verify-replay target/zyal/runs/{{run_id}}
+	rtk just zyal-superreasoning-audit-live target/zyal/runs/{{run_id}}
+
+# Opt-in live local advanced-reasoning proof. Refuses CI and requires users-only credentials.
+zyal-advanced-reasoning-live-local run_id="advanced-reasoning-live-local" provider="" model="":
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if [ "${CI:-}" = "true" ]; then
+		echo "zyal-advanced-reasoning-live-local refuses CI=true" >&2
+		exit 1
+	fi
+	if [ "${JEKKO_ZYAL_LIVE:-}" != "1" ]; then
+		echo "set JEKKO_ZYAL_LIVE=1 to run live local proof" >&2
+		exit 1
+	fi
+	if [ -z "${JEKKO_BIN:-}" ]; then
+		if [ -x "target/debug/jekko" ]; then
+			export JEKKO_BIN="$PWD/target/debug/jekko"
+		elif [ -x "target/release/jekko" ]; then
+			export JEKKO_BIN="$PWD/target/release/jekko"
+		else
+			echo "set JEKKO_BIN to a built jekko binary before running live proof" >&2
+			exit 1
+		fi
+	fi
+	args=(--repo . --run-id "{{run_id}}" port-run --config docs/ZYAL/examples/31-advanced-reasoning-foundry.port-run.json --live --max-ticks 1)
+	if [ -n "{{provider}}" ]; then
+		args+=(--provider "{{provider}}")
+	fi
+	if [ -n "{{model}}" ]; then
+		args+=(--model "{{model}}")
+	fi
+	JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- "${args[@]}"
+
+# Opt-in live local MiniRedis ladder proof. Refuses CI and requires users-only credentials.
+zyal-miniredis-live-local run_id="miniredis-live-local" provider="" model="":
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if [ "${CI:-}" = "true" ]; then
+		echo "zyal-miniredis-live-local refuses CI=true" >&2
+		exit 1
+	fi
+	if [ "${JEKKO_ZYAL_LIVE:-}" != "1" ]; then
+		echo "set JEKKO_ZYAL_LIVE=1 to run live local proof" >&2
+		exit 1
+	fi
+	if [ -z "${JEKKO_BIN:-}" ]; then
+		if [ -x "target/debug/jekko" ]; then
+			export JEKKO_BIN="$PWD/target/debug/jekko"
+		elif [ -x "target/release/jekko" ]; then
+			export JEKKO_BIN="$PWD/target/release/jekko"
+		else
+			echo "set JEKKO_BIN to a built jekko binary before running live proof" >&2
+			exit 1
+		fi
+	fi
+	args=(--repo . --run-id "{{run_id}}" port-run --config docs/ZYAL/examples/35-rust-redis-replacement-superreasoning.port-run.json --live --max-ticks 1)
+	if [ -n "{{provider}}" ]; then
+		args+=(--provider "{{provider}}")
+	fi
+	if [ -n "{{model}}" ]; then
+		args+=(--model "{{model}}")
+	fi
+	JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- "${args[@]}"
+
+# Heavy live super-agent run against the canonical 12-stage MiniRedis
+# SuperWorkflow manifest. Refuses CI and requires JEKKO_ZYAL_LIVE=1 +
+# JEKKO_BIN. Phase H scaffold: per-phase work is still a stub until the
+# jankurai-runner follow-up; the recipe exists so operators can drive the
+# wave plan end-to-end against the supervisor store.
+zyal-super-redis run_id="zyal-super-redis-local":
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if [ "${CI:-}" = "true" ]; then
+		echo "zyal-super-redis refuses CI=true" >&2
+		exit 1
+	fi
+	if [ "${JEKKO_ZYAL_LIVE:-}" != "1" ]; then
+		echo "set JEKKO_ZYAL_LIVE=1 to run the live super-agent recipe" >&2
+		exit 1
+	fi
+	if [ -z "${JEKKO_BIN:-}" ]; then
+		if [ -x "target/debug/jekko" ]; then
+			export JEKKO_BIN="$PWD/target/debug/jekko"
+		elif [ -x "target/release/jekko" ]; then
+			export JEKKO_BIN="$PWD/target/release/jekko"
+		else
+			echo "set JEKKO_BIN to a built jekko binary before running live super-agent" >&2
+			exit 1
+		fi
+	fi
+	JEKKO_KEY_SOURCE_POLICY=users-only \
+		rtk cargo run -p jekko-cli --offline -- port-run \
+			--super agent/zyal/ambitious-superworkflow.zyal \
+			--run-id "{{run_id}}"
+
+# Print phase + task status for an existing super-agent run as JSON.
+# Usage: just zyal-super-status <run_id>
+zyal-super-status run_id:
+	rtk cargo run -p jekko-cli --offline -- port-run --status "{{run_id}}"
 
 # Broad full-suite lane for local release-style port workflow proof.
 # jankurai:proof HLT-032-ZYAL-COMPILE-DRIFT parallel=1 cache=cargo-test narrow-targets=false
@@ -691,7 +863,25 @@ ci-local-audit:
 	mkdir -p {{jankurai_artifact_root}}
 	bash ops/ci/jankurai.sh --setup-only
 	jankurai audit . --mode advisory --json {{jankurai_artifact_root}}/repo-score.json --md {{jankurai_artifact_root}}/repo-score.md
+	cargo run -p xtask --locked -- jankurai-gate --score {{jankurai_artifact_root}}/repo-score.json
 	bash ops/ci/jankurai-badge.sh
+
+# Narrow audit lane: just `jankurai audit` + the gate. Mirrors the
+# remote `jankurai` workflow's two-step gate exactly so `just fast`
+# can include it without paying for the full ci-local-audit lane.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true
+audit-gate-fast:
+	mkdir -p {{jankurai_artifact_root}}
+	jankurai audit . --mode advisory --json {{jankurai_artifact_root}}/repo-score.json --md {{jankurai_artifact_root}}/repo-score.md
+	cargo run -p xtask --locked -- jankurai-gate --score {{jankurai_artifact_root}}/repo-score.json
+
+# Narrow parity lane: just the cargo-fmt, clippy, and xtask parity
+# checks the remote `parity` workflow runs. Heavier than fmt-check-fast
+# + clippy-check-fast but matches `ops/ci/parity.sh` 1:1, so `just fast`
+# now passing means `parity` workflow will also pass.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true
+parity-fast:
+	bash ops/ci/parity.sh
 
 # CI step 2: proof routing + evidence index regeneration.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true

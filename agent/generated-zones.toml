@@ -3,3 +3,9 @@ command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile
 path = "agent/sandbox-lanes.toml"
 read_only = true
 source = "zyalc"
+
+[[zone]]
+command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/ambitious-superworkflow.zyal --out agent/superworkflows/ambitious-superworkflow.superworkflow.json"
+path = "agent/superworkflows/ambitious-superworkflow.superworkflow.json"
+read_only = true
+source = "zyalc"

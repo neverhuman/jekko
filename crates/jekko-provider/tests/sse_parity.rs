@@ -176,5 +176,6 @@ fn kind_tag(ev: &jekko_provider::ProviderEvent) -> &'static str {
         ProviderEventKind::Usage { .. } => "usage",
         ProviderEventKind::StreamEnd { .. } => "stream-end",
         ProviderEventKind::Error { .. } => "error",
+        ProviderEventKind::Metadata { .. } => "metadata",
     }
 }

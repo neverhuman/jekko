@@ -9,7 +9,10 @@ publish = false
 path = "src/lib.rs"
 
 [dependencies]
+aes-gcm = "0.10"
 anyhow = { workspace = true }
+base64 = "0.22"
+scrypt = "0.11"
 thiserror = { workspace = true }
 tracing = "0.1"
 

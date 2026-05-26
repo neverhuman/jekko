@@ -93,6 +93,7 @@ pub(crate) fn finalize_run(inputs: FinalizeInputs<'_>) -> Result<HeroJudgeRunSum
     packet.validate()?;
     write_json_pretty(&paths.output_superreasoning_packet_json, &packet)?;
     write_json_pretty(&headless.superreasoning_packet_json, &packet)?;
+    daemon_store::export_model_receipts_jsonl(db, run_id, &headless.model_receipts_jsonl)?;
 
     let replay_sources = replay_source_artifacts(
         &paths.prompt_lineage_json,

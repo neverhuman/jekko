@@ -1,0 +1,35 @@
+{
+  "target": "MiniKV",
+  "replacement": "MiniKV Rust",
+  "target_repo": "./fixtures/minikv-reference",
+  "replacement_repo": ".",
+  "request": "Run one bounded advanced-reasoning proof tick with graph export, verifier-gated memory, confidence caps, and target-switched parity artifacts.",
+  "worker_cap": 2,
+  "fake_worker_cycle": true,
+  "allow_dirty": true,
+  "advanced_reasoning": {
+    "enabled": true,
+    "worker_cap": 2,
+    "confidence_cap": 0.35,
+    "store_raw_reasoning": false,
+    "allow_power_for_routine_roles": false
+  },
+  "evidence_inputs": [
+    {
+      "id": "advanced-reasoning-runbook",
+      "kind": "file",
+      "role": "workflow_doc",
+      "path_or_url": "docs/ZYAL/examples/31-advanced-reasoning-foundry.zyal",
+      "max_bytes": 32768
+    }
+  ],
+  "live_call_budget": {
+    "max_calls": 12,
+    "max_parallel": 1,
+    "require_live": true
+  },
+  "proofs": {
+    "redis_jedis_stage0": false,
+    "reasoning_benchmark": true
+  }
+}

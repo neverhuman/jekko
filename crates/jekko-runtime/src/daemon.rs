@@ -18,6 +18,10 @@ use uuid::Uuid;
 use crate::bus::Bus;
 use crate::error::{RuntimeError, RuntimeResult};
 
+pub mod super_reasoning;
+
+pub use super_reasoning::{SuperReasoningPlan, SUPER_REASONING_METADATA_KEY};
+
 /// Lifecycle status of a daemon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -97,6 +101,97 @@ impl DaemonRegistry {
             .insert(record.id.clone(), record.clone());
         self.publish_status(&record).await;
         record
+    }
+
+    /// Register a daemon and attach a validated super-reasoning mission plan.
+    ///
+    /// This is intentionally generic: the plan may describe a port, rewrite,
+    /// research program, proof search, large refactor, or parity project. The
+    /// host can derive it from existing ZYAL `workflow`, `fleet`, `memory`,
+    /// `repo_intelligence`, `evidence`, `approvals`, and `sandbox` blocks
+    /// without introducing target-specific top-level schema.
+    pub async fn register_super_reasoning_plan(
+        &self,
+        session_id: impl Into<String>,
+        name: impl Into<String>,
+        plan: SuperReasoningPlan,
+    ) -> RuntimeResult<DaemonRecord> {
+        plan.validate()?;
+        let record = self.register(session_id, name).await;
+        self.attach_super_reasoning_plan(&record.id, plan).await?;
+        self.get(&record.id)
+            .await
+            .ok_or_else(|| RuntimeError::not_found("daemon", &record.id))
+    }
+
+    /// Attach or replace the super-reasoning mission plan for an existing daemon.
+    pub async fn attach_super_reasoning_plan(
+        &self,
+        id: &str,
+        plan: SuperReasoningPlan,
+    ) -> RuntimeResult<()> {
+        plan.validate()?;
+        let topological_phase_ids = plan.topological_phase_ids()?;
+        let parallel_waves = plan.parallel_waves()?;
+        let ready_phase_ids = plan.ready_phase_ids(std::iter::empty::<String>())?;
+        let payload = serde_json::json!({
+            "schema_version": super_reasoning::SUPER_REASONING_SCHEMA_VERSION,
+            "plan": plan,
+            "topological_phase_ids": topological_phase_ids,
+            "parallel_waves": parallel_waves,
+            "ready_phase_ids": ready_phase_ids,
+        });
+
+        let mut inner = self.inner.write().await;
+        let rec = match inner.get_mut(id) {
+            Some(r) => r,
+            None => return Err(RuntimeError::not_found("daemon", id)),
+        };
+        if !rec.metadata.is_object() {
+            rec.metadata = serde_json::json!({});
+        }
+        if let Some(obj) = rec.metadata.as_object_mut() {
+            obj.insert(SUPER_REASONING_METADATA_KEY.to_string(), payload);
+        }
+        rec.time_updated = Utc::now().timestamp_millis();
+        self.publish_status(rec).await;
+        Ok(())
+    }
+
+    /// Return the typed super-reasoning plan attached to a daemon, if present.
+    pub async fn super_reasoning_plan(
+        &self,
+        id: &str,
+    ) -> RuntimeResult<Option<SuperReasoningPlan>> {
+        let inner = self.inner.read().await;
+        let rec = match inner.get(id) {
+            Some(r) => r,
+            None => return Err(RuntimeError::not_found("daemon", id)),
+        };
+        let Some(payload) = rec.metadata.get(SUPER_REASONING_METADATA_KEY) else {
+            return Ok(None);
+        };
+        let Some(plan_value) = payload.get("plan") else {
+            return Ok(None);
+        };
+        Ok(Some(serde_json::from_value(plan_value.clone())?))
+    }
+
+    /// Compute currently-runnable phases from a daemon's super-reasoning plan.
+    pub async fn super_reasoning_ready_phase_ids<I, S>(
+        &self,
+        id: &str,
+        completed_phase_ids: I,
+    ) -> RuntimeResult<Vec<String>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let plan = self
+            .super_reasoning_plan(id)
+            .await?
+            .ok_or_else(|| RuntimeError::not_found("super_reasoning_plan", id))?;
+        plan.ready_phase_ids(completed_phase_ids)
     }
 
     /// Transition a daemon's status.
@@ -181,5 +276,26 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(sub.recv().await.unwrap().kind, "daemon.status");
+    }
+
+    #[tokio::test]
+    async fn stores_super_reasoning_plan_metadata() {
+        let reg = DaemonRegistry::new();
+        let plan = SuperReasoningPlan::default_megaproject_plan(
+            "mission_redis_like_rewrite",
+            "Rewrite a reference system with full parity, performance closure, and final signoff.",
+        );
+
+        let rec = reg
+            .register_super_reasoning_plan("session_1", "mega project", plan)
+            .await
+            .unwrap();
+
+        assert!(rec.metadata.get(SUPER_REASONING_METADATA_KEY).is_some());
+        let ready = reg
+            .super_reasoning_ready_phase_ids(&rec.id, std::iter::empty::<String>())
+            .await
+            .unwrap();
+        assert_eq!(ready, vec!["source_of_truth"]);
     }
 }

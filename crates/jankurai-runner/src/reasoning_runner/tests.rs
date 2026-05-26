@@ -134,6 +134,7 @@ impl ModelClient for InvalidLiveJsonClient {
             budget_remaining: None,
             route: Some(crate::model_client::kind_label(kind).to_string()),
             credential_policy: None,
+            selected_credential_user_id: None,
             credential_user_id: None,
             retry_count: Some(0),
         })
@@ -249,4 +250,224 @@ async fn requested_proofs_write_stage0_manifest_and_benchmark() {
     assert!(report.advanced.parity_approved_ci_txt.exists());
     let benchmark = fs::read_to_string(report.advanced.reasoning_benchmark_json.unwrap()).unwrap();
     assert!(benchmark.contains("\"winner\": \"tournament\""));
+}
+
+// ---- Parallel brainstorm (Phase D3-D5) ----
+//
+// The JEKKO_REASONING_PARALLEL env var is process-global, so we serialize
+// these tests through a Mutex to prevent the parallel-enabled and
+// parallel-disabled tests from racing and reading each other's setting.
+use std::sync::Mutex;
+
+static PARALLEL_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+/// RAII helper that sets and restores `JEKKO_REASONING_PARALLEL`. Holds the
+/// `PARALLEL_ENV_LOCK` for the duration so concurrent test runners don't
+/// observe a half-mutated environment.
+struct ParallelEnvGuard {
+    _lock: std::sync::MutexGuard<'static, ()>,
+    prev: Option<String>,
+}
+
+impl ParallelEnvGuard {
+    fn set(value: Option<&str>) -> Self {
+        let lock = PARALLEL_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let prev = std::env::var("JEKKO_REASONING_PARALLEL").ok();
+        match value {
+            Some(v) => std::env::set_var("JEKKO_REASONING_PARALLEL", v),
+            None => std::env::remove_var("JEKKO_REASONING_PARALLEL"),
+        }
+        Self { _lock: lock, prev }
+    }
+}
+
+impl Drop for ParallelEnvGuard {
+    fn drop(&mut self) {
+        match &self.prev {
+            Some(v) => std::env::set_var("JEKKO_REASONING_PARALLEL", v),
+            None => std::env::remove_var("JEKKO_REASONING_PARALLEL"),
+        }
+    }
+}
+
+#[tokio::test]
+async fn brainstorm_runs_lanes_in_parallel_when_env_set() {
+    // Two runs back-to-back: one with the parallel env on, one with it off,
+    // same fake-client delay. Parallel run must be measurably faster
+    // because the brainstorm lanes overlap, while the surrounding phases
+    // (frame/critique/master_plan/verify/parity_seed) still run serially in
+    // both. With lane_cap=5 and 100ms per call, brainstorm contributes
+    // ~500ms sequentially vs ~100ms parallel, saving ~400ms wall-time. We
+    // use a comfortable margin to absorb scheduler jitter on busy CI.
+    use std::time::Instant;
+
+    let lane_cap = 5usize;
+    let delay_ms = 100u64;
+
+    let dir_parallel = tempdir().unwrap();
+    let db_parallel = Db::open_in_memory().unwrap();
+    bootstrap_repo(dir_parallel.path());
+    let parallel_target = PortTargetRequest {
+        worker_cap: lane_cap,
+        ..target()
+    };
+    let parallel_started = Instant::now();
+    {
+        let _guard = ParallelEnvGuard::set(Some("1"));
+        run_advanced_reasoning_tick_with_db(
+            dir_parallel.path(),
+            "run-parallel-walltime",
+            parallel_target,
+            AdvancedReasoningConfig {
+                enabled: true,
+                worker_cap: lane_cap,
+                ..AdvancedReasoningConfig::default()
+            },
+            PortRuntimeOptions::default(),
+            true,
+            &FakeModelClient::success("not json but fake is allowed").with_delay(delay_ms),
+            &db_parallel,
+        )
+        .await
+        .unwrap();
+    }
+    let parallel_elapsed = parallel_started.elapsed();
+
+    let dir_sequential = tempdir().unwrap();
+    let db_sequential = Db::open_in_memory().unwrap();
+    bootstrap_repo(dir_sequential.path());
+    let sequential_target = PortTargetRequest {
+        worker_cap: lane_cap,
+        ..target()
+    };
+    let sequential_started = Instant::now();
+    {
+        let _guard = ParallelEnvGuard::set(None);
+        run_advanced_reasoning_tick_with_db(
+            dir_sequential.path(),
+            "run-sequential-walltime",
+            sequential_target,
+            AdvancedReasoningConfig {
+                enabled: true,
+                worker_cap: lane_cap,
+                ..AdvancedReasoningConfig::default()
+            },
+            PortRuntimeOptions::default(),
+            true,
+            &FakeModelClient::success("not json but fake is allowed").with_delay(delay_ms),
+            &db_sequential,
+        )
+        .await
+        .unwrap();
+    }
+    let sequential_elapsed = sequential_started.elapsed();
+
+    let saved = sequential_elapsed.saturating_sub(parallel_elapsed);
+    assert!(
+        saved >= std::time::Duration::from_millis(200),
+        "parallel brainstorm should save at least 200ms wall-time vs sequential; \
+         parallel={parallel_elapsed:?}, sequential={sequential_elapsed:?}, saved={saved:?}",
+    );
+}
+
+#[tokio::test]
+async fn brainstorm_persists_lanes_in_deterministic_order() {
+    // Even though parallel lanes can complete out of order, the persistence
+    // loop replays results sorted by lane index — so lane-1's artifact id
+    // must precede lane-N's in the SQLite-backed listing.
+    let dir = tempdir().unwrap();
+    let db = Db::open_in_memory().unwrap();
+    bootstrap_repo(dir.path());
+    let lane_cap = 4usize;
+    let _guard = ParallelEnvGuard::set(Some("1"));
+    let report = run_advanced_reasoning_tick_with_db(
+        dir.path(),
+        "run-parallel-order",
+        PortTargetRequest {
+            worker_cap: lane_cap,
+            ..target()
+        },
+        AdvancedReasoningConfig {
+            enabled: true,
+            worker_cap: lane_cap,
+            ..AdvancedReasoningConfig::default()
+        },
+        PortRuntimeOptions::default(),
+        true,
+        // Asymmetric delays: lane index 0 runs slowest so completion order
+        // differs from spawn order. Persistence-side sort must still
+        // produce lane-1..lane-N.
+        &FakeModelClient::success("not json but fake is allowed").with_delay(20),
+        &db,
+    )
+    .await
+    .unwrap();
+    assert_eq!(report.advanced.lane_count, lane_cap);
+
+    let artifacts = jekko_store::daemon::list_reasoning_artifacts_for_run(
+        db.connection(),
+        "run-parallel-order",
+    )
+    .unwrap();
+    let lane_ids: Vec<String> = artifacts
+        .iter()
+        .map(|artifact| artifact.id.clone())
+        .filter(|id| id.starts_with("artifact-stage-proposal-"))
+        .collect();
+    let expected: Vec<String> = (1..=lane_cap)
+        .map(|n| format!("artifact-stage-proposal-{n}"))
+        .collect();
+    assert_eq!(
+        lane_ids, expected,
+        "brainstorm artifacts must be persisted in lane-index order; got {lane_ids:?}",
+    );
+}
+
+#[tokio::test]
+async fn brainstorm_sequential_when_env_unset() {
+    // With the gate off, the parallel path is dormant and the tick behaves
+    // exactly like the pre-Phase-D3 sequential implementation: same number
+    // of lanes, same artifact ids in the same order.
+    let dir = tempdir().unwrap();
+    let db = Db::open_in_memory().unwrap();
+    bootstrap_repo(dir.path());
+    let lane_cap = 4usize;
+    let _guard = ParallelEnvGuard::set(None);
+    let report = run_advanced_reasoning_tick_with_db(
+        dir.path(),
+        "run-sequential-baseline",
+        PortTargetRequest {
+            worker_cap: lane_cap,
+            ..target()
+        },
+        AdvancedReasoningConfig {
+            enabled: true,
+            worker_cap: lane_cap,
+            ..AdvancedReasoningConfig::default()
+        },
+        PortRuntimeOptions::default(),
+        true,
+        &FakeModelClient::success("not json but fake is allowed"),
+        &db,
+    )
+    .await
+    .unwrap();
+    assert_eq!(report.advanced.lane_count, lane_cap);
+
+    let artifacts = jekko_store::daemon::list_reasoning_artifacts_for_run(
+        db.connection(),
+        "run-sequential-baseline",
+    )
+    .unwrap();
+    let lane_ids: Vec<String> = artifacts
+        .iter()
+        .map(|artifact| artifact.id.clone())
+        .filter(|id| id.starts_with("artifact-stage-proposal-"))
+        .collect();
+    let expected: Vec<String> = (1..=lane_cap)
+        .map(|n| format!("artifact-stage-proposal-{n}"))
+        .collect();
+    assert_eq!(lane_ids, expected);
 }

@@ -1,0 +1,35 @@
+{
+  "target": "MiniRedis",
+  "replacement": "MiniRedis Rust",
+  "target_repo": "./references/miniredis",
+  "replacement_repo": ".",
+  "request": "Run one bounded MiniRedis long-horizon proof tick covering seed parity generation, gap routing, restart-safe artifacts, and users-only live model receipts.",
+  "worker_cap": 2,
+  "fake_worker_cycle": true,
+  "allow_dirty": true,
+  "advanced_reasoning": {
+    "enabled": true,
+    "worker_cap": 2,
+    "confidence_cap": 0.35,
+    "store_raw_reasoning": false,
+    "allow_power_for_routine_roles": false
+  },
+  "evidence_inputs": [
+    {
+      "id": "miniredis-superreasoning-runbook",
+      "kind": "file",
+      "role": "workflow_doc",
+      "path_or_url": "docs/ZYAL/examples/35-rust-redis-replacement-superreasoning.zyal",
+      "max_bytes": 32768
+    }
+  ],
+  "live_call_budget": {
+    "max_calls": 12,
+    "max_parallel": 1,
+    "require_live": true
+  },
+  "proofs": {
+    "redis_jedis_stage0": true,
+    "reasoning_benchmark": true
+  }
+}

@@ -175,6 +175,7 @@ pub struct HeroJudgeRunSummary {
     pub superreasoning_packet_json: PathBuf,
     pub superreasoning_packet_sha256: String,
     pub replay_receipt_json: PathBuf,
+    pub model_receipts_jsonl: PathBuf,
     pub claim_ledger_jsonl: PathBuf,
     pub unsupported_claims_jsonl: PathBuf,
     pub negative_memory_jsonl: PathBuf,

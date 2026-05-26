@@ -4,6 +4,8 @@
 //!   `# zyal: declarative target=toml schema=<name>@<ver>`.
 //! - Profile C — workflow: first non-blank line is
 //!   `# zyal: declarative target=github-workflow schema=actions/workflow@<ver>`.
+//! - Profile D — SuperWorkflow: first non-blank line is
+//!   `# zyal: declarative target=superworkflow schema=zyal/superworkflow@<ver>`.
 //!
 //! Anything else is rejected so silent format drift cannot happen.
 
@@ -25,6 +27,8 @@ pub enum Profile {
     Workflow { schema: String },
     /// Declarative daemon runbook. Validated by `compile --all --check`, not emitted.
     Daemon { schema: String },
+    /// Declarative SuperWorkflow manifest (9-12 macro phases). Emits canonical JSON.
+    SuperWorkflow { schema: String },
 }
 
 impl std::fmt::Display for Profile {
@@ -34,6 +38,7 @@ impl std::fmt::Display for Profile {
             Profile::DeclarativeToml { .. } => write!(f, "declarative-toml"),
             Profile::Workflow { .. } => write!(f, "workflow"),
             Profile::Daemon { .. } => write!(f, "daemon"),
+            Profile::SuperWorkflow { .. } => write!(f, "superworkflow"),
         }
     }
 }
@@ -74,6 +79,7 @@ pub fn parse_header(raw: &str) -> Result<(Profile, usize)> {
             "toml" => Profile::DeclarativeToml { schema },
             "github-workflow" => Profile::Workflow { schema },
             "daemon" => Profile::Daemon { schema },
+            "superworkflow" => Profile::SuperWorkflow { schema },
             other => return Err(anyhow!("unsupported target '{other}'")),
         };
         let pragma_offset = raw.find(pragma_line).unwrap_or(0) + pragma_line.len();
@@ -155,6 +161,14 @@ mod tests {
         let (p, _) = parse_header("# zyal: declarative target=daemon schema=runbook/smoke@1")
             .expect("daemon target");
         assert!(matches!(p, Profile::Daemon { .. }));
+    }
+
+    #[test]
+    fn detects_superworkflow_target() {
+        let (p, _) =
+            parse_header("# zyal: declarative target=superworkflow schema=zyal/superworkflow@1")
+                .expect("superworkflow target");
+        assert!(matches!(p, Profile::SuperWorkflow { .. }));
     }
 
     #[test]

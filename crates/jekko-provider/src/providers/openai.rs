@@ -108,6 +108,13 @@ pub fn map_openai_frame_stateful(
     frame: &SseFrame,
     state: &mut OpenAiStreamState,
 ) -> ProviderResult<Vec<ProviderEvent>> {
+    if frame.event == "jnoccio-metadata" {
+        let payload = parse_data_as_json(&frame.data)?;
+        return Ok(vec![ProviderEvent::with_raw(
+            ProviderEventKind::Metadata { metadata: payload },
+            frame.event.clone(),
+        )]);
+    }
     let data = match preparse_sse_frame(frame, Some("[DONE]"), None) {
         SsePreparse::Resolved(events) => return Ok(events),
         SsePreparse::Payload(data) => data,
@@ -279,5 +286,22 @@ mod tests {
         let body = a.build_body(&r);
         assert_eq!(body["store"], false);
         assert_eq!(body["prompt_cache_key"], "sess-1");
+    }
+
+    #[test]
+    fn metadata_event_decodes_from_jnoccio_frame() {
+        let frame = SseFrame {
+            event: "jnoccio-metadata".to_string(),
+            data: json!({
+                "credential_user_id": "user-1",
+                "winner_model_id": "provider/model"
+            })
+            .to_string(),
+            id: None,
+            retry: None,
+        };
+        let events = map_openai_frame_stateful(&frame, &mut OpenAiStreamState::new()).unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0].kind, ProviderEventKind::Metadata { .. }));
     }
 }

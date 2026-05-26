@@ -30,6 +30,8 @@ const EXPECTED_SUBCOMMANDS: &[&str] = &[
     "db",
     "upgrade",
     "uninstall",
+    "watch",
+    "port-run",
 ];
 
 fn help_output() -> String {

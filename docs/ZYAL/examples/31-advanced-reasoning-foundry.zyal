@@ -77,8 +77,13 @@ parity_lab:
     - perf_ratio_over_budget
 
 model_policy:
-  routine: jnoccio/routine
-  power: jnoccio/power-winner
+  routine: {}
+  power: {}
+  critic: {}
+  verifier: {}
+  meta_judge: {}
+  reproducer: {}
+  memory_curator: {}
   use_power_for: [stage_reduce, critic, perf_close, hard_escalation]
   use_routine_for: [frame, stage_brainstorm, phase_brainstorm, verifier, memory_curate, parity_generate]
   record_reliability: true

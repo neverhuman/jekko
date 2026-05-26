@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+### 2026-05-26 - Super-Agent operator surfaces (Phase H wave)
+
+- `jekko port-run --super <manifest>` integration wrapper: compiles a
+  superworkflow `.zyal` via `zyalc`, validates the DAG, persists state
+  to `zyal-supervisor`, and walks execution waves. Phase bodies are
+  STUB today; `--live` per-phase invocation is a follow-up. Flags:
+  `--dry-run`, `--resume <id>`, `--status <id>`, `--db <path>`,
+  `--max-stages <n>`, `--time-budget-hours <h>`.
+- `jekko watch <run_id>`: notify-based tail of
+  `target/zyal/runs/<run_id>/events.jsonl`. Output formats `plain`
+  (default), `json`, `tui`. Surfaces all four remediation rules
+  (stall, provider error burst, parity gaps growing, jankurai
+  regression) with `--stall-threshold` and `--error-rate-threshold`
+  overrides. See `docs/ZYAL/OBSERVABILITY.md`.
+- `jnoccio-fusion` `/metrics` Prometheus endpoint:
+  `text/plain; version=0.0.4` scrape at the canonical path. 19 metric
+  families (gateway totals + per-`{model, provider}` counters and
+  per-`{model}` gauges). Mirrors the JSON dashboard at
+  `/v1/jnoccio/metrics`. See `docs/ZYAL/OBSERVABILITY.md`.
+- `zyalc compile` Profile D — SuperWorkflow: new `target=superworkflow`
+  pragma compiles a 9-12 phase manifest to canonical JSON. Reference
+  manifest at `agent/zyal/ambitious-superworkflow.zyal` emits
+  `agent/superworkflows/ambitious-superworkflow.superworkflow.json`.
+- New crates landed under `crates/`:
+  - `zyal-core` — canonical types shared across the backbone.
+  - `zyal-key-pool` — multi-user credential scan + `PolicyHook` trait
+    (default `AlwaysAllow` stub).
+  - `zyal-supervisor` — phase planner + 8-table SQLite store driving
+    the SuperWorkflow execution waves.
+- `jnoccio-fusion` multi-user routing: when
+  `JNOCCIO_UPSTREAM_KEY_SOURCE=users_pool`, the gateway fans one
+  `ResolvedModel` per `~/.jekko/users/<id>/llm.env` slot keyed by the
+  entry's provider env name. Router id becomes
+  `{provider}/{model}@{user_id}` so per-user slots route
+  independently. `PolicyHook` gate runs `check_and_reserve` before
+  upstream dispatch; refusals return HTTP 429. See
+  `docs/ZYAL/MULTI_USER_KEYS.md`.
+
+### Earlier unreleased
+
 - Added the canonical human-facing schema at `docs/ZYAL/SPEC.md` together with
   generator/check tooling so parser/schema drift cannot go silent.
 - Added three semantic bug-finder runbooks: basic, advanced, and ultra.

@@ -3,6 +3,18 @@ use tempfile::tempdir;
 use super::*;
 use crate::hashing::sha256_hex;
 use crate::model_policy::ModelPolicy;
+use crate::port::PortTargetRequest;
+
+fn super_target() -> PortTargetRequest {
+    PortTargetRequest {
+        target: "Reference".into(),
+        replacement: "Candidate".into(),
+        target_repo: None,
+        replacement_repo: None,
+        request: "replace Reference with Candidate".into(),
+        worker_cap: 10,
+    }
+}
 
 #[test]
 fn superreasoning_packet_hash_is_stable() {
@@ -224,4 +236,82 @@ fn packet_reconstruction_rejects_tampered_policy_hash() {
         .unwrap_err()
         .to_string();
     assert!(err.contains("policy hash") || err.contains("stable hash"));
+}
+
+#[test]
+fn draft_super_master_plan_emits_nine_to_twelve_stages() {
+    let plan = draft_super_master_plan(&super_target());
+    assert!((SUPER_STAGE_MIN..=SUPER_STAGE_MAX).contains(&plan.stages.len()));
+    assert_eq!(plan.tasks.len(), plan.stages.len() * 2);
+    // First stage matches the canonical kickoff phase.
+    assert!(plan.stages[0].name.eq_ignore_ascii_case("Source of truth"));
+    // Drafted plan must pass the macro validator.
+    validate_super_macro_plan(&plan).unwrap();
+
+    // The 12-stage upper bound is reachable when configured.
+    let cfg = SuperReasoningConfig {
+        macro_stage_target: SUPER_STAGE_MAX,
+        ..SuperReasoningConfig::default()
+    };
+    let max_plan = draft_super_master_plan_with_config(&super_target(), &cfg);
+    assert_eq!(max_plan.stages.len(), SUPER_STAGE_MAX);
+    validate_super_macro_plan(&max_plan).unwrap();
+}
+
+#[test]
+fn validate_super_macro_plan_rejects_cycle() {
+    let mut plan = draft_super_master_plan(&super_target());
+    let first_id = plan.stages[0].id.clone();
+    let last_idx = plan.stages.len() - 1;
+    let last_id = plan.stages[last_idx].id.clone();
+    // Introduce a back edge from first stage to last stage to force a cycle.
+    plan.stages[0].dependencies.push(last_id);
+    let err = validate_super_macro_plan(&plan).unwrap_err().to_string();
+    assert!(
+        err.contains("cycle"),
+        "expected cycle error, got: {err} (first stage id={first_id})"
+    );
+}
+
+#[test]
+fn validate_super_macro_plan_rejects_duplicate_stage_id() {
+    let mut plan = draft_super_master_plan(&super_target());
+    let dup_id = plan.stages[0].id.clone();
+    plan.stages[1].id = dup_id;
+    let err = validate_super_macro_plan(&plan).unwrap_err().to_string();
+    assert!(
+        err.contains("duplicate"),
+        "expected duplicate-id error, got: {err}"
+    );
+}
+
+#[test]
+fn parallel_phase_policy_default_caps_at_workspace_max() {
+    let policy = ParallelPhasePolicy::default();
+    assert!(policy.effective_max_parallel_phases() <= MAX_SUPERREASONING_WORKERS);
+    assert!(policy.effective_per_phase_worker_cap() <= MAX_SUPERREASONING_WORKERS);
+
+    // Overshoot is clamped down to the workspace cap.
+    let oversized = ParallelPhasePolicy {
+        max_parallel_phases: 9_999,
+        per_phase_worker_cap: 9_999,
+        ..ParallelPhasePolicy::default()
+    };
+    assert_eq!(
+        oversized.effective_max_parallel_phases(),
+        MAX_SUPERREASONING_WORKERS
+    );
+    assert_eq!(
+        oversized.effective_per_phase_worker_cap(),
+        MAX_SUPERREASONING_WORKERS
+    );
+
+    // Zero / underflow clamps up to 1.
+    let zero = ParallelPhasePolicy {
+        max_parallel_phases: 0,
+        per_phase_worker_cap: 0,
+        ..ParallelPhasePolicy::default()
+    };
+    assert_eq!(zero.effective_max_parallel_phases(), 1);
+    assert_eq!(zero.effective_per_phase_worker_cap(), 1);
 }

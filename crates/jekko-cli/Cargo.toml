@@ -25,14 +25,21 @@ jekko-server = { path = "../jekko-server" }
 jekko-plugin-api = { path = "../jekko-plugin-api" }
 jekko-store = { path = "../jekko-store" }
 jekko-tui = { path = "../jekko-tui" }
+jankurai-runner = { path = "../jankurai-runner" }
+crossterm = "0.28"
+notify = "6"
+ratatui = { version = "0.28", default-features = false, features = ["crossterm"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+zyal-supervisor = { path = "../zyal-supervisor" }
+zyalc = { path = "../zyalc" }
 
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"
-tempfile = "3"

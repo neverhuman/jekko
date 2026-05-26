@@ -266,7 +266,7 @@ pub const CATALOG: &[CatalogEntry] = &[
         provider_id: "jnoccio",
         env_names: &["JNOCCIO_DEVELOPER_KEY"],
         signup_url: None,
-        recommended_model_id: Some("jnoccio-fusion"),
+        recommended_model_id: Some("jnoccio-router"),
         priority: 96,
         companion_env_names: None,
     },

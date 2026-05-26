@@ -10,6 +10,7 @@ use serde_json::Value;
 
 use crate::prompt;
 use crate::session::{MessageInfo, SessionInfo};
+use jekko_provider::adapter::ProviderCredential;
 
 /// Request to run a one-shot prompt through the agent runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,7 +33,7 @@ pub struct RunRequest {
 }
 
 /// Request passed to the agent executor.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AgentTurnRequest {
     /// Raw prompt text.
     pub prompt: String,
@@ -51,6 +52,12 @@ pub struct AgentTurnRequest {
     /// Optional model identifier.
     #[serde(default)]
     pub model: Option<String>,
+    /// Credential preselected by the runtime for this turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential: Option<ProviderCredential>,
+    /// User folder id associated with the selected credential, if known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_credential_user_id: Option<String>,
     /// Whether the parent run is ephemeral.
     pub ephemeral: bool,
 }
@@ -73,9 +80,15 @@ pub struct AgentTurnResult {
     /// Credential source policy applied to this turn.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_source_policy: Option<String>,
+    /// User folder id selected before the upstream router metadata is known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_credential_user_id: Option<String>,
     /// User folder id when the credential came from `~/.jekko/users/*/llm.env`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_user_id: Option<String>,
+    /// Final router metadata payload when the provider exposes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub router_metadata: Option<Value>,
 }
 
 /// Result of a one-shot run.
@@ -110,9 +123,20 @@ pub struct RunResult {
     /// Credential source policy applied to this turn.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_source_policy: Option<String>,
+    /// User folder id selected before the upstream router metadata is known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_credential_user_id: Option<String>,
     /// User folder id when the credential came from `~/.jekko/users/*/llm.env`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_user_id: Option<String>,
+    /// Final router metadata payload when the provider exposes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub router_metadata: Option<Value>,
     /// Whether the runtime accepted the request.
     pub accepted: bool,
+    /// Whether the agent turn completed successfully.
+    pub success: bool,
+    /// Error text when the turn failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }

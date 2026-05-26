@@ -2,13 +2,13 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use zyalc::{compile, replay_verify, runbook_lint};
+use zyalc::{compile, live_audit, replay_verify, runbook_lint};
 
 #[derive(Parser, Debug)]
 #[command(
     name = "zyalc",
     version,
-    about = "Compile .zyal source files to TOML or GitHub Actions YAML"
+    about = "Compile .zyal source files to TOML, GitHub Actions YAML, or SuperWorkflow JSON"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -62,6 +62,18 @@ enum Cmd {
         #[arg(long, default_value = "text")]
         format: String,
         /// Exit non-zero on the first failure rather than reporting all.
+        #[arg(long)]
+        strict: bool,
+    },
+    /// Audit a completed live superreasoning run for credential provenance
+    /// and non-substituted live model outcomes.
+    AuditLiveRun {
+        /// Path to the run directory containing superreasoning artifacts.
+        run_dir: PathBuf,
+        /// Output format: text or json.
+        #[arg(long, default_value = "text")]
+        format: String,
+        /// Fail on any missing or substituted live evidence.
         #[arg(long)]
         strict: bool,
     },
@@ -197,6 +209,18 @@ fn dispatch(cli: &Cli) -> Result<i32> {
                 for failure in &report.failures {
                     eprintln!("  - {failure}");
                 }
+            }
+            Ok(report.exit_code())
+        }
+        Cmd::AuditLiveRun {
+            run_dir,
+            format,
+            strict,
+        } => {
+            let report = live_audit::audit(run_dir, *strict)?;
+            live_audit::print_report(&report, format)?;
+            if *strict && report.status != "passed" {
+                anyhow::bail!("live audit failed: {}", report.failures.join("; "));
             }
             Ok(report.exit_code())
         }
