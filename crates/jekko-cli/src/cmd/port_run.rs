@@ -24,9 +24,9 @@
 //! - `--super <PATH>` -> compile + persist + walk waves.
 //! - `--dry-run`      -> print the wave plan as JSON without persisting.
 //! - `--resume <ID>`  -> reopen a run, reset in-flight `Running` phases to
-//!                       `Pending`, then walk remaining waves.
+//!   `Pending`, then walk remaining waves.
 //! - `--status <ID>`  -> print persisted phase + task rows as JSON; no state
-//!                       changes.
+//!   changes.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};

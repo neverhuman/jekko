@@ -48,13 +48,15 @@ validate:
 	just fast
 
 # Workspace-wide fast lane composed from narrow proof targets.
-# `fmt-check-fast` runs first so a stray formatting violation fails fast
-# before the heavier typecheck/build/test lanes burn time. The `parity`
-# GitHub workflow runs `cargo fmt --all --check` and rejects PRs that
-# drift; mirroring it here closes the local-CI parity gap.
+# `fmt-check-fast` and `clippy-check-fast` run first so format / lint
+# violations fail fast before the heavier typecheck/build/test lanes
+# burn time. The `parity` GitHub workflow runs `cargo fmt --all --check`
+# AND `cargo clippy --all-targets -- -D warnings` and rejects PRs that
+# drift; mirroring them here closes the local-CI parity gap.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
 workspace-fast:
 	just fmt-check-fast
+	just clippy-check-fast
 	just workspace-typecheck-fast
 	just workspace-build-fast
 	just workspace-test-fast
@@ -67,11 +69,22 @@ fmt-check-fast:
 	cargo fmt --all -- --check
 	cd jnoccio-fusion && cargo fmt --all -- --check
 
-# Apply rustfmt across both build trees. Use before committing if
-# fmt-check-fast fails.
+# Narrow lane: clippy with -D warnings across both build trees. Mirrors
+# the GitHub `parity` workflow's rust-parity-gates step.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
+clippy-check-fast:
+	cargo clippy --workspace --all-targets --locked -- -D warnings
+	cd jnoccio-fusion && cargo clippy --all-targets --locked -- -D warnings
+
+# Apply rustfmt + clippy autofix across both build trees. Use before
+# committing if fmt-check-fast or clippy-check-fast fails.
 fmt:
 	cargo fmt --all
 	cd jnoccio-fusion && cargo fmt --all
+
+clippy-fix:
+	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-no-vcs -- -D warnings
+	cd jnoccio-fusion && cargo clippy --all-targets --fix --allow-dirty --allow-no-vcs -- -D warnings
 
 # Narrow lane for workspace typecheck-only feedback.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true

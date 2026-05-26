@@ -597,9 +597,8 @@ fn run_tui(events_path: &Path, args: &WatchArgs) -> Result<()> {
             }
 
             // Disconnected sender means the watcher thread died.
-            match rx.recv_timeout(Duration::from_millis(0)) {
-                Err(RecvTimeoutError::Disconnected) => break,
-                _ => {}
+            if let Err(RecvTimeoutError::Disconnected) = rx.recv_timeout(Duration::from_millis(0)) {
+                break;
             }
         }
         Ok(())

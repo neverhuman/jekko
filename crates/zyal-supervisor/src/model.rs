@@ -70,8 +70,10 @@ pub struct Phase {
 /// `Ready` via [`crate::planner::ready_phases`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum PhaseStatus {
     /// Phase is not ready because dependencies remain.
+    #[default]
     Pending,
     /// Phase dependencies are complete and it can be scheduled.
     Ready,
@@ -87,12 +89,6 @@ pub enum PhaseStatus {
     Parked,
     /// Phase failed irrecoverably.
     Failed,
-}
-
-impl Default for PhaseStatus {
-    fn default() -> Self {
-        PhaseStatus::Pending
-    }
 }
 
 impl PhaseStatus {
@@ -149,8 +145,10 @@ pub struct Task {
 /// Persisted task status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum TaskStatus {
     /// Task is available for lease.
+    #[default]
     Pending,
     /// Task is leased to an agent and executing.
     Running,
@@ -158,12 +156,6 @@ pub enum TaskStatus {
     Done,
     /// Task is blocked.
     Blocked,
-}
-
-impl Default for TaskStatus {
-    fn default() -> Self {
-        TaskStatus::Pending
-    }
 }
 
 impl TaskStatus {
@@ -227,10 +219,12 @@ pub enum GateKind {
 /// Phase-scoped write authority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum WriteScope {
     /// Writes are limited to scratch (no merge target).
     ScratchOnly,
     /// Writes go to an isolated worktree.
+    #[default]
     IsolatedWorktree,
     /// Writes target an integration branch awaiting sign-off.
     IntegrationBranch,
@@ -238,28 +232,18 @@ pub enum WriteScope {
     PrimaryRepo,
 }
 
-impl Default for WriteScope {
-    fn default() -> Self {
-        WriteScope::IsolatedWorktree
-    }
-}
-
 /// Required sign-off mode before a phase can complete.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum PhaseSignoffMode {
     /// No sign-off required.
     None,
     /// A single reviewer must approve.
+    #[default]
     Single,
     /// Multiple reviewers must approve (quorum policy is host-defined).
     Quorum,
-}
-
-impl Default for PhaseSignoffMode {
-    fn default() -> Self {
-        PhaseSignoffMode::Single
-    }
 }
 
 /// Controller orchestration policy.
@@ -307,37 +291,29 @@ pub struct SandboxPolicy {
 /// Sandbox isolation backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum SandboxMode {
     /// In-process (no isolation; tests only).
     InProcess,
     /// Isolated git worktree.
+    #[default]
     Worktree,
     /// Containerized sandbox.
     Container,
 }
 
-impl Default for SandboxMode {
-    fn default() -> Self {
-        SandboxMode::Worktree
-    }
-}
-
 /// Network egress policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum NetworkPolicy {
     /// No outbound network.
+    #[default]
     Deny,
     /// Allowlisted egress only.
     Allowlist,
     /// Unrestricted egress (highest authority).
     Allow,
-}
-
-impl Default for NetworkPolicy {
-    fn default() -> Self {
-        NetworkPolicy::Deny
-    }
 }
 
 /// Repo graph indexing policy.
@@ -355,17 +331,13 @@ pub struct RepoGraphPolicy {
 /// Repo graph storage backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum GraphStore {
     /// Persist to the supervisor SQLite store.
+    #[default]
     Sqlite,
     /// Keep in memory only.
     InMemory,
-}
-
-impl Default for GraphStore {
-    fn default() -> Self {
-        GraphStore::Sqlite
-    }
 }
 
 /// Parity / differential testing policy.

@@ -298,14 +298,8 @@ fn model_event_payload(
         Some(retry_count) => retry_count,
         None => attempt.saturating_sub(1),
     };
-    let budget_used = match receipt.budget_used {
-        Some(budget_used) => budget_used,
-        None => 0,
-    };
-    let budget_remaining = match receipt.budget_remaining {
-        Some(budget_remaining) => budget_remaining,
-        None => 0,
-    };
+    let budget_used = receipt.budget_used.unwrap_or_default();
+    let budget_remaining = receipt.budget_remaining.unwrap_or_default();
     json!({
         "kind": receipt.kind,
         "provider": receipt.provider,
@@ -471,20 +465,6 @@ pub(crate) fn export_reasoning_graph(
     Ok(path)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::parse_structured_model_json;
-
-    #[test]
-    fn parse_structured_model_json_accepts_wrapped_object() {
-        let text =
-            "Here is the JSON: {\"answer\":true,\"count\":2}\nExtra notes: ignore this {not json}";
-        let value = parse_structured_model_json(text).expect("wrapped JSON should parse");
-        assert_eq!(value["answer"], true);
-        assert_eq!(value["count"], 2);
-    }
-}
-
 pub(crate) fn emit_state(sink: &EventSink, state: &str) -> Result<()> {
     sink.emit(EventKind::ReasoningState, json!({"state": state}))
 }
@@ -499,4 +479,18 @@ fn synthetic_structured_value(kind: ModelTaskKind) -> serde_json::Value {
 fn mark_blocked_for_parse_error(db: &Db, run_id: &str, error: &str) -> Result<()> {
     daemon_store::mark_daemon_run(db, run_id, "blocked", "model_json_parse", Some(error))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_structured_model_json;
+
+    #[test]
+    fn parse_structured_model_json_accepts_wrapped_object() {
+        let text =
+            "Here is the JSON: {\"answer\":true,\"count\":2}\nExtra notes: ignore this {not json}";
+        let value = parse_structured_model_json(text).expect("wrapped JSON should parse");
+        assert_eq!(value["answer"], true);
+        assert_eq!(value["count"], 2);
+    }
 }

@@ -138,10 +138,7 @@ pub fn classify_text(text: &str) -> Result<ClassifyResult> {
                 Some(id) if !id.is_empty() => id.to_string(),
                 _ => UNKNOWN_CAP_LABEL.to_string(),
             };
-            let cap_marker = match cap_id {
-                Some(id) => id,
-                None => String::new(),
-            };
+            let cap_marker = cap_id.unwrap_or_default();
             findings.push(Finding {
                 rule_id: format!("cap:{}", cap_id_label),
                 fingerprint: format!("cap:{}", cap_id_label),
@@ -234,10 +231,7 @@ fn finding_rule_id(
     id: Option<String>,
     rule: Option<String>,
 ) -> String {
-    match rule_id.or(check_id).or(id).or(rule) {
-        Some(value) => value,
-        None => String::new(),
-    }
+    rule_id.or(check_id).or(id).or(rule).unwrap_or_default()
 }
 
 #[derive(Debug, Deserialize)]

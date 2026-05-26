@@ -147,7 +147,7 @@ pub fn encode_embedding(vector: &[f32]) -> Vec<u8> {
 /// column) back to a vector. Returns `None` when the byte length is not a
 /// multiple of 4 (corrupted row).
 pub fn decode_embedding(bytes: &[u8]) -> Option<Vec<f32>> {
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return None;
     }
     let mut out = Vec::with_capacity(bytes.len() / 4);
