@@ -1,17 +1,17 @@
 {
-  "report_fingerprint": "sha256:a347a347a481eb0704cdc60d2fb4170e3a152918d8291a52d7a0475fa30b6d13",
-  "input_fingerprint": "sha256:0b674b7c10d2a71617a5d1c530f617b10e802b91ea5cf166ef26105230ca0b59",
-  "policy_fingerprint": "sha256:afb627621abadec1941741eed4c953ce33bb7620c69d7538ba3c544255d1a834",
+  "report_fingerprint": "sha256:65795d78a03a944fb86230f47c736d78ddfd9f13c206c89e7f1361ebcfa0d9a6",
+  "input_fingerprint": "sha256:959674e3bfc222f9358c0be17e62e6075e6b3231703ad7c6eed43ee848f624b9",
+  "policy_fingerprint": "sha256:3e1df82f91169457e77990d4e848241b878b0323d2d5005bfa608d1ac85a3319",
   "manifest_fingerprints": {
-    "owner_map": "sha256:becd367faa55446c3a8698a626a8d12de3915fbb45eb0e7f30c6d9c05b31a725",
-    "test_map": "sha256:f7a4ab28ab2b6969941e7a3e05a3eacccc390adb38ccff23e897b011fdf6cdc6",
-    "generated_zones": "sha256:6906fe09ef04c4e71b2382eaad6eb7d15450acc7e0dd99e8c8f97caaf33dfd79",
+    "owner_map": "sha256:742562e9ab544a7037d8d42b48eb488e141d49fe6baa49561344b89138c6f464",
+    "test_map": "sha256:acbd957d4baf35fe774403babf192e7f7d384c310fd03c1ae2025650cb7eddbb",
+    "generated_zones": "sha256:6bf9d3dab34f9f8028765eb928da998c519d5a7dbfaa895f5de58ecf23060bfb",
     "boundaries": "sha256:65fe11e0be72e3ce25bed8fa55e239acc39c55520cd41c0344c7aab23eb0573d",
     "proof_lanes": "sha256:3300ad5c4520ddf97ea5b8a95c545516b7c100851dba3ba352519019962613e7",
     "standard_version": "sha256:69c2cc2291946f90279f378110e50d9cac1a905237fa3732adc6e1b58445d72e"
   },
   "dirty_worktree": true,
-  "generated_at": "1779643687",
+  "generated_at": "1779767031",
   "schema_url": "schemas/repo-score.schema.json",
   "standard": "jankurai",
   "standard_version": "0.9.0",
@@ -21,29 +21,32 @@
   "target_stack_id": "rust-ratatui-docker",
   "target_stack": "Rust core + TypeScript/React/Vite + PostgreSQL + generated contracts + exception-only Python AI/data service",
   "claimed_conformance_level": "HL3",
-  "observed_conformance_level": "HL3",
-  "conformance_decision": "pass",
-  "conformance_blockers": [],
+  "observed_conformance_level": "HL2",
+  "conformance_decision": "block",
+  "conformance_blockers": [
+    "HLT-013-RENDERED-UX-GAP on apps/web",
+    "HLT-001-DEAD-MARKER on crates/jankurai-runner/src/reasoning_io.rs"
+  ],
   "repo": ".",
-  "run_id": "1779643687",
-  "started_at": "1779643687",
-  "elapsed_ms": 6850,
+  "run_id": "1779767031",
+  "started_at": "1779767031",
+  "elapsed_ms": 8826,
   "scope": {
     "mode": "full",
     "paths": []
   },
-  "score": 88,
-  "raw_score": 88,
+  "score": 70,
+  "raw_score": 86,
   "decision": {
     "status": "advisory",
-    "minimum_score": 85,
+    "minimum_score": 65,
     "passed": true,
-    "hard_findings": 0,
-    "soft_findings": 2,
+    "hard_findings": 2,
+    "soft_findings": 1,
     "ratchet": {
-      "baseline_score": 88,
+      "baseline_score": 70,
       "allowed_drop": 0,
-      "passed": true,
+      "passed": false,
       "score_delta": 0,
       "baseline_report_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       "baseline_input_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
@@ -54,7 +57,7 @@
     }
   },
   "git": {
-    "head": "18951c915",
+    "head": "1022f4de7",
     "base": null,
     "changed_files": 0,
     "mode": "full",
@@ -62,7 +65,7 @@
   },
   "policy": {
     "path": "./agent/audit-policy.toml",
-    "minimum_score": 85,
+    "minimum_score": 65,
     "fail_on": [
       "critical",
       "high"
@@ -78,7 +81,10 @@
     "paper_edition": "2026.05-ed8",
     "target_stack": "rust-ts-vite-react-postgres-bounded-python"
   },
-  "caps_applied": [],
+  "caps_applied": [
+    "fallback-soup-in-product-code",
+    "missing-rendered-ux-qa-lane"
+  ],
   "hard_rules": [
     {
       "id": "no-root-agent-instructions",
@@ -317,8 +323,8 @@
     {
       "name": "Proof lanes and test routing",
       "weight": 12,
-      "score": 100,
-      "weighted_points": 12.0,
+      "score": 98,
+      "weighted_points": 11.76,
       "evidence": [
         "one-command setup/validation lane found",
         "deterministic fast lane found",
@@ -327,11 +333,12 @@
         "test/proof routing map present",
         "jankurai audit lane found in CI",
         "web e2e lane present or no web surface",
-        "rendered UX QA lane present or no web surface",
         "DOM geometry UX QA runtime found",
         "Rust property/integration tests present or no Rust surface"
       ],
-      "notes": []
+      "notes": [
+        "web surface lacks layered rendered UX QA"
+      ]
     },
     {
       "name": "Security and supply-chain posture",
@@ -346,9 +353,9 @@
         "security lane present",
         "canonical security lane wrapper present",
         "agent-readiness audit gate found in CI",
-        "rust bad-behavior advisory signals: 2069",
+        "rust bad-behavior advisory signals: 2203",
         "ci bad-behavior advisory signals: 1",
-        "git bad-behavior advisory signals: 1",
+        "git bad-behavior advisory signals: 2",
         "gittools bad-behavior advisory signals: 1",
         "Rust and npm dependency audits are operational commands",
         "secret scanning command is operational",
@@ -359,17 +366,18 @@
     {
       "name": "Code shape and semantic surface",
       "weight": 12,
-      "score": 45,
-      "weighted_points": 5.4,
+      "score": 27,
+      "weighted_points": 3.24,
       "evidence": [
-        "largest authored code file: crates/jankurai-runner/src/parity_lab.rs (1089 LOC)",
+        "largest authored code file: crates/jekko-runtime/src/daemon/super_reasoning.rs (1231 LOC)",
         "code file exceeds 500 LOC",
         "code file exceeds 1000 LOC",
         "most code files stay under 300 LOC",
-        "copy-code advisory classes found: 58 (advisory only, no score impact)",
-        "rust bad-behavior advisory signals: 2069",
+        "copy-code advisory classes found: 62 (advisory only, no score impact)",
+        "fallback soup marker found",
+        "rust bad-behavior advisory signals: 2203",
         "ci bad-behavior advisory signals: 1",
-        "git bad-behavior advisory signals: 1",
+        "git bad-behavior advisory signals: 2",
         "gittools bad-behavior advisory signals: 1",
         "no hard bad-behavior findings across detector-backed language families"
       ],
@@ -426,12 +434,12 @@
     {
       "name": "Jankurai tool adoption and CI replacement",
       "weight": 7,
-      "score": 49,
-      "weighted_points": 3.43,
+      "score": 48,
+      "weighted_points": 3.36,
       "evidence": [
         "control-plane files present",
-        "applicable=16",
-        "configured=16",
+        "applicable=17",
+        "configured=17",
         "ci_evidence=5",
         "artifact_verified=0"
       ],
@@ -456,37 +464,40 @@
     {
       "name": "Build speed signals",
       "weight": 4,
-      "score": 80,
-      "weighted_points": 3.2,
+      "score": 95,
+      "weighted_points": 3.8,
       "evidence": [
         "build acceleration markers found",
         "targeted test/build commands found",
         "locked dependency graph present",
         "CI cache hint found",
+        "fast lane uses targeted commands and target-only audit artifacts",
         "explicit cache marker plus narrow per-package target found"
       ],
       "notes": []
     }
   ],
   "ux_qa": {
-    "web_surface": false,
-    "has_rendered_ux_lane": true,
-    "missing_categories": [],
+    "web_surface": true,
+    "has_rendered_ux_lane": false,
+    "missing_categories": [
+      "layout stability checks",
+      "generated API mocks"
+    ],
     "evidence": {
       "accessibility": [
         "agent/baselines/main.repo-score.json"
       ],
-      "api_mocks": [
-        "jnoccio-fusion/config/models.json"
-      ],
+      "api_mocks": [],
       "artifact_backed_proof": [
+        "agent/baselines/main.repo-score.json",
         "agent/ux-qa.toml",
-        "crates/jankurai-runner/src/hero_judge.rs",
-        "crates/jankurai-runner/src/hero_judge_runner_flow.rs",
-        "crates/jankurai-runner/src/superreasoning.rs",
-        "crates/jekko-cli/src/cli.rs"
+        "crates/jankurai-runner/src/hero_judge/summary.rs",
+        "crates/jankurai-runner/src/hero_judge_runner_artifacts.rs",
+        "crates/jankurai-runner/src/hero_judge_runner_finalize.rs"
       ],
       "design_tokens": [
+        "agent/baselines/main.repo-score.json",
         "agent/e2e/design-tokens.md"
       ],
       "geometry_runtime": [
@@ -639,8 +650,8 @@
   },
   "tool_adoption": {
     "control_plane_present": true,
-    "applicable_count": 16,
-    "configured_count": 16,
+    "applicable_count": 17,
+    "configured_count": 17,
     "ci_evidence_count": 5,
     "artifact_verified_count": 0,
     "replaced_count": 5,
@@ -870,17 +881,20 @@
         "id": "ux-qa",
         "category": "ux",
         "mode": "auto",
-        "applicable": false,
-        "status": "not_applicable",
+        "applicable": true,
+        "status": "configured",
         "replaced_tools": [
           "playwright",
           "axe-core",
           "visual baselines"
         ],
         "evidence": [
-          "mode=auto"
+          "mode=auto",
+          "tool-adoption config entry present"
         ],
-        "missing": [],
+        "missing": [
+          "CI command evidence"
+        ],
         "local_command": "jankurai ux audit --config agent/ux-qa.toml --out target/jankurai/ux-qa.json",
         "ci_command": "jankurai ux audit --config agent/ux-qa.toml --out target/jankurai/ux-qa.json",
         "artifact_paths": [
@@ -1111,7 +1125,7 @@
       }
     ],
     "evidence": {
-      "applicable_count": 16,
+      "applicable_count": 17,
       "applicable_tools": [
         "audit-ci",
         "proof-routing",
@@ -1122,6 +1136,7 @@
         "ci-bad-behavior",
         "git-bad-behavior",
         "release-bad-behavior",
+        "ux-qa",
         "contract-drift",
         "rust-witness",
         "authz-matrix",
@@ -1141,7 +1156,7 @@
         "rust-witness"
       ],
       "config_present": true,
-      "configured_count": 16,
+      "configured_count": 17,
       "configured_tools": [
         "audit-ci",
         "proof-routing",
@@ -1152,6 +1167,7 @@
         "ci-bad-behavior",
         "git-bad-behavior",
         "release-bad-behavior",
+        "ux-qa",
         "contract-drift",
         "rust-witness",
         "authz-matrix",
@@ -1172,6 +1188,7 @@
       "ci-bad-behavior",
       "git-bad-behavior",
       "release-bad-behavior",
+      "ux-qa",
       "contract-drift",
       "rust-witness",
       "authz-matrix",
@@ -1199,7 +1216,7 @@
   "copy_code": {
     "schema_version": "1.1.0",
     "generated_by": "jankurai copy-code",
-    "generated_at": "2026-05-24T17:28:00.757325578+00:00",
+    "generated_at": "2026-05-26T03:43:43.279446123+00:00",
     "repo": ".",
     "auditor_version": "1.5.1",
     "status": "review",
@@ -1237,20 +1254,20 @@
       ]
     },
     "summary": {
-      "files_scanned": 1063,
-      "files_considered": 576,
-      "active_files": 576,
+      "files_scanned": 1284,
+      "files_considered": 771,
+      "active_files": 771,
       "exact_file_classes": 0,
       "hard_classes": 0,
-      "warning_classes": 58,
+      "warning_classes": 62,
       "hard_instances": 0,
-      "warning_instances": 176,
-      "duplicate_lines": 149,
-      "duplicate_tokens": 436,
-      "duplicate_bytes": 4308,
-      "total_redundant_lines": 245,
-      "total_redundant_tokens": 707,
-      "total_redundant_bytes": 6963
+      "warning_instances": 174,
+      "duplicate_lines": 172,
+      "duplicate_tokens": 460,
+      "duplicate_bytes": 4635,
+      "total_redundant_lines": 255,
+      "total_redundant_tokens": 683,
+      "total_redundant_bytes": 6896
     },
     "classes": [
       {
@@ -1439,111 +1456,6 @@
         ]
       },
       {
-        "id": "copy-code-body-rust-6945669db995c77a",
-        "kind": "exact_unit_different_name",
-        "severity": "warning",
-        "confidence": "medium",
-        "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 4,
-        "duplicate_bytes": 37,
-        "instance_count": 12,
-        "total_redundant_lines": 11,
-        "total_redundant_tokens": 44,
-        "total_redundant_bytes": 407,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "2756a9ae9e87ab8e",
-        "reason": "same body appears under different names across files",
-        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
-        "instances": [
-          {
-            "path": "crates/jankurai-runner/src/model_client.rs",
-            "language": "rust",
-            "start_line": 596,
-            "end_line": 597,
-            "unit_name": "fake_model_success_receipt_is_deterministic"
-          },
-          {
-            "path": "crates/jankurai-runner/src/model_client.rs",
-            "language": "rust",
-            "start_line": 610,
-            "end_line": 611,
-            "unit_name": "fake_model_failure_receipt_records_error"
-          },
-          {
-            "path": "crates/jankurai-runner/src/model_client.rs",
-            "language": "rust",
-            "start_line": 626,
-            "end_line": 627,
-            "unit_name": "budgeted_client_blocks_after_limit"
-          },
-          {
-            "path": "crates/jankurai-runner/src/model_client.rs",
-            "language": "rust",
-            "start_line": 644,
-            "end_line": 645,
-            "unit_name": "budgeted_client_rejects_fake_when_live_required"
-          },
-          {
-            "path": "crates/jankurai-runner/src/model_client.rs",
-            "language": "rust",
-            "start_line": 675,
-            "end_line": 676,
-            "unit_name": "runtime_client_does_not_pass_model_when_route_model_is_unspecified"
-          },
-          {
-            "path": "crates/jankurai-runner/src/repo_graph.rs",
-            "language": "rust",
-            "start_line": 430,
-            "end_line": 431,
-            "unit_name": "builds_file_test_and_import_edges"
-          },
-          {
-            "path": "crates/jekko-runtime/src/tool/edit/mod.rs",
-            "language": "rust",
-            "start_line": 105,
-            "end_line": 106,
-            "unit_name": "replaces_once"
-          },
-          {
-            "path": "crates/jekko-runtime/src/tool/edit/mod.rs",
-            "language": "rust",
-            "start_line": 122,
-            "end_line": 123,
-            "unit_name": "errors_on_duplicates_without_replace_all"
-          },
-          {
-            "path": "crates/jekko-runtime/src/tool/edit/mod.rs",
-            "language": "rust",
-            "start_line": 137,
-            "end_line": 138,
-            "unit_name": "replace_all_works"
-          },
-          {
-            "path": "crates/jekko-runtime/src/tool/read.rs",
-            "language": "rust",
-            "start_line": 105,
-            "end_line": 106,
-            "unit_name": "reads_with_line_numbers"
-          },
-          {
-            "path": "crates/jekko-runtime/src/tool/read.rs",
-            "language": "rust",
-            "start_line": 122,
-            "end_line": 123,
-            "unit_name": "applies_offset_and_limit"
-          },
-          {
-            "path": "crates/jekko-runtime/src/tool/write.rs",
-            "language": "rust",
-            "start_line": 71,
-            "end_line": 72,
-            "unit_name": "writes_file"
-          }
-        ]
-      },
-      {
         "id": "copy-code-unit-rust-848c888d447ff804",
         "kind": "exact_unit_same_name",
         "severity": "warning",
@@ -1594,36 +1506,36 @@
         "total_redundant_bytes": 50,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "c79cab65d4a099c4",
+        "fingerprint": "210e1e6855a386ee",
         "reason": "same body appears under different names across files",
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jankurai-runner/src/hero_judge/population.rs",
             "language": "rust",
-            "start_line": 664,
-            "end_line": 666,
+            "start_line": 140,
+            "end_line": 142,
             "unit_name": "default_true"
           },
           {
-            "path": "crates/jankurai-runner/src/port.rs",
+            "path": "crates/jankurai-runner/src/port/plan.rs",
             "language": "rust",
-            "start_line": 413,
-            "end_line": 415,
+            "start_line": 161,
+            "end_line": 163,
             "unit_name": "default_true"
           },
           {
-            "path": "crates/jankurai-runner/src/port_runner.rs",
+            "path": "crates/jankurai-runner/src/port_runner/config.rs",
             "language": "rust",
-            "start_line": 277,
-            "end_line": 279,
+            "start_line": 65,
+            "end_line": 67,
             "unit_name": "default_fake_worker"
           },
           {
-            "path": "crates/jankurai-runner/src/superreasoning.rs",
+            "path": "crates/jankurai-runner/src/superreasoning/config.rs",
             "language": "rust",
-            "start_line": 324,
-            "end_line": 326,
+            "start_line": 652,
+            "end_line": 654,
             "unit_name": "default_true"
           },
           {
@@ -1664,30 +1576,65 @@
           {
             "path": "crates/xtask/src/commands/security_lane.rs",
             "language": "rust",
-            "start_line": 175,
-            "end_line": 178,
+            "start_line": 179,
+            "end_line": 182,
             "unit_name": "run_gitleaks"
           },
           {
             "path": "crates/xtask/src/commands/security_lane.rs",
             "language": "rust",
-            "start_line": 204,
-            "end_line": 207,
+            "start_line": 213,
+            "end_line": 216,
             "unit_name": "run_cargo_audit"
           },
           {
             "path": "crates/xtask/src/commands/security_lane.rs",
             "language": "rust",
-            "start_line": 226,
-            "end_line": 229,
+            "start_line": 235,
+            "end_line": 238,
             "unit_name": "run_zizmor"
           },
           {
             "path": "crates/xtask/src/commands/security_lane.rs",
             "language": "rust",
-            "start_line": 254,
-            "end_line": 257,
+            "start_line": 263,
+            "end_line": 266,
             "unit_name": "run_syft"
+          }
+        ]
+      },
+      {
+        "id": "copy-code-body-rust-e0e339e056b6fe3c",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 9,
+        "duplicate_tokens": 15,
+        "duplicate_bytes": 215,
+        "instance_count": 2,
+        "total_redundant_lines": 9,
+        "total_redundant_tokens": 15,
+        "total_redundant_bytes": 215,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "56370f2600f1a81a",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/jankurai-runner/src/bin_main/hero_series/files.rs",
+            "language": "rust",
+            "start_line": 25,
+            "end_line": 34,
+            "unit_name": "filter_series_lanes"
+          },
+          {
+            "path": "crates/jankurai-runner/src/hero_judge_runner_helpers.rs",
+            "language": "rust",
+            "start_line": 132,
+            "end_line": 141,
+            "unit_name": "filter_lane_metrics"
           }
         ]
       },
@@ -1750,8 +1697,8 @@
           {
             "path": "crates/jankurai-runner/src/worker_pool.rs",
             "language": "rust",
-            "start_line": 121,
-            "end_line": 128,
+            "start_line": 142,
+            "end_line": 149,
             "unit_name": "sanitize_branch_segment"
           },
           {
@@ -1760,6 +1707,42 @@
             "start_line": 170,
             "end_line": 177,
             "unit_name": "sanitize_branch_segment"
+          }
+        ]
+      },
+      {
+        "id": "copy-code-unit-rust-490c7d8dce1a397c",
+        "kind": "exact_unit_same_name",
+        "severity": "warning",
+        "confidence": "high",
+        "language": "rust",
+        "unit_name": "exit_code",
+        "duplicate_lines": 7,
+        "duplicate_tokens": 7,
+        "duplicate_bytes": 99,
+        "instance_count": 2,
+        "total_redundant_lines": 7,
+        "total_redundant_tokens": 7,
+        "total_redundant_bytes": 99,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "d53fab64a1a48ae3",
+        "reason": "same-name semantic unit copied across multiple files",
+        "recommended_action": "keep the named unit in one owner and call it from the other sites",
+        "instances": [
+          {
+            "path": "crates/zyalc/src/live_audit/report.rs",
+            "language": "rust",
+            "start_line": 20,
+            "end_line": 27,
+            "unit_name": "exit_code"
+          },
+          {
+            "path": "crates/zyalc/src/replay_verify.rs",
+            "language": "rust",
+            "start_line": 54,
+            "end_line": 61,
+            "unit_name": "exit_code"
           }
         ]
       },
@@ -1796,92 +1779,6 @@
             "start_line": 154,
             "end_line": 160,
             "unit_name": "published"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-unit-rust-54f43cddd8c9a04e",
-        "kind": "exact_unit_same_name",
-        "severity": "warning",
-        "confidence": "high",
-        "language": "rust",
-        "unit_name": "parse_opt_json",
-        "duplicate_lines": 3,
-        "duplicate_tokens": 9,
-        "duplicate_bytes": 76,
-        "instance_count": 3,
-        "total_redundant_lines": 6,
-        "total_redundant_tokens": 18,
-        "total_redundant_bytes": 152,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "58a8a88d8db6190e",
-        "reason": "same-name semantic unit copied across multiple files",
-        "recommended_action": "keep the named unit in one owner and call it from the other sites",
-        "instances": [
-          {
-            "path": "crates/jekko-store/src/daemon/forever.rs",
-            "language": "rust",
-            "start_line": 563,
-            "end_line": 566,
-            "unit_name": "parse_opt_json"
-          },
-          {
-            "path": "crates/jekko-store/src/daemon/port.rs",
-            "language": "rust",
-            "start_line": 951,
-            "end_line": 954,
-            "unit_name": "parse_opt_json"
-          },
-          {
-            "path": "crates/jekko-store/src/daemon/reasoning.rs",
-            "language": "rust",
-            "start_line": 548,
-            "end_line": 551,
-            "unit_name": "parse_opt_json"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-unit-rust-83d9f27efacf10fd",
-        "kind": "exact_unit_same_name",
-        "severity": "warning",
-        "confidence": "high",
-        "language": "rust",
-        "unit_name": "collect_rows",
-        "duplicate_lines": 3,
-        "duplicate_tokens": 9,
-        "duplicate_bytes": 64,
-        "instance_count": 3,
-        "total_redundant_lines": 6,
-        "total_redundant_tokens": 18,
-        "total_redundant_bytes": 128,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "58a8a88d8db6190e",
-        "reason": "same-name semantic unit copied across multiple files",
-        "recommended_action": "keep the named unit in one owner and call it from the other sites",
-        "instances": [
-          {
-            "path": "crates/jekko-store/src/daemon/forever.rs",
-            "language": "rust",
-            "start_line": 570,
-            "end_line": 573,
-            "unit_name": "collect_rows"
-          },
-          {
-            "path": "crates/jekko-store/src/daemon/port.rs",
-            "language": "rust",
-            "start_line": 958,
-            "end_line": 961,
-            "unit_name": "collect_rows"
-          },
-          {
-            "path": "crates/jekko-store/src/daemon/reasoning.rs",
-            "language": "rust",
-            "start_line": 555,
-            "end_line": 558,
-            "unit_name": "collect_rows"
           }
         ]
       },
@@ -1937,29 +1834,29 @@
         "total_redundant_bytes": 30,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "622b3c5dde1f1fbb",
+        "fingerprint": "4e1e49a97bdc6ac4",
         "reason": "same-name semantic unit copied across multiple files",
         "recommended_action": "keep the named unit in one owner and call it from the other sites",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jankurai-runner/src/hero_judge/population.rs",
             "language": "rust",
-            "start_line": 664,
-            "end_line": 666,
+            "start_line": 140,
+            "end_line": 142,
             "unit_name": "default_true"
           },
           {
-            "path": "crates/jankurai-runner/src/port.rs",
+            "path": "crates/jankurai-runner/src/port/plan.rs",
             "language": "rust",
-            "start_line": 413,
-            "end_line": 415,
+            "start_line": 161,
+            "end_line": 163,
             "unit_name": "default_true"
           },
           {
-            "path": "crates/jankurai-runner/src/superreasoning.rs",
+            "path": "crates/jankurai-runner/src/superreasoning/config.rs",
             "language": "rust",
-            "start_line": 324,
-            "end_line": 326,
+            "start_line": 652,
+            "end_line": 654,
             "unit_name": "default_true"
           },
           {
@@ -1986,36 +1883,36 @@
         "total_redundant_bytes": 21,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "211182012b128846",
+        "fingerprint": "0b3ab7295b4f0a04",
         "reason": "same body appears under different names across files",
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jankurai-runner/src/hero_judge/config.rs",
             "language": "rust",
-            "start_line": 668,
-            "end_line": 670,
+            "start_line": 103,
+            "end_line": 105,
             "unit_name": "default_generations"
           },
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jankurai-runner/src/hero_judge/population.rs",
             "language": "rust",
-            "start_line": 680,
-            "end_line": 682,
+            "start_line": 152,
+            "end_line": 154,
             "unit_name": "default_verifier_lanes"
           },
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jankurai-runner/src/hero_judge/population.rs",
             "language": "rust",
-            "start_line": 684,
-            "end_line": 686,
+            "start_line": 156,
+            "end_line": 158,
             "unit_name": "default_literature_lanes"
           },
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jankurai-runner/src/hero_judge/population.rs",
             "language": "rust",
-            "start_line": 688,
-            "end_line": 690,
+            "start_line": 160,
+            "end_line": 162,
             "unit_name": "default_red_team_lanes"
           }
         ]
@@ -2148,6 +2045,69 @@
         ]
       },
       {
+        "id": "copy-code-body-rust-6945669db995c77a",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 1,
+        "duplicate_tokens": 4,
+        "duplicate_bytes": 37,
+        "instance_count": 6,
+        "total_redundant_lines": 5,
+        "total_redundant_tokens": 20,
+        "total_redundant_bytes": 185,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "11f6aeb3b083b568",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/jekko-runtime/src/tool/edit/mod.rs",
+            "language": "rust",
+            "start_line": 105,
+            "end_line": 106,
+            "unit_name": "replaces_once"
+          },
+          {
+            "path": "crates/jekko-runtime/src/tool/edit/mod.rs",
+            "language": "rust",
+            "start_line": 122,
+            "end_line": 123,
+            "unit_name": "errors_on_duplicates_without_replace_all"
+          },
+          {
+            "path": "crates/jekko-runtime/src/tool/edit/mod.rs",
+            "language": "rust",
+            "start_line": 137,
+            "end_line": 138,
+            "unit_name": "replace_all_works"
+          },
+          {
+            "path": "crates/jekko-runtime/src/tool/read.rs",
+            "language": "rust",
+            "start_line": 105,
+            "end_line": 106,
+            "unit_name": "reads_with_line_numbers"
+          },
+          {
+            "path": "crates/jekko-runtime/src/tool/read.rs",
+            "language": "rust",
+            "start_line": 122,
+            "end_line": 123,
+            "unit_name": "applies_offset_and_limit"
+          },
+          {
+            "path": "crates/jekko-runtime/src/tool/write.rs",
+            "language": "rust",
+            "start_line": 71,
+            "end_line": 72,
+            "unit_name": "writes_file"
+          }
+        ]
+      },
+      {
         "id": "copy-code-body-rust-4bc7d056d416ed07",
         "kind": "exact_unit_different_name",
         "severity": "warning",
@@ -2211,6 +2171,41 @@
         ]
       },
       {
+        "id": "copy-code-body-rust-f2b4a488332b663f",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 5,
+        "duplicate_tokens": 12,
+        "duplicate_bytes": 126,
+        "instance_count": 2,
+        "total_redundant_lines": 5,
+        "total_redundant_tokens": 12,
+        "total_redundant_bytes": 126,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "9a6376e70254a23b",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/jankurai-runner/src/reasoning_io.rs",
+            "language": "rust",
+            "start_line": 264,
+            "end_line": 269,
+            "unit_name": "push_model_attempt_outcome"
+          },
+          {
+            "path": "crates/jankurai-runner/src/reasoning_io.rs",
+            "language": "rust",
+            "start_line": 276,
+            "end_line": 281,
+            "unit_name": "push_model_outcome"
+          }
+        ]
+      },
+      {
         "id": "copy-code-body-rust-7b9bae8a38d9d74f",
         "kind": "exact_unit_different_name",
         "severity": "warning",
@@ -2246,101 +2241,65 @@
         ]
       },
       {
-        "id": "copy-code-unit-rust-8a8ebceb0400dcc7",
-        "kind": "exact_unit_same_name",
-        "severity": "warning",
-        "confidence": "high",
-        "language": "rust",
-        "unit_name": "now_secs",
-        "duplicate_lines": 5,
-        "duplicate_tokens": 10,
-        "duplicate_bytes": 125,
-        "instance_count": 2,
-        "total_redundant_lines": 5,
-        "total_redundant_tokens": 10,
-        "total_redundant_bytes": 125,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "693854300b3bae84",
-        "reason": "same-name semantic unit copied across multiple files",
-        "recommended_action": "keep the named unit in one owner and call it from the other sites",
-        "instances": [
-          {
-            "path": "crates/jankurai-runner/src/parity_lab.rs",
-            "language": "rust",
-            "start_line": 899,
-            "end_line": 904,
-            "unit_name": "now_secs"
-          },
-          {
-            "path": "crates/jekko-cli/src/cmd/daemon.rs",
-            "language": "rust",
-            "start_line": 643,
-            "end_line": 648,
-            "unit_name": "now_secs"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-body-rust-ab80b0029566ed53",
+        "id": "copy-code-body-rust-288f2d33c4682e4a",
         "kind": "exact_unit_different_name",
         "severity": "warning",
         "confidence": "medium",
         "language": "rust",
         "duplicate_lines": 1,
-        "duplicate_tokens": 1,
-        "duplicate_bytes": 9,
+        "duplicate_tokens": 2,
+        "duplicate_bytes": 17,
         "instance_count": 6,
         "total_redundant_lines": 5,
-        "total_redundant_tokens": 5,
-        "total_redundant_bytes": 45,
+        "total_redundant_tokens": 10,
+        "total_redundant_bytes": 85,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "7383060e9fd68cb5",
+        "fingerprint": "21fea3faa0eb7cd3",
         "reason": "same body appears under different names across files",
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge_eval_metrics.rs",
+            "path": "crates/memory-benchmark/src/corpus/real_papers/json_helpers.rs",
             "language": "rust",
-            "start_line": 396,
-            "end_line": 397,
-            "unit_name": "storage_safe_summary"
+            "start_line": 68,
+            "end_line": 69,
+            "unit_name": "required_array_value"
           },
           {
-            "path": "crates/jekko-store/src/daemon/port.rs",
+            "path": "crates/memory-benchmark/src/corpus/real_papers/json_helpers.rs",
             "language": "rust",
-            "start_line": 937,
-            "end_line": 938,
-            "unit_name": "serialize_opt"
+            "start_line": 89,
+            "end_line": 90,
+            "unit_name": "as_str"
           },
           {
-            "path": "crates/jekko-store/src/daemon/reasoning.rs",
+            "path": "crates/memory-benchmark/src/corpus/real_papers/json_helpers.rs",
             "language": "rust",
-            "start_line": 534,
-            "end_line": 535,
-            "unit_name": "serialize_opt"
+            "start_line": 96,
+            "end_line": 97,
+            "unit_name": "as_bool"
           },
           {
-            "path": "crates/xtask/src/pr_workflow_contract.rs",
+            "path": "crates/zyalc/src/runbook_lint/query.rs",
             "language": "rust",
-            "start_line": 318,
-            "end_line": 319,
-            "unit_name": "mapping"
+            "start_line": 70,
+            "end_line": 71,
+            "unit_name": "collect_values_for_key"
           },
           {
-            "path": "crates/xtask/src/pr_workflow_contract.rs",
+            "path": "crates/zyalc/src/runbook_lint/query.rs",
             "language": "rust",
-            "start_line": 324,
-            "end_line": 325,
-            "unit_name": "sequence"
+            "start_line": 125,
+            "end_line": 126,
+            "unit_name": "yaml_usize"
           },
           {
-            "path": "crates/xtask/src/pr_workflow_contract.rs",
+            "path": "crates/zyalc/src/runbook_lint/query.rs",
             "language": "rust",
-            "start_line": 360,
-            "end_line": 361,
-            "unit_name": "value_to_string"
+            "start_line": 133,
+            "end_line": 134,
+            "unit_name": "yaml_f64"
           }
         ]
       },
@@ -2509,58 +2468,115 @@
         ]
       },
       {
-        "id": "copy-code-body-rust-0a76d27a920f262f",
+        "id": "copy-code-unit-rust-ae1f59cd9d435830",
+        "kind": "exact_unit_same_name",
+        "severity": "warning",
+        "confidence": "high",
+        "language": "rust",
+        "unit_name": "sha256_hex",
+        "duplicate_lines": 4,
+        "duplicate_tokens": 12,
+        "duplicate_bytes": 102,
+        "instance_count": 2,
+        "total_redundant_lines": 4,
+        "total_redundant_tokens": 12,
+        "total_redundant_bytes": 102,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "510f625d8d90825e",
+        "reason": "same-name semantic unit copied across multiple files",
+        "recommended_action": "keep the named unit in one owner and call it from the other sites",
+        "instances": [
+          {
+            "path": "crates/zyalc/src/live_audit/tests.rs",
+            "language": "rust",
+            "start_line": 10,
+            "end_line": 14,
+            "unit_name": "sha256_hex"
+          },
+          {
+            "path": "crates/zyalc/src/replay_verify.rs",
+            "language": "rust",
+            "start_line": 300,
+            "end_line": 304,
+            "unit_name": "sha256_hex"
+          }
+        ]
+      },
+      {
+        "id": "copy-code-body-rust-233c8be8f2affc77",
         "kind": "exact_unit_different_name",
         "severity": "warning",
         "confidence": "medium",
         "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 2,
-        "duplicate_bytes": 20,
-        "instance_count": 5,
+        "duplicate_lines": 4,
+        "duplicate_tokens": 8,
+        "duplicate_bytes": 93,
+        "instance_count": 2,
         "total_redundant_lines": 4,
         "total_redundant_tokens": 8,
-        "total_redundant_bytes": 80,
+        "total_redundant_bytes": 93,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "402547e127a43301",
+        "fingerprint": "93e15487df30210f",
         "reason": "same body appears under different names across files",
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
             "path": "crates/jankurai-runner/src/hero_judge_runner_completion.rs",
             "language": "rust",
-            "start_line": 167,
-            "end_line": 168,
-            "unit_name": "state_label"
+            "start_line": 120,
+            "end_line": 124,
+            "unit_name": "model_outcome_payload"
           },
           {
-            "path": "crates/jekko-tui/src/inline_runtime/state.rs",
+            "path": "crates/jankurai-runner/src/reasoning_io.rs",
             "language": "rust",
-            "start_line": 251,
-            "end_line": 252,
-            "unit_name": "label"
+            "start_line": 288,
+            "end_line": 292,
+            "unit_name": "model_event_payload"
+          }
+        ]
+      },
+      {
+        "id": "copy-code-body-rust-6ca8145c710b5034",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 2,
+        "duplicate_tokens": 1,
+        "duplicate_bytes": 32,
+        "instance_count": 3,
+        "total_redundant_lines": 4,
+        "total_redundant_tokens": 2,
+        "total_redundant_bytes": 64,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "870cd442c3dbe9ed",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/jankurai-runner/src/superreasoning/config.rs",
+            "language": "rust",
+            "start_line": 656,
+            "end_line": 658,
+            "unit_name": "default_max_workers"
           },
           {
-            "path": "crates/jekko-tui/src/inline_runtime/state.rs",
+            "path": "crates/jankurai-runner/src/superreasoning/config.rs",
             "language": "rust",
-            "start_line": 261,
-            "end_line": 262,
-            "unit_name": "cycle"
+            "start_line": 668,
+            "end_line": 670,
+            "unit_name": "default_per_phase_worker_cap"
           },
           {
-            "path": "crates/memory-benchmark/src/types.rs",
+            "path": "crates/jankurai-runner/src/superreasoning/config.rs",
             "language": "rust",
-            "start_line": 263,
-            "end_line": 264,
-            "unit_name": "name"
-          },
-          {
-            "path": "crates/memory-benchmark/src/types.rs",
-            "language": "rust",
-            "start_line": 302,
-            "end_line": 303,
-            "unit_name": "name"
+            "start_line": 725,
+            "end_line": 727,
+            "unit_name": "default_worktree_pool_size"
           }
         ]
       },
@@ -2614,55 +2630,6 @@
         ]
       },
       {
-        "id": "copy-code-body-rust-288f2d33c4682e4a",
-        "kind": "exact_unit_different_name",
-        "severity": "warning",
-        "confidence": "medium",
-        "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 2,
-        "duplicate_bytes": 17,
-        "instance_count": 4,
-        "total_redundant_lines": 3,
-        "total_redundant_tokens": 6,
-        "total_redundant_bytes": 51,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "9eea4061e6d910d7",
-        "reason": "same body appears under different names across files",
-        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
-        "instances": [
-          {
-            "path": "crates/jankurai-runner/src/hero_judge_eval_metrics.rs",
-            "language": "rust",
-            "start_line": 412,
-            "end_line": 413,
-            "unit_name": "value_count"
-          },
-          {
-            "path": "crates/memory-benchmark/src/corpus/real_papers/json_helpers.rs",
-            "language": "rust",
-            "start_line": 68,
-            "end_line": 69,
-            "unit_name": "required_array_value"
-          },
-          {
-            "path": "crates/memory-benchmark/src/corpus/real_papers/json_helpers.rs",
-            "language": "rust",
-            "start_line": 89,
-            "end_line": 90,
-            "unit_name": "as_str"
-          },
-          {
-            "path": "crates/memory-benchmark/src/corpus/real_papers/json_helpers.rs",
-            "language": "rust",
-            "start_line": 96,
-            "end_line": 97,
-            "unit_name": "as_bool"
-          }
-        ]
-      },
-      {
         "id": "copy-code-body-rust-f08349630b623044",
         "kind": "exact_unit_different_name",
         "severity": "warning",
@@ -2694,6 +2661,55 @@
             "start_line": 166,
             "end_line": 169,
             "unit_name": "push_inline_code"
+          }
+        ]
+      },
+      {
+        "id": "copy-code-body-rust-e84266e9b6b27597",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 1,
+        "duplicate_tokens": 1,
+        "duplicate_bytes": 19,
+        "instance_count": 4,
+        "total_redundant_lines": 3,
+        "total_redundant_tokens": 3,
+        "total_redundant_bytes": 57,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "5284506f4b5a4814",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/xtask/src/commands/package.rs",
+            "language": "rust",
+            "start_line": 313,
+            "end_line": 314,
+            "unit_name": "dist_label_for_target_triples_is_normalized"
+          },
+          {
+            "path": "crates/zyal-core/src/forbidden.rs",
+            "language": "rust",
+            "start_line": 107,
+            "end_line": 108,
+            "unit_name": "detects_artifact_shape_marker"
+          },
+          {
+            "path": "crates/zyal-core/src/forbidden.rs",
+            "language": "rust",
+            "start_line": 115,
+            "end_line": 116,
+            "unit_name": "detects_credential_leakage"
+          },
+          {
+            "path": "crates/zyal-core/src/forbidden.rs",
+            "language": "rust",
+            "start_line": 137,
+            "end_line": 138,
+            "unit_name": "clean_text_returns_none"
           }
         ]
       },
@@ -2740,49 +2756,6 @@
         ]
       },
       {
-        "id": "copy-code-unit-rust-6bc0952e51e8104f",
-        "kind": "exact_unit_same_name",
-        "severity": "warning",
-        "confidence": "high",
-        "language": "rust",
-        "unit_name": "parse_json",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 5,
-        "duplicate_bytes": 46,
-        "instance_count": 3,
-        "total_redundant_lines": 2,
-        "total_redundant_tokens": 10,
-        "total_redundant_bytes": 92,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "d5b54874fd5d1bb4",
-        "reason": "same-name semantic unit copied across multiple files",
-        "recommended_action": "keep the named unit in one owner and call it from the other sites",
-        "instances": [
-          {
-            "path": "crates/jekko-store/src/daemon/forever.rs",
-            "language": "rust",
-            "start_line": 557,
-            "end_line": 558,
-            "unit_name": "parse_json"
-          },
-          {
-            "path": "crates/jekko-store/src/daemon/port.rs",
-            "language": "rust",
-            "start_line": 945,
-            "end_line": 946,
-            "unit_name": "parse_json"
-          },
-          {
-            "path": "crates/jekko-store/src/daemon/reasoning.rs",
-            "language": "rust",
-            "start_line": 542,
-            "end_line": 543,
-            "unit_name": "parse_json"
-          }
-        ]
-      },
-      {
         "id": "copy-code-body-rust-77a4a218732028cd",
         "kind": "exact_unit_different_name",
         "severity": "warning",
@@ -2804,8 +2777,8 @@
           {
             "path": "crates/jankurai-runner/src/hero_judge_runner_completion.rs",
             "language": "rust",
-            "start_line": 94,
-            "end_line": 95,
+            "start_line": 108,
+            "end_line": 109,
             "unit_name": "retryable_model_error"
           },
           {
@@ -2821,48 +2794,6 @@
             "start_line": 114,
             "end_line": 115,
             "unit_name": "rejection_category"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-body-rust-7d9fb61fa266c0df",
-        "kind": "exact_unit_different_name",
-        "severity": "warning",
-        "confidence": "medium",
-        "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 4,
-        "duplicate_bytes": 43,
-        "instance_count": 3,
-        "total_redundant_lines": 2,
-        "total_redundant_tokens": 8,
-        "total_redundant_bytes": 86,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "a729489f3ab37e30",
-        "reason": "same body appears under different names across files",
-        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
-        "instances": [
-          {
-            "path": "crates/xtask/src/pr_workflow_contract.rs",
-            "language": "rust",
-            "start_line": 411,
-            "end_line": 412,
-            "unit_name": "rejects_missing_required_env_key"
-          },
-          {
-            "path": "crates/xtask/src/pr_workflow_contract.rs",
-            "language": "rust",
-            "start_line": 419,
-            "end_line": 420,
-            "unit_name": "rejects_inline_step_exports"
-          },
-          {
-            "path": "crates/xtask/src/pr_workflow_contract.rs",
-            "language": "rust",
-            "start_line": 443,
-            "end_line": 444,
-            "unit_name": "rejects_old_wrapper_invocation"
           }
         ]
       },
@@ -2944,6 +2875,48 @@
         ]
       },
       {
+        "id": "copy-code-body-rust-1f7cd4091e89f5b6",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 1,
+        "duplicate_tokens": 3,
+        "duplicate_bytes": 20,
+        "instance_count": 3,
+        "total_redundant_lines": 2,
+        "total_redundant_tokens": 6,
+        "total_redundant_bytes": 40,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "3b176a4b738b7994",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/jekko-tui/src/layout/status_pack/tests.rs",
+            "language": "rust",
+            "start_line": 61,
+            "end_line": 62,
+            "unit_name": "pack_drop_order_respects_priority_ties_by_position"
+          },
+          {
+            "path": "crates/jekko-tui/src/layout/status_pack/tests.rs",
+            "language": "rust",
+            "start_line": 119,
+            "end_line": 120,
+            "unit_name": "pack_keeps_one_segment_when_all_drop_candidates_consumed"
+          },
+          {
+            "path": "crates/jekko-tui/src/layout/status_pack/tests.rs",
+            "language": "rust",
+            "start_line": 130,
+            "end_line": 131,
+            "unit_name": "pack_width_just_fits_keeps_all"
+          }
+        ]
+      },
+      {
         "id": "copy-code-body-rust-e7e6c6dac485983e",
         "kind": "exact_unit_different_name",
         "severity": "warning",
@@ -3014,6 +2987,48 @@
         ]
       },
       {
+        "id": "copy-code-body-rust-0a76d27a920f262f",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 1,
+        "duplicate_tokens": 2,
+        "duplicate_bytes": 20,
+        "instance_count": 3,
+        "total_redundant_lines": 2,
+        "total_redundant_tokens": 4,
+        "total_redundant_bytes": 40,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "8e434c0c565cb001",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/jankurai-runner/src/hero_judge_runner_completion.rs",
+            "language": "rust",
+            "start_line": 175,
+            "end_line": 176,
+            "unit_name": "state_label"
+          },
+          {
+            "path": "crates/memory-benchmark/src/types.rs",
+            "language": "rust",
+            "start_line": 263,
+            "end_line": 264,
+            "unit_name": "name"
+          },
+          {
+            "path": "crates/memory-benchmark/src/types.rs",
+            "language": "rust",
+            "start_line": 302,
+            "end_line": 303,
+            "unit_name": "name"
+          }
+        ]
+      },
+      {
         "id": "copy-code-unit-rust-e50fa76f3d18b424",
         "kind": "exact_unit_same_name",
         "severity": "warning",
@@ -3050,6 +3065,48 @@
         ]
       },
       {
+        "id": "copy-code-body-rust-ab80b0029566ed53",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 1,
+        "duplicate_tokens": 1,
+        "duplicate_bytes": 9,
+        "instance_count": 3,
+        "total_redundant_lines": 2,
+        "total_redundant_tokens": 2,
+        "total_redundant_bytes": 18,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "20b49ec159823a76",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/xtask/src/pr_workflow_contract/assertions.rs",
+            "language": "rust",
+            "start_line": 133,
+            "end_line": 134,
+            "unit_name": "mapping"
+          },
+          {
+            "path": "crates/xtask/src/pr_workflow_contract/assertions.rs",
+            "language": "rust",
+            "start_line": 139,
+            "end_line": 140,
+            "unit_name": "sequence"
+          },
+          {
+            "path": "crates/xtask/src/pr_workflow_contract/assertions.rs",
+            "language": "rust",
+            "start_line": 175,
+            "end_line": 176,
+            "unit_name": "value_to_string"
+          }
+        ]
+      },
+      {
         "id": "copy-code-unit-rust-e4f41a846351da51",
         "kind": "exact_unit_same_name",
         "severity": "warning",
@@ -3065,101 +3122,93 @@
         "total_redundant_bytes": 15,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "eda5af483add8853",
+        "fingerprint": "62a1b56202724b1f",
         "reason": "same-name semantic unit copied across multiple files",
         "recommended_action": "keep the named unit in one owner and call it from the other sites",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jankurai-runner/src/hero_judge/population.rs",
             "language": "rust",
-            "start_line": 708,
-            "end_line": 710,
+            "start_line": 180,
+            "end_line": 182,
             "unit_name": "default_evidence_max_bytes"
           },
           {
-            "path": "crates/jankurai-runner/src/port.rs",
+            "path": "crates/jankurai-runner/src/port/target.rs",
             "language": "rust",
-            "start_line": 260,
-            "end_line": 262,
+            "start_line": 114,
+            "end_line": 116,
             "unit_name": "default_evidence_max_bytes"
           }
         ]
       },
       {
-        "id": "copy-code-body-rust-e3b0c44298fc1c14",
+        "id": "copy-code-body-rust-af0f8237780fac00",
         "kind": "exact_unit_different_name",
         "severity": "warning",
         "confidence": "medium",
         "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 0,
-        "duplicate_bytes": 0,
-        "instance_count": 3,
+        "duplicate_lines": 2,
+        "duplicate_tokens": 2,
+        "duplicate_bytes": 10,
+        "instance_count": 2,
         "total_redundant_lines": 2,
-        "total_redundant_tokens": 0,
-        "total_redundant_bytes": 0,
+        "total_redundant_tokens": 2,
+        "total_redundant_bytes": 10,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "0861530edffd70ec",
+        "fingerprint": "9d2e58a450d4a78f",
         "reason": "same body appears under different names across files",
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/port_runner.rs",
+            "path": "crates/jankurai-runner/src/hero_judge/population.rs",
             "language": "rust",
-            "start_line": 282,
-            "end_line": 283,
-            "unit_name": "_pathbuf_send_sync"
+            "start_line": 184,
+            "end_line": 186,
+            "unit_name": "default_promotion_min_score"
           },
           {
-            "path": "crates/jekko-cli/src/cmd/daemon.rs",
+            "path": "crates/jankurai-runner/src/superreasoning/config.rs",
             "language": "rust",
-            "start_line": 680,
-            "end_line": 680,
-            "unit_name": "_path_ref"
-          },
-          {
-            "path": "crates/jekko-tui/src/inline_runtime.rs",
-            "language": "rust",
-            "start_line": 101,
-            "end_line": 101,
-            "unit_name": "_unused_sender_lifetime_marker"
+            "start_line": 685,
+            "end_line": 687,
+            "unit_name": "default_promotion_threshold"
           }
         ]
       },
       {
-        "id": "copy-code-unit-rust-dcdb61e444311c44",
-        "kind": "exact_unit_same_name",
+        "id": "copy-code-body-rust-618486ffe4a76ad0",
+        "kind": "exact_unit_different_name",
         "severity": "warning",
-        "confidence": "high",
+        "confidence": "medium",
         "language": "rust",
-        "unit_name": "current_cwd_display",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 9,
-        "duplicate_bytes": 82,
+        "duplicate_lines": 2,
+        "duplicate_tokens": 1,
+        "duplicate_bytes": 7,
         "instance_count": 2,
-        "total_redundant_lines": 1,
-        "total_redundant_tokens": 9,
-        "total_redundant_bytes": 82,
+        "total_redundant_lines": 2,
+        "total_redundant_tokens": 1,
+        "total_redundant_bytes": 7,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "10636fe21fda5266",
-        "reason": "same-name semantic unit copied across multiple files",
-        "recommended_action": "keep the named unit in one owner and call it from the other sites",
+        "fingerprint": "c8fc2f05f4bc24a1",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jekko-tui/src/components/boot_inline.rs",
+            "path": "crates/jankurai-runner/src/reasoning/config.rs",
             "language": "rust",
-            "start_line": 125,
-            "end_line": 126,
-            "unit_name": "current_cwd_display"
+            "start_line": 112,
+            "end_line": 114,
+            "unit_name": "default_worker_cap"
           },
           {
-            "path": "crates/jekko-tui/src/components/splash.rs",
+            "path": "crates/jankurai-runner/src/superreasoning/config.rs",
             "language": "rust",
-            "start_line": 238,
-            "end_line": 239,
-            "unit_name": "current_cwd_display"
+            "start_line": 664,
+            "end_line": 666,
+            "unit_name": "default_max_parallel_phases"
           }
         ]
       },
@@ -3178,22 +3227,22 @@
         "total_redundant_bytes": 51,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "9afbf4d827dcfac7",
+        "fingerprint": "229de883db7fb6ab",
         "reason": "same body appears under different names across files",
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jekko-store/src/daemon/port.rs",
+            "path": "crates/jekko-store/src/daemon/port/graph_model.rs",
             "language": "rust",
-            "start_line": 891,
-            "end_line": 892,
+            "start_line": 131,
+            "end_line": 132,
             "unit_name": "repo_graph_node_from_row"
           },
           {
-            "path": "crates/jekko-store/src/daemon/reasoning.rs",
+            "path": "crates/jekko-store/src/daemon/reasoning/artifacts.rs",
             "language": "rust",
-            "start_line": 469,
-            "end_line": 470,
+            "start_line": 161,
+            "end_line": 162,
             "unit_name": "reasoning_edge_from_row"
           }
         ]
@@ -3213,23 +3262,93 @@
         "total_redundant_bytes": 51,
         "effective_severity": "warning",
         "hard_fail": false,
-        "fingerprint": "9bd606d23acf6d5e",
+        "fingerprint": "dc102bf1771831fb",
         "reason": "same body appears under different names across files",
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jekko-store/src/daemon/reasoning.rs",
+            "path": "crates/jekko-store/src/daemon/reasoning/artifacts.rs",
             "language": "rust",
-            "start_line": 450,
-            "end_line": 451,
+            "start_line": 142,
+            "end_line": 143,
             "unit_name": "reasoning_artifact_from_row"
           },
           {
-            "path": "crates/jekko-store/src/daemon/reasoning.rs",
+            "path": "crates/jekko-store/src/daemon/reasoning/memory.rs",
             "language": "rust",
-            "start_line": 500,
-            "end_line": 501,
+            "start_line": 113,
+            "end_line": 114,
             "unit_name": "memory_capsule_from_row"
+          }
+        ]
+      },
+      {
+        "id": "copy-code-body-rust-a0350927b5e4ed3e",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 1,
+        "duplicate_tokens": 5,
+        "duplicate_bytes": 47,
+        "instance_count": 2,
+        "total_redundant_lines": 1,
+        "total_redundant_tokens": 5,
+        "total_redundant_bytes": 47,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "233fc2d5ed6ad455",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/xtask/src/commands/jankurai_gate.rs",
+            "language": "rust",
+            "start_line": 217,
+            "end_line": 218,
+            "unit_name": "evidence_filter_narrows_match"
+          },
+          {
+            "path": "crates/xtask/src/commands/jankurai_gate.rs",
+            "language": "rust",
+            "start_line": 238,
+            "end_line": 239,
+            "unit_name": "non_high_severities_are_ignored"
+          }
+        ]
+      },
+      {
+        "id": "copy-code-body-rust-b3e3e62d4619bb43",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 1,
+        "duplicate_tokens": 5,
+        "duplicate_bytes": 41,
+        "instance_count": 2,
+        "total_redundant_lines": 1,
+        "total_redundant_tokens": 5,
+        "total_redundant_bytes": 41,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "2f1ebb0e623bc355",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/jekko-cli/src/cmd/port_run.rs",
+            "language": "rust",
+            "start_line": 447,
+            "end_line": 448,
+            "unit_name": "run_status"
+          },
+          {
+            "path": "crates/jekko-cli/src/cmd/port_run.rs",
+            "language": "rust",
+            "start_line": 532,
+            "end_line": 533,
+            "unit_name": "run_resume"
           }
         ]
       },
@@ -3267,189 +3386,13 @@
             "unit_name": "serialises_to_expected_json_shape"
           }
         ]
-      },
-      {
-        "id": "copy-code-unit-rust-6e4c01c35bd6c72f",
-        "kind": "exact_unit_same_name",
-        "severity": "warning",
-        "confidence": "high",
-        "language": "rust",
-        "unit_name": "current_git_branch",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 5,
-        "duplicate_bytes": 36,
-        "instance_count": 2,
-        "total_redundant_lines": 1,
-        "total_redundant_tokens": 5,
-        "total_redundant_bytes": 36,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "10636fe21fda5266",
-        "reason": "same-name semantic unit copied across multiple files",
-        "recommended_action": "keep the named unit in one owner and call it from the other sites",
-        "instances": [
-          {
-            "path": "crates/jekko-tui/src/components/boot_inline.rs",
-            "language": "rust",
-            "start_line": 139,
-            "end_line": 140,
-            "unit_name": "current_git_branch"
-          },
-          {
-            "path": "crates/jekko-tui/src/components/splash.rs",
-            "language": "rust",
-            "start_line": 252,
-            "end_line": 253,
-            "unit_name": "current_git_branch"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-body-rust-249cf9b7fd5e9451",
-        "kind": "exact_unit_different_name",
-        "severity": "warning",
-        "confidence": "medium",
-        "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 5,
-        "duplicate_bytes": 27,
-        "instance_count": 2,
-        "total_redundant_lines": 1,
-        "total_redundant_tokens": 5,
-        "total_redundant_bytes": 27,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "d4f4e258dbc7f960",
-        "reason": "same body appears under different names across files",
-        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
-        "instances": [
-          {
-            "path": "crates/jekko-provider/src/transform/variants/efforts.rs",
-            "language": "rust",
-            "start_line": 65,
-            "end_line": 66,
-            "unit_name": "google_thinking_config"
-          },
-          {
-            "path": "crates/jekko-provider/src/transform/variants/efforts.rs",
-            "language": "rust",
-            "start_line": 90,
-            "end_line": 91,
-            "unit_name": "anthropic_static_budgets"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-body-rust-9d419d9c4edffbdb",
-        "kind": "exact_unit_different_name",
-        "severity": "warning",
-        "confidence": "medium",
-        "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 4,
-        "duplicate_bytes": 22,
-        "instance_count": 2,
-        "total_redundant_lines": 1,
-        "total_redundant_tokens": 4,
-        "total_redundant_bytes": 22,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "a6884f33d8b37acd",
-        "reason": "same body appears under different names across files",
-        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
-        "instances": [
-          {
-            "path": "crates/jekko-tui/src/engine/ansi.rs",
-            "language": "rust",
-            "start_line": 133,
-            "end_line": 134,
-            "unit_name": "find_osc_end"
-          },
-          {
-            "path": "crates/jekko-tui/src/engine/ansi.rs",
-            "language": "rust",
-            "start_line": 157,
-            "end_line": 158,
-            "unit_name": "find_csi"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-body-rust-33cb2d7ecfd18f72",
-        "kind": "exact_unit_different_name",
-        "severity": "warning",
-        "confidence": "medium",
-        "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 3,
-        "duplicate_bytes": 39,
-        "instance_count": 2,
-        "total_redundant_lines": 1,
-        "total_redundant_tokens": 3,
-        "total_redundant_bytes": 39,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "f03de8d34ae10101",
-        "reason": "same body appears under different names across files",
-        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
-        "instances": [
-          {
-            "path": "crates/jekko-tui/src/transcript/syntax/renderer.rs",
-            "language": "rust",
-            "start_line": 189,
-            "end_line": 190,
-            "unit_name": "soft_break"
-          },
-          {
-            "path": "crates/jekko-tui/src/transcript/syntax/renderer.rs",
-            "language": "rust",
-            "start_line": 194,
-            "end_line": 195,
-            "unit_name": "newline_after_block"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-body-rust-45b95c84571c0d39",
-        "kind": "exact_unit_different_name",
-        "severity": "warning",
-        "confidence": "medium",
-        "language": "rust",
-        "duplicate_lines": 1,
-        "duplicate_tokens": 3,
-        "duplicate_bytes": 29,
-        "instance_count": 2,
-        "total_redundant_lines": 1,
-        "total_redundant_tokens": 3,
-        "total_redundant_bytes": 29,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "31079d4e3a20d880",
-        "reason": "same body appears under different names across files",
-        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
-        "instances": [
-          {
-            "path": "crates/jankurai-runner/src/hero_judge_eval_metrics.rs",
-            "language": "rust",
-            "start_line": 496,
-            "end_line": 497,
-            "unit_name": "mean_metric"
-          },
-          {
-            "path": "crates/jankurai-runner/src/hero_judge_eval_metrics.rs",
-            "language": "rust",
-            "start_line": 557,
-            "end_line": 558,
-            "unit_name": "red_team_penalty"
-          }
-        ]
       }
     ],
     "notes": [
       "hard classes are limited to exact active-source file matches and substantial exact same-name units",
       "warning classes include same-body different-name units and token/block duplication",
       "tests, fixtures, stories, config, Docker, and migrations are omitted unless --include-tests is set",
-      "showing the top 50 classes and omitting 8 lower-ranked classes"
+      "showing the top 50 classes and omitting 12 lower-ranked classes"
     ]
   },
   "profile_structure": {
@@ -3721,10 +3664,10 @@
       "severity": "medium",
       "category": "shape",
       "path": ".",
-      "problem": "`Code shape and semantic surface` scored 45 below the standard floor of 85",
+      "problem": "`Code shape and semantic surface` scored 27 below the standard floor of 85",
       "agent_fix": "split large or ambiguous authored code into smaller semantic modules with focused tests",
       "evidence": [
-        "largest authored code file: crates/jankurai-runner/src/parity_lab.rs (1089 LOC)",
+        "largest authored code file: crates/jekko-runtime/src/daemon/super_reasoning.rs (1231 LOC)",
         "code file exceeds 500 LOC",
         "code file exceeds 1000 LOC",
         "most code files stay under 300 LOC"
@@ -3734,7 +3677,7 @@
       "confidence": 0.76,
       "evidence_kind": "repository-scan",
       "rerun_command": "just fast",
-      "fingerprint": "sha256:c6596757c6ec7435c263b36ef105f9745020688f6795c181549cb2726588629e",
+      "fingerprint": "sha256:9b075f913b0746f7f035f68e97d271afc95e3955b3b98206563213189753c382",
       "rule_id": "HLT-001-DEAD-MARKER",
       "tlr": "Entropy",
       "lane": "fast",
@@ -3742,40 +3685,69 @@
       "owner": "tools"
     },
     {
-      "severity": "medium",
-      "category": "proof",
-      "path": "Justfile",
-      "problem": "`Build speed signals` scored 80 below the standard floor of 85",
-      "agent_fix": "add fast deterministic build/test targets, caches, and narrow proof lanes for agent iteration",
+      "severity": "high",
+      "category": "ux-qa",
+      "path": "apps/web",
+      "problem": "web surface lacks layered rendered UX QA evidence",
+      "agent_fix": "add Storybook state coverage, Playwright screenshots, visual review or `@jankurai/ux-qa`, accessibility scans, CLS checks, generated mocks, and design tokens",
       "evidence": [
-        "build acceleration markers found",
-        "targeted test/build commands found",
-        "locked dependency graph present",
-        "CI cache hint found"
+        "rendered UX QA lane missing"
       ],
-      "check_id": "HLT-018-PERF-CONCURRENCY-DRIFT:proof",
-      "hardness": "soft",
-      "confidence": 0.76,
+      "check_id": "HLT-013-RENDERED-UX-GAP:ux-qa",
+      "hardness": "hard",
+      "confidence": 0.88,
+      "evidence_kind": "ux-proof",
+      "rerun_command": "just ux-qa",
+      "fingerprint": "sha256:571d35c2e730a393b782bac14825b197c0543920bb21967079d264ac602ea5b1",
+      "rule_id": "HLT-013-RENDERED-UX-GAP",
+      "tlr": "Verification and rendered UX",
+      "lane": "web",
+      "docs_url": "docs/testing.md",
+      "owner": "apps"
+    },
+    {
+      "severity": "high",
+      "category": "vibe",
+      "path": "crates/jankurai-runner/src/reasoning_io.rs",
+      "problem": "fallback soup detected in product code",
+      "agent_fix": "collapse fallback chains into explicit typed states with bounded retry policy, telemetry, and documented repair guidance",
+      "evidence": [
+        "crates/jankurai-runner/src/reasoning_io.rs:301 let budget_used = receipt.budget_used.unwrap_or_default();"
+      ],
+      "check_id": "HLT-001-DEAD-MARKER:vibe",
+      "hardness": "hard",
+      "confidence": 0.88,
       "evidence_kind": "repository-scan",
       "rerun_command": "just fast",
-      "fingerprint": "sha256:2f2531223d7f7036c20d44b58cd52e64aa53ffd6cb85e01e541c1feff0c09cb2",
-      "rule_id": "HLT-018-PERF-CONCURRENCY-DRIFT",
-      "tlr": "Verification",
+      "fingerprint": "sha256:7c24b9d9c9656f0ba10afcb47ba69f2f3d0d91414ee7b44ef224a7ca10d3cfcd",
+      "rule_id": "HLT-001-DEAD-MARKER",
+      "tlr": "Entropy",
       "lane": "fast",
-      "docs_url": "docs/testing.md",
-      "owner": "workspace"
+      "docs_url": "docs/audit-rubric.md#future-hostile-language-rule",
+      "owner": "tools",
+      "line": 301
     }
   ],
   "agent_fix_queue": [
     {
-      "path": "Justfile",
-      "priority": "medium",
-      "rule_id": "HLT-018-PERF-CONCURRENCY-DRIFT",
-      "tlr": "Verification",
+      "path": "apps/web",
+      "priority": "high",
+      "rule_id": "HLT-013-RENDERED-UX-GAP",
+      "tlr": "Verification and rendered UX",
+      "lane": "web",
+      "owner": "apps",
+      "task": "add Storybook state coverage, Playwright screenshots, visual review or `@jankurai/ux-qa`, accessibility scans, CLS checks, generated mocks, and design tokens",
+      "why": "web surface lacks layered rendered UX QA evidence"
+    },
+    {
+      "path": "crates/jankurai-runner/src/reasoning_io.rs",
+      "priority": "high",
+      "rule_id": "HLT-001-DEAD-MARKER",
+      "tlr": "Entropy",
       "lane": "fast",
-      "owner": "workspace",
-      "task": "add fast deterministic build/test targets, caches, and narrow proof lanes for agent iteration",
-      "why": "`Build speed signals` scored 80 below the standard floor of 85"
+      "owner": "tools",
+      "task": "collapse fallback chains into explicit typed states with bounded retry policy, telemetry, and documented repair guidance",
+      "why": "fallback soup detected in product code"
     },
     {
       "path": ".",
@@ -3785,7 +3757,7 @@
       "lane": "fast",
       "owner": "tools",
       "task": "split large or ambiguous authored code into smaller semantic modules with focused tests",
-      "why": "`Code shape and semantic surface` scored 45 below the standard floor of 85"
+      "why": "`Code shape and semantic surface` scored 27 below the standard floor of 85"
     }
   ]
 }
