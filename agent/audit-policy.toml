@@ -213,6 +213,11 @@ excluded_paths = [
     "packages/jekko/src/cli/cmd/tui/context/capability.ts",
     "packages/jekko/src/cli/headless-runtime.ts",
     "apps/",
+    # Profile::SuperWorkflow YAML manifest — zyalc-compiled, parsed as YAML
+    # (not the runbook sentinel-envelope format jankurai 1.5.1's HLT-024
+    # rule expects). Sentinel-envelope check is forward-incompatible with
+    # the new SuperWorkflow profile until jankurai learns it.
+    "agent/zyal/ambitious-superworkflow.zyal",
     "packages/jekko/src/format/",
     "packages/jekko/src/provider/provider.ts",
     "packages/jekko/src/lsp/",
