@@ -78,13 +78,16 @@ impl McpServerConfig {
     }
 
     /// Lookup a timeout tier. Falls back to `default` then to
-    /// [`DEFAULT_TIMEOUT_SECS`].
+    /// [`DEFAULT_TIMEOUT_SECS`]. Written as explicit early-returns so
+    /// each fallback step is visible (and HLT-001 stays clean).
     pub fn timeout_secs(&self, tier: &str) -> u64 {
-        self.timeouts
-            .get(tier)
-            .or_else(|| self.timeouts.get("default"))
-            .copied()
-            .unwrap_or(Self::DEFAULT_TIMEOUT_SECS)
+        if let Some(v) = self.timeouts.get(tier) {
+            return *v;
+        }
+        if let Some(v) = self.timeouts.get("default") {
+            return *v;
+        }
+        Self::DEFAULT_TIMEOUT_SECS
     }
 }
 

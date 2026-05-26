@@ -36,3 +36,9 @@ rule = "HLT-001-DEAD-MARKER"
 evidence = ".ok_or_else(|| anyhow!"
 reason = "Rust+anyhow idiom: `.ok_or_else(|| anyhow!(...))?` is the canonical way to turn an Option that must be Some at this point into a typed error with a human-readable message. It's an explicit failure path with provenance, not fallback soup. Jankurai 1.5.1's HLT-001 detector pattern-matches the `.ok_or_else` token without inspecting the closure body. Other HLT-001 evidence (stub markers, .unwrap_or(0), etc.) still fail the gate."
 expires = "2099-01-01"
+
+[[allow]]
+rule = "HLT-008-FALSE-GREEN-RISK"
+evidence = "status_against_crashy_server_surfaces_early_exit"
+reason = "Real integration test (crates/jekko-cli/tests/mcp_status.rs:122): spawns a python subprocess that prints to stderr and exits non-zero, then asserts `jekko mcp status` surfaces both the early exit AND the specific stderr content via two `predicate::str::contains` checks on captured stderr. Non-tautological end-to-end assertion. Jankurai 1.5.1's HLT-008 detector trips on the words `crashy` and `early_exit` in the function name without parsing the assertion body; renaming the function to evade a keyword detector would be adversarial. Other HLT-008 evidence (genuine skipped/focused/snapshot-only tests) still fails the gate."
+expires = "2099-01-01"

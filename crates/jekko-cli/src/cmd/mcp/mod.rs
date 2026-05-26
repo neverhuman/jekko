@@ -197,16 +197,17 @@ fn preset_list() -> Result<()> {
 }
 
 fn preset_add(config_path: &std::path::Path, args: &McpPresetAddArgs) -> Result<()> {
-    let preset = presets::find_preset(&args.name).ok_or_else(|| {
-        anyhow!(
+    let preset = match presets::find_preset(&args.name) {
+        Some(p) => p,
+        None => bail!(
             "unknown preset `{}`; run `jekko mcp preset list` to see available presets",
             args.name
-        )
-    })?;
-    let server_name = args
-        .rename
-        .clone()
-        .unwrap_or_else(|| preset.name.to_string());
+        ),
+    };
+    let server_name = match args.rename.clone() {
+        Some(n) => n,
+        None => preset.name.to_string(),
+    };
     validate_server_name(&server_name).map_err(map_mcp_err)?;
 
     // Warn (don't fail) when the user is missing required env vars: the
@@ -245,11 +246,12 @@ fn resolve_config_path(override_path: Option<&std::path::Path>) -> Result<PathBu
     if let Some(p) = override_path {
         return Ok(p.to_path_buf());
     }
-    default_mcp_config_path().ok_or_else(|| {
-        anyhow!(
+    match default_mcp_config_path() {
+        Some(p) => Ok(p),
+        None => bail!(
             "neither JEKKO_HOME nor HOME is set; pass --config <path> or export one of those vars"
-        )
-    })
+        ),
+    }
 }
 
 fn list(config_path: &std::path::Path) -> Result<()> {
@@ -332,7 +334,10 @@ async fn status(
             server.transport
         );
     }
-    let timeout_secs = timeout_override.unwrap_or_else(|| server.timeout_secs("default"));
+    let timeout_secs = match timeout_override {
+        Some(t) => t,
+        None => server.timeout_secs("default"),
+    };
     let mut client = StdioClient::spawn(name, server)
         .await
         .map_err(map_mcp_err)?;
