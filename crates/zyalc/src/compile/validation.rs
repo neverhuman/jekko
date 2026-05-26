@@ -57,10 +57,7 @@ pub(super) fn validate_superworkflow_profile(source: &Path, raw: &str) -> Result
 /// * No phase may declare itself as a dependency, and every dependency must
 ///   reference a known phase id.
 /// * The dependency graph must be acyclic (Kahn topological sort).
-pub(super) fn validate_superworkflow_value(
-    source: &Path,
-    value: &serde_yaml::Value,
-) -> Result<()> {
+pub(super) fn validate_superworkflow_value(source: &Path, value: &serde_yaml::Value) -> Result<()> {
     let root = value.as_mapping().ok_or_else(|| {
         anyhow!(
             "superworkflow body in {} must be a YAML mapping",
@@ -162,8 +159,7 @@ fn superworkflow_dependencies_are_acyclic(phases: &[serde_yaml::Value]) -> Resul
         if let Some(depends_on) = lookup(phase, "depends_on") {
             // Dedupe before counting — see zyal-supervisor planner for the
             // same fix rationale (false-cycle on duplicate dep entries).
-            let mut seen: std::collections::BTreeSet<String> =
-                std::collections::BTreeSet::new();
+            let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
             for dep in depends_on.as_sequence().cloned().unwrap_or_default() {
                 let dep = dep
                     .as_str()
@@ -210,10 +206,7 @@ fn require_map<'a>(map: &'a serde_yaml::Mapping, key: &str) -> Result<&'a serde_
         .ok_or_else(|| anyhow!("`{key}` must be a mapping"))
 }
 
-fn require_seq<'a>(
-    map: &'a serde_yaml::Mapping,
-    key: &str,
-) -> Result<&'a Vec<serde_yaml::Value>> {
+fn require_seq<'a>(map: &'a serde_yaml::Mapping, key: &str) -> Result<&'a Vec<serde_yaml::Value>> {
     require_present(map, key)?
         .as_sequence()
         .ok_or_else(|| anyhow!("`{key}` must be a sequence"))

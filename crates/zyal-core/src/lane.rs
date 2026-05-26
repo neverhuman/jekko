@@ -46,6 +46,12 @@ macro_rules! id_newtype {
     };
 }
 
-id_newtype!(LaneId, "Identifier for a single reasoning lane (one strategy / one role).");
-id_newtype!(RunId, "Identifier for a single ZYAL run (one orchestrated reasoning cycle).");
+id_newtype!(
+    LaneId,
+    "Identifier for a single reasoning lane (one strategy / one role)."
+);
+id_newtype!(
+    RunId,
+    "Identifier for a single ZYAL run (one orchestrated reasoning cycle)."
+);
 id_newtype!(ArtifactRef, "Reference to a reasoning artifact by id.");

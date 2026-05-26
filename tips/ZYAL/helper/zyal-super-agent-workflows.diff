@@ -1,0 +1,2190 @@
+diff --git a/crates/jekko-core/Cargo.toml b/crates/jekko-core/Cargo.toml
+index 08e6f657..d4f7b9a1 100644
+--- a/crates/jekko-core/Cargo.toml
++++ b/crates/jekko-core/Cargo.toml
+@@ -9,5 +9,7 @@ path = "src/lib.rs"
+ 
+ [dependencies]
+ serde = { workspace = true }
+ serde_json = { workspace = true }
++serde_yaml = { workspace = true }
++sha2 = "0.10"
+ thiserror = { workspace = true }
+diff --git a/crates/jekko-core/src/error.rs b/crates/jekko-core/src/error.rs
+index 2342b46d..3ddcf5c2 100644
+--- a/crates/jekko-core/src/error.rs
++++ b/crates/jekko-core/src/error.rs
+@@ -26,6 +26,13 @@ pub enum CoreError {
+     #[error("invalid identifier '{value}' for kind '{kind}'")]
+     InvalidId {
+         /// Identifier kind tag (e.g. `"session"`, `"message"`).
+         kind: &'static str,
+         /// Offending value.
+         value: String,
+     },
++    /// A pure-domain parser rejected an input document.
++    #[error("parse error in {surface}: {message}")]
++    Parse {
++        /// Surface being parsed.
++        surface: &'static str,
++        /// Human-readable parser failure.
++        message: String,
++    },
+     /// A required field was missing while decoding a struct from JSON.
+     #[error("missing field '{0}'")]
+     MissingField(&'static str),
+ }
+diff --git a/crates/jekko-core/src/lib.rs b/crates/jekko-core/src/lib.rs
+index c252f9a7..69d4d9a4 100644
+--- a/crates/jekko-core/src/lib.rs
++++ b/crates/jekko-core/src/lib.rs
+@@ -90,6 +90,7 @@ pub mod project;
+ pub mod provider;
+ pub mod session;
+ pub mod theme;
+ pub mod v2;
++pub mod zyal_port_super;
+ 
+ pub use error::{CoreError, CoreResult};
+diff --git a/crates/jekko-core/src/zyal_port_super.rs b/crates/jekko-core/src/zyal_port_super.rs
+new file mode 100644
+index 00000000..b5c0d7bc
+--- /dev/null
++++ b/crates/jekko-core/src/zyal_port_super.rs
+@@ -0,0 +1,634 @@
++//! Pure compiler for ZYAL super-agent port workflows.
++//!
++//! This module intentionally performs no I/O and does not call models. It turns
++//! the advanced ZYAL blocks already used by the flagship port/reasoning
++//! examples into a deterministic, host-owned execution plan that the runtime can
++//! seed into SQLite before any worker starts.
++
++use std::collections::{BTreeMap, BTreeSet};
++
++use serde::{Deserialize, Serialize};
++use sha2::{Digest, Sha256};
++
++use crate::error::{CoreError, CoreResult};
++
++const SURFACE: &str = "zyal.port_super";
++const DEFAULT_MAX_WORKERS: u16 = 10;
++const MAX_WORKERS: u16 = 20;
++
++/// Parsed top-level envelope for the advanced port/reasoning ZYAL blocks.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct ZyalPortSuperEnvelope {
++    /// Runtime sentinel version.
++    pub version: Option<String>,
++    /// Runtime intent.
++    pub intent: Option<String>,
++    /// Confirmation literal.
++    pub confirm: Option<String>,
++    /// Optional run id. If absent, the compiler derives one from the plan hash.
++    pub id: Option<String>,
++    /// Job framing.
++    pub job: JobBlock,
++    /// Generic reference-to-replacement port configuration.
++    pub port: PortBlock,
++    /// Advanced reasoning lane policy.
++    #[serde(default)]
++    pub advanced_reasoning: Option<AdvancedReasoningBlock>,
++    /// Repository graph policy.
++    #[serde(default)]
++    pub repo_graph: Option<RepoGraphBlock>,
++    /// Target-switched parity/performance lab policy.
++    #[serde(default)]
++    pub parity_lab: Option<ParityLabBlock>,
++    /// Model routing and outcome recording policy.
++    #[serde(default)]
++    pub model_policy: Option<ModelPolicyBlock>,
++    /// Optional workflow block from the runbook.
++    #[serde(default)]
++    pub workflow: Option<WorkflowBlock>,
++    /// Optional sandbox block, preserved in the compiled payload.
++    #[serde(default)]
++    pub sandbox: Option<serde_json::Value>,
++    /// Optional done block.
++    #[serde(default)]
++    pub done: Option<DoneBlock>,
++}
++
++/// ZYAL job block.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct JobBlock {
++    /// Human-readable name.
++    pub name: String,
++    /// User objective.
++    pub objective: String,
++    /// Risk notes.
++    #[serde(default)]
++    pub risk: Vec<String>,
++}
++
++/// Generic port block.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct PortBlock {
++    /// Reference system.
++    pub target: String,
++    /// Candidate replacement system.
++    pub replacement: String,
++    /// Optional reference repository path/URL.
++    #[serde(default)]
++    pub target_repo: Option<String>,
++    /// Optional replacement repository path/URL.
++    #[serde(default)]
++    pub replacement_repo: Option<String>,
++    /// Maximum active workers requested by the runbook.
++    #[serde(default)]
++    pub worker_cap: Option<u16>,
++    /// Resume store hint.
++    #[serde(default)]
++    pub resume_store: Option<String>,
++    /// Require a clean primary tree before launch.
++    #[serde(default)]
++    pub require_clean_start: Option<bool>,
++    /// Strategy tag used by existing examples.
++    #[serde(default)]
++    pub stage_strategy: Option<String>,
++    /// Back-compat alias used by older generic examples.
++    #[serde(default)]
++    pub phase_strategy: Option<String>,
++    /// Stop conditions from the port block.
++    #[serde(default)]
++    pub stop_on: Vec<String>,
++}
++
++/// Advanced reasoning policy.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct AdvancedReasoningBlock {
++    /// Enable advanced reasoning lanes.
++    #[serde(default)]
++    pub enabled: bool,
++    /// Requested worker cap for reasoning lanes.
++    #[serde(default)]
++    pub worker_cap: Option<u16>,
++    /// Confidence cap when executable evidence is absent.
++    #[serde(default)]
++    pub confidence_cap_without_executable_evidence: Option<f64>,
++    /// Whether raw reasoning is stored. Must be false for super-agent plans.
++    #[serde(default)]
++    pub store_raw_reasoning: bool,
++    /// Existing example option: use blind lanes.
++    #[serde(default)]
++    pub blind_lanes: Option<bool>,
++    /// Existing example option: force strategy diversity.
++    #[serde(default)]
++    pub strategy_diversity_required: Option<bool>,
++    /// Optional role list.
++    #[serde(default)]
++    pub roles: Vec<String>,
++    /// Artifact policy payload.
++    #[serde(default)]
++    pub artifacts: Option<serde_json::Value>,
++    /// Reducer policy payload.
++    #[serde(default)]
++    pub reducer: Option<serde_json::Value>,
++    /// Memory policy payload.
++    #[serde(default)]
++    pub memory: Option<serde_json::Value>,
++}
++
++/// Repository graph block.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct RepoGraphBlock {
++    /// Enable repo graph.
++    #[serde(default)]
++    pub enabled: bool,
++    /// Store hint, normally `sqlite`.
++    #[serde(default)]
++    pub store: Option<String>,
++    /// Export path.
++    #[serde(default)]
++    pub export: Option<String>,
++    /// Requested node kinds.
++    #[serde(default)]
++    pub nodes: Vec<String>,
++    /// Requested edge kinds.
++    #[serde(default)]
++    pub edges: Vec<String>,
++    /// Whether graph context should feed workers.
++    #[serde(default)]
++    pub feed_workers: Option<bool>,
++}
++
++/// Parity lab block.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct ParityLabBlock {
++    /// Enable parity lab.
++    #[serde(default)]
++    pub enabled: bool,
++    /// Style tag, e.g. `redlinedb`.
++    #[serde(default)]
++    pub style: Option<String>,
++    /// Artifact directory.
++    #[serde(default)]
++    pub artifact_dir: Option<String>,
++    /// Cases directory.
++    #[serde(default)]
++    pub cases_dir: Option<String>,
++    /// Whether only approved cases count for required gates.
++    #[serde(default)]
++    pub approved_cases_only: Option<bool>,
++    /// Raw results file name/path.
++    #[serde(default)]
++    pub raw_results: Option<String>,
++    /// Summary file name/path.
++    #[serde(default)]
++    pub summary: Option<String>,
++    /// Gaps file name/path.
++    #[serde(default)]
++    pub gaps: Option<String>,
++    /// Adapter declarations.
++    #[serde(default)]
++    pub adapters: Option<ParityAdaptersBlock>,
++    /// Required tags.
++    #[serde(default)]
++    pub required_tags: Vec<String>,
++    /// Performance budget payload.
++    #[serde(default)]
++    pub perf_budget: Option<serde_json::Value>,
++    /// Failure conditions.
++    #[serde(default)]
++    pub fail_on: Vec<String>,
++    /// Inline parity cases, if any.
++    #[serde(default)]
++    pub cases: Vec<serde_json::Value>,
++}
++
++/// Reference/candidate adapter block.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct ParityAdaptersBlock {
++    /// Reference adapter.
++    pub reference: ParityAdapterBlock,
++    /// Candidate adapter.
++    pub candidate: ParityAdapterBlock,
++}
++
++/// Single parity adapter.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct ParityAdapterBlock {
++    /// Adapter target kind.
++    #[serde(default)]
++    pub target_kind: Option<String>,
++    /// Repository path.
++    #[serde(default)]
++    pub repo: Option<String>,
++    /// Command used to launch the adapter.
++    #[serde(default)]
++    pub command: Option<String>,
++    /// Whether this side must be read-only.
++    #[serde(default)]
++    pub read_only: Option<bool>,
++}
++
++/// Model routing policy.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct ModelPolicyBlock {
++    /// Routine model route.
++    #[serde(default)]
++    pub routine: Option<String>,
++    /// Power model route.
++    #[serde(default)]
++    pub power: Option<String>,
++    /// Use routine model for these activities.
++    #[serde(default)]
++    pub use_routine_for: Vec<String>,
++    /// Use power model for these activities.
++    #[serde(default)]
++    pub use_power_for: Vec<String>,
++    /// Record reliability/outcomes.
++    #[serde(default)]
++    pub record_reliability: Option<bool>,
++    /// Existing generic example field.
++    #[serde(default)]
++    pub record_outcomes: Option<bool>,
++    /// Paid live-call default policy.
++    #[serde(default)]
++    pub paid_live_calls_default: Option<bool>,
++}
++
++/// Workflow block captured from the runbook.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct WorkflowBlock {
++    /// Declared state names.
++    #[serde(default)]
++    pub states: Vec<String>,
++    /// Persistence backend.
++    #[serde(default)]
++    pub persist: Option<String>,
++    /// Receipt path.
++    #[serde(default)]
++    pub receipts: Option<String>,
++    /// Optional stop file.
++    #[serde(default)]
++    pub stop_file: Option<String>,
++}
++
++/// Done block captured from the runbook.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct DoneBlock {
++    /// Required completion predicates.
++    #[serde(default)]
++    pub require: Vec<String>,
++    /// Forbidden completion states.
++    #[serde(default)]
++    pub forbid: Vec<String>,
++}
++
++/// Compiled host-owned super-agent plan.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct CompiledPortSuperPlan {
++    /// Stable plan hash.
++    pub plan_hash: String,
++    /// Run id.
++    pub run_id: String,
++    /// Job name.
++    pub job_name: String,
++    /// Original objective.
++    pub objective: String,
++    /// Target descriptor.
++    pub target: TargetDescriptor,
++    /// Candidate descriptor.
++    pub replacement: TargetDescriptor,
++    /// Maximum active workers.
++    pub worker_cap: u16,
++    /// Strategy tag.
++    pub stage_strategy: String,
++    /// Compiled macro phases.
++    pub phases: Vec<CompiledPhase>,
++    /// Compiled reasoning lanes.
++    pub lanes: Vec<CompiledReasoningLane>,
++    /// Repo graph policy.
++    pub repo_graph: CompiledRepoGraphPolicy,
++    /// Parity lab policy.
++    pub parity_lab: CompiledParityPolicy,
++    /// Memory policy.
++    pub memory: CompiledMemoryPolicy,
++    /// Model policy.
++    pub model_policy: CompiledModelPolicy,
++    /// Completion policy.
++    pub done: DoneBlock,
++    /// Preserved workflow state names from source.
++    pub source_workflow_states: Vec<String>,
++}
++
++/// Target or replacement descriptor.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct TargetDescriptor {
++    /// Human name.
++    pub name: String,
++    /// Optional repository path or URL.
++    pub repo: Option<String>,
++}
++
++/// A compiled macro phase.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct CompiledPhase {
++    /// Phase id.
++    pub id: String,
++    /// One-based ordinal.
++    pub ordinal: u8,
++    /// Human-readable name.
++    pub name: String,
++    /// Phase objective.
++    pub objective: String,
++    /// Strategy tag.
++    pub strategy: String,
++    /// Dependencies by phase id.
++    pub depends_on: Vec<String>,
++    /// Phase ids safe to run in parallel with, subject to write-scope checks.
++    pub can_run_parallel_with: Vec<String>,
++    /// Required sign-off gates.
++    pub gates: Vec<String>,
++    /// Seed tasks for this phase.
++    pub task_seeds: Vec<CompiledTaskSeed>,
++}
++
++/// A seed task compiled from a phase.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct CompiledTaskSeed {
++    /// Task id.
++    pub id: String,
++    /// Task title.
++    pub title: String,
++    /// Lane role suggested for the task.
++    pub role: String,
++    /// Declared write scope.
++    pub write_scope: Vec<String>,
++    /// Proof lane label.
++    pub proof_lane: String,
++}
++
++/// Reasoning lane seed.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct CompiledReasoningLane {
++    /// Lane id.
++    pub id: String,
++    /// Role name.
++    pub role: String,
++    /// Diversity strategy.
++    pub strategy: String,
++    /// Write-scope policy.
++    pub write_scope: Vec<String>,
++}
++
++/// Compiled repo graph policy.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct CompiledRepoGraphPolicy {
++    /// Whether graph is enabled.
++    pub enabled: bool,
++    /// Store backend.
++    pub store: String,
++    /// Node kinds.
++    pub nodes: Vec<String>,
++    /// Edge kinds.
++    pub edges: Vec<String>,
++    /// Export path.
++    pub export: Option<String>,
++    /// Feed workers.
++    pub feed_workers: bool,
++}
++
++/// Compiled parity policy.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct CompiledParityPolicy {
++    /// Whether parity lab is enabled.
++    pub enabled: bool,
++    /// Style tag.
++    pub style: String,
++    /// Artifact directory.
++    pub artifact_dir: Option<String>,
++    /// Cases directory.
++    pub cases_dir: Option<String>,
++    /// Required tags.
++    pub required_tags: Vec<String>,
++    /// Failure conditions.
++    pub fail_on: Vec<String>,
++    /// Reference adapter.
++    pub reference: Option<ParityAdapterBlock>,
++    /// Candidate adapter.
++    pub candidate: Option<ParityAdapterBlock>,
++}
++
++/// Compiled memory policy.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct CompiledMemoryPolicy {
++    /// Store raw reasoning.
++    pub store_raw_reasoning: bool,
++    /// Positive memory write gate.
++    pub positive_write_gate: String,
++    /// Negative memory write gate.
++    pub negative_write_gate: String,
++    /// Poison guard.
++    pub poison_guard: bool,
++    /// Confidence cap without executable evidence.
++    pub confidence_cap_without_executable_evidence: f64,
++}
++
++/// Compiled model policy.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct CompiledModelPolicy {
++    /// Routine route.
++    pub routine: Option<String>,
++    /// Power route.
++    pub power: Option<String>,
++    /// Reliability recording enabled.
++    pub record_reliability: bool,
++}
++
++/// Compile a sentinel-wrapped or raw YAML ZYAL port/reasoning runbook.
++pub fn compile_port_super_plan(raw: &str) -> CoreResult<CompiledPortSuperPlan> {
++    let body = extract_zyal_body(raw)?;
++    compile_port_super_plan_from_body(&body)
++}
++
++/// Compile a raw YAML body without sentinel wrappers.
++pub fn compile_port_super_plan_from_body(body: &str) -> CoreResult<CompiledPortSuperPlan> {
++    let envelope: ZyalPortSuperEnvelope = serde_yaml::from_str(body).map_err(|err| parse(err))?;
++    validate_envelope(&envelope)?;
++
++    let worker_cap = envelope
++        .port
++        .worker_cap
++        .or_else(|| envelope.advanced_reasoning.as_ref().and_then(|a| a.worker_cap))
++        .unwrap_or(DEFAULT_MAX_WORKERS)
++        .clamp(1, MAX_WORKERS);
++    let strategy = envelope
++        .port
++        .stage_strategy
++        .clone()
++        .or_else(|| envelope.port.phase_strategy.clone())
++        .unwrap_or_else(|| "runtime_generated_from_evidence".to_string());
++    let phases = default_phases();
++    validate_phase_graph(&phases)?;
++    let lanes = compile_lanes(envelope.advanced_reasoning.as_ref(), worker_cap);
++    let repo_graph = compile_repo_graph(envelope.repo_graph.as_ref());
++    let parity_lab = compile_parity(envelope.parity_lab.as_ref());
++    let memory = compile_memory(envelope.advanced_reasoning.as_ref());
++    let model_policy = compile_model_policy(envelope.model_policy.as_ref());
++    let done = envelope.done.clone().unwrap_or_else(default_done);
++    let source_workflow_states = envelope
++        .workflow
++        .as_ref()
++        .map(|w| w.states.clone())
++        .unwrap_or_default();
++
++    let mut plan = CompiledPortSuperPlan {
++        plan_hash: String::new(),
++        run_id: envelope
++            .id
++            .clone()
++            .unwrap_or_else(|| "port-super-plan-pending-hash".to_string()),
++        job_name: envelope.job.name.clone(),
++        objective: envelope.job.objective.clone(),
++        target: TargetDescriptor {
++            name: envelope.port.target.clone(),
++            repo: envelope.port.target_repo.clone(),
++        },
++        replacement: TargetDescriptor {
++            name: envelope.port.replacement.clone(),
++            repo: envelope.port.replacement_repo.clone(),
++        },
++        worker_cap,
++        stage_strategy: strategy,
++        phases,
++        lanes,
++        repo_graph,
++        parity_lab,
++        memory,
++        model_policy,
++        done,
++        source_workflow_states,
++    };
++    finalize_plan_hash(&mut plan)?;
++    Ok(plan)
++}
++
++fn finalize_plan_hash(plan: &mut CompiledPortSuperPlan) -> CoreResult<()> {
++    plan.plan_hash.clear();
++    let first_hash = stable_hash(plan)?;
++    if plan.run_id == "port-super-plan-pending-hash" {
++        plan.run_id = format!("port-super-{}", &first_hash[..12]);
++    }
++    plan.plan_hash.clear();
++    plan.plan_hash = stable_hash(plan)?;
++    Ok(())
++}
++
++fn validate_envelope(envelope: &ZyalPortSuperEnvelope) -> CoreResult<()> {
++    if envelope.port.target.trim().is_empty() {
++        return Err(parse_msg("port.target must be non-empty"));
++    }
++    if envelope.port.replacement.trim().is_empty() {
++        return Err(parse_msg("port.replacement must be non-empty"));
++    }
++    let cap = envelope
++        .port
++        .worker_cap
++        .or_else(|| envelope.advanced_reasoning.as_ref().and_then(|a| a.worker_cap))
++        .unwrap_or(DEFAULT_MAX_WORKERS);
++    if cap == 0 || cap > MAX_WORKERS {
++        return Err(parse_msg(format!(
++            "worker cap must be between 1 and {MAX_WORKERS}; got {cap}"
++        )));
++    }
++    if let Some(reasoning) = &envelope.advanced_reasoning {
++        if reasoning.store_raw_reasoning {
++            return Err(parse_msg(
++                "advanced_reasoning.store_raw_reasoning must be false for super-agent runs",
++            ));
++        }
++    }
++    if let Some(parity) = &envelope.parity_lab {
++        if parity.enabled {
++            let fail_on: BTreeSet<_> = parity.fail_on.iter().map(String::as_str).collect();
++            for required in ["zero_cases", "failed_case", "missing_required_case"] {
++                if !fail_on.contains(required) {
++                    return Err(parse_msg(format!(
++                        "parity_lab.fail_on must include '{required}'"
++                    )));
++                }
++            }
++        }
++    }
++    Ok(())
++}
++
++fn validate_phase_graph(phases: &[CompiledPhase]) -> CoreResult<()> {
++    if !(9..=12).contains(&phases.len()) {
++        return Err(parse_msg(format!(
++            "super-agent macro plan must have 9-12 phases; got {}",
++            phases.len()
++        )));
++    }
++    let ids: BTreeSet<_> = phases.iter().map(|p| p.id.as_str()).collect();
++    for phase in phases {
++        for dep in &phase.depends_on {
++            if !ids.contains(dep.as_str()) {
++                return Err(parse_msg(format!(
++                    "phase '{}' depends on unknown phase '{dep}'",
++                    phase.id
++                )));
++            }
++        }
++    }
++    let mut visiting = BTreeSet::new();
++    let mut visited = BTreeSet::new();
++    let map: BTreeMap<_, _> = phases.iter().map(|p| (p.id.as_str(), p)).collect();
++    for phase in phases {
++        detect_cycle(phase.id.as_str(), &map, &mut visiting, &mut visited)?;
++    }
++    Ok(())
++}
++
++fn detect_cycle<'a>(
++    id: &'a str,
++    map: &BTreeMap<&'a str, &'a CompiledPhase>,
++    visiting: &mut BTreeSet<&'a str>,
++    visited: &mut BTreeSet<&'a str>,
++) -> CoreResult<()> {
++    if visited.contains(id) {
++        return Ok(());
++    }
++    if !visiting.insert(id) {
++        return Err(parse_msg(format!("phase dependency cycle at '{id}'")));
++    }
++    if let Some(phase) = map.get(id) {
++        for dep in &phase.depends_on {
++            detect_cycle(dep.as_str(), map, visiting, visited)?;
++        }
++    }
++    visiting.remove(id);
++    visited.insert(id);
++    Ok(())
++}
++
++fn compile_lanes(
++    reasoning: Option<&AdvancedReasoningBlock>,
++    worker_cap: u16,
++) -> Vec<CompiledReasoningLane> {
++    let default_roles = vec![
++        "framer",
++        "retriever",
++        "stage_planner",
++        "builder",
++        "parity_author",
++        "critic",
++        "verifier",
++        "reducer",
++        "performance_hunter",
++        "memory_curator",
++        "integrator",
++    ];
++    let roles: Vec<String> = reasoning
++        .map(|r| r.roles.clone())
++        .filter(|r| !r.is_empty())
++        .unwrap_or_else(|| default_roles.iter().map(|r| (*r).to_string()).collect());
++    roles
++        .into_iter()
++        .take(worker_cap as usize)
++        .map(|role| CompiledReasoningLane {
++            id: format!("lane-{role}"),
++            role,
++            strategy: "blind_then_critic_then_reduce".to_string(),
++            write_scope: vec!["scratch_only".to_string()],
++        })
++        .collect()
++}
++
++fn compile_repo_graph(repo_graph: Option<&RepoGraphBlock>) -> CompiledRepoGraphPolicy {
++    let defaults_nodes = [
++        "target",
++        "replacement",
++        "stage",
++        "task",
++        "files",
++        "modules",
++        "functions",
++        "commands",
++        "tests",
++        "parity_cases",
++        "perf_budgets",
++    ];
++    let default_edges = [
++        "contains",
++        "imports",
++        "calls",
++        "tests",
++        "implements",
++        "depends_on",
++        "phase_owns",
++        "task_touches",
++        "parity_covers",
++        "changed_by",
++        "supports",
++        "critiques",
++        "reduces",
++    ];
++    CompiledRepoGraphPolicy {
++        enabled: repo_graph.map(|r| r.enabled).unwrap_or(true),
++        store: repo_graph
++            .and_then(|r| r.store.clone())
++            .unwrap_or_else(|| "sqlite".to_string()),
++        nodes: repo_graph
++            .map(|r| r.nodes.clone())
++            .filter(|v| !v.is_empty())
++            .unwrap_or_else(|| defaults_nodes.iter().map(|s| (*s).to_string()).collect()),
++        edges: repo_graph
++            .map(|r| r.edges.clone())
++            .filter(|v| !v.is_empty())
++            .unwrap_or_else(|| default_edges.iter().map(|s| (*s).to_string()).collect()),
++        export: repo_graph.and_then(|r| r.export.clone()),
++        feed_workers: repo_graph.and_then(|r| r.feed_workers).unwrap_or(true),
++    }
++}
++
++fn compile_parity(parity: Option<&ParityLabBlock>) -> CompiledParityPolicy {
++    let adapters = parity.and_then(|p| p.adapters.clone());
++    CompiledParityPolicy {
++        enabled: parity.map(|p| p.enabled).unwrap_or(true),
++        style: parity
++            .and_then(|p| p.style.clone())
++            .unwrap_or_else(|| "target_switched".to_string()),
++        artifact_dir: parity.and_then(|p| p.artifact_dir.clone()),
++        cases_dir: parity.and_then(|p| p.cases_dir.clone()),
++        required_tags: parity
++            .map(|p| p.required_tags.clone())
++            .filter(|v| !v.is_empty())
++            .unwrap_or_else(|| vec!["required".into(), "approved".into()]),
++        fail_on: parity
++            .map(|p| p.fail_on.clone())
++            .filter(|v| !v.is_empty())
++            .unwrap_or_else(|| {
++                vec![
++                    "zero_cases".into(),
++                    "missing_required_case".into(),
++                    "skipped_required_case".into(),
++                    "failed_case".into(),
++                    "missing_perf_data".into(),
++                    "perf_ratio_over_budget".into(),
++                ]
++            }),
++        reference: adapters.as_ref().map(|a| a.reference.clone()),
++        candidate: adapters.as_ref().map(|a| a.candidate.clone()),
++    }
++}
++
++fn compile_memory(reasoning: Option<&AdvancedReasoningBlock>) -> CompiledMemoryPolicy {
++    CompiledMemoryPolicy {
++        store_raw_reasoning: false,
++        positive_write_gate: "verifier_or_reducer_approval".to_string(),
++        negative_write_gate: "falsifying_evidence".to_string(),
++        poison_guard: true,
++        confidence_cap_without_executable_evidence: reasoning
++            .and_then(|r| r.confidence_cap_without_executable_evidence)
++            .unwrap_or(0.35),
++    }
++}
++
++fn compile_model_policy(model: Option<&ModelPolicyBlock>) -> CompiledModelPolicy {
++    CompiledModelPolicy {
++        routine: model.and_then(|m| m.routine.clone()),
++        power: model.and_then(|m| m.power.clone()),
++        record_reliability: model
++            .and_then(|m| m.record_reliability.or(m.record_outcomes))
++            .unwrap_or(true),
++    }
++}
++
++fn default_done() -> DoneBlock {
++    DoneBlock {
++        require: vec![
++            "target_request_captured".into(),
++            "master_plan_generated_from_runtime_evidence".into(),
++            "phases_complete".into(),
++            "jankurai_gate_passed".into(),
++            "parity_gate_passed".into(),
++            "perf_budgets_checked".into(),
++            "memory_capsules_verified_or_rejected".into(),
++        ],
++        forbid: vec![
++            "model_only_claim".into(),
++            "raw_chain_of_thought_storage".into(),
++            "missing_required_parity_case".into(),
++            "skipped_required_parity_case".into(),
++            "unchecked_perf_budget".into(),
++        ],
++    }
++}
++
++fn default_phases() -> Vec<CompiledPhase> {
++    let specs = vec![
++        (
++            "scope-contract",
++            "Scope contract",
++            "Capture request, success criteria, non-goals, trust boundaries, budgets, and stop conditions.",
++            vec![],
++            vec![],
++        ),
++        (
++            "reference-inventory",
++            "Reference inventory",
++            "Inventory docs, source, tests, examples, APIs, commands, protocol behavior, and executable references.",
++            vec!["scope-contract"],
++            vec!["repo-graph-risk"],
++        ),
++        (
++            "repo-graph-risk",
++            "Repo graph and risk map",
++            "Seed the repo graph, map blast radius, identify generated zones, tests, parity surfaces, and high-risk boundaries.",
++            vec!["scope-contract"],
++            vec!["reference-inventory"],
++        ),
++        (
++            "architecture-plan",
++            "Architecture plan",
++            "Reduce evidence into the target architecture, module boundaries, data model, runtime model, and rollback strategy.",
++            vec!["reference-inventory", "repo-graph-risk"],
++            vec![],
++        ),
++        (
++            "core-surface",
++            "Core surface implementation",
++            "Build the central interfaces, command/API shell, persistence shell, and minimal executable skeleton.",
++            vec!["architecture-plan"],
++            vec!["parity-harness"],
++        ),
++        (
++            "feature-semantics",
++            "Feature semantics waves",
++            "Execute bounded behavior clusters in isolated worktrees with critic and verifier lanes.",
++            vec!["core-surface"],
++            vec!["parity-harness"],
++        ),
++        (
++            "parity-harness",
++            "Parity harness and case library",
++            "Build target-switched reference/candidate adapters, approved cases, raw JSONL results, summaries, and gap extraction.",
++            vec!["architecture-plan"],
++            vec!["core-surface", "feature-semantics"],
++        ),
++        (
++            "integration-fusion",
++            "Integration and fusion",
++            "Fuse green worktrees, resolve conflicts, refresh graph, re-run proof lanes, and quarantine failed lanes.",
++            vec!["feature-semantics", "parity-harness"],
++            vec![],
++        ),
++        (
++            "performance-closure",
++            "Performance closure",
++            "Profile reference/candidate gaps, optimize hot paths, enforce p95/p99/RSS budgets, and re-run parity.",
++            vec!["integration-fusion"],
++            vec![],
++        ),
++        (
++            "release-signoff",
++            "Release sign-off",
++            "Verify parity, performance, Jankurai, rollback, memory, repo graph, and clean-tree evidence before done.",
++            vec!["performance-closure"],
++            vec![],
++        ),
++    ];
++
++    specs
++        .into_iter()
++        .enumerate()
++        .map(|(idx, (id, name, objective, deps, parallel))| {
++            let ordinal = (idx + 1) as u8;
++            CompiledPhase {
++                id: id.to_string(),
++                ordinal,
++                name: name.to_string(),
++                objective: objective.to_string(),
++                strategy: "plan_build_verify_reduce".to_string(),
++                depends_on: deps.into_iter().map(str::to_string).collect(),
++                can_run_parallel_with: parallel.into_iter().map(str::to_string).collect(),
++                gates: vec![
++                    "no_unresolved_critical_objections".into(),
++                    "proof_commands_pass".into(),
++                    "memory_capsules_verified_or_rejected".into(),
++                    "repo_graph_updated".into(),
++                    "rollback_known_when_risky".into(),
++                ],
++                task_seeds: default_tasks_for_phase(id, ordinal),
++            }
++        })
++        .collect()
++}
++
++fn default_tasks_for_phase(phase_id: &str, ordinal: u8) -> Vec<CompiledTaskSeed> {
++    let prefix = format!("p{ordinal:02}-{phase_id}");
++    vec![
++        CompiledTaskSeed {
++            id: format!("{prefix}-plan"),
++            title: format!("Plan {phase_id}"),
++            role: "stage_planner".into(),
++            write_scope: vec!["scratch_only".into()],
++            proof_lane: "planning_review".into(),
++        },
++        CompiledTaskSeed {
++            id: format!("{prefix}-build"),
++            title: format!("Execute {phase_id}"),
++            role: "builder".into(),
++            write_scope: vec!["declared_worker_paths_only".into()],
++            proof_lane: "phase_verify".into(),
++        },
++        CompiledTaskSeed {
++            id: format!("{prefix}-verify"),
++            title: format!("Verify {phase_id}"),
++            role: "verifier".into(),
++            write_scope: vec!["scratch_only".into(), "target/zyal/**".into()],
++            proof_lane: "executable_evidence".into(),
++        },
++        CompiledTaskSeed {
++            id: format!("{prefix}-memory"),
++            title: format!("Curate memory for {phase_id}"),
++            role: "memory_curator".into(),
++            write_scope: vec!["target/zyal/**".into(), ".jekko/daemon/**".into()],
++            proof_lane: "memory_review".into(),
++        },
++    ]
++}
++
++fn extract_zyal_body(raw: &str) -> CoreResult<String> {
++    if !raw.contains("<<<ZYAL") {
++        return Ok(raw.trim().to_string());
++    }
++    let start = raw
++        .find(">>>")
++        .ok_or_else(|| parse_msg("missing ZYAL start sentinel close marker '>>>'"))?;
++    let rest = &raw[start + 3..];
++    let end = rest
++        .find("<<<END_ZYAL")
++        .ok_or_else(|| parse_msg("missing END_ZYAL sentinel"))?;
++    Ok(rest[..end].trim().to_string())
++}
++
++fn stable_hash<T: Serialize>(value: &T) -> CoreResult<String> {
++    let json = serde_json::to_vec(value).map_err(|err| CoreError::Parse {
++        surface: SURFACE,
++        message: err.to_string(),
++    })?;
++    let mut hasher = Sha256::new();
++    hasher.update(json);
++    Ok(format!("{:x}", hasher.finalize()))
++}
++
++fn parse(err: serde_yaml::Error) -> CoreError {
++    CoreError::Parse {
++        surface: SURFACE,
++        message: err.to_string(),
++    }
++}
++
++fn parse_msg(message: impl Into<String>) -> CoreError {
++    CoreError::Parse {
++        surface: SURFACE,
++        message: message.into(),
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn sample() -> &'static str {
++        r#"
++<<<ZYAL v1:daemon id=redis-jedis-port-foundry>>>
++version: v1
++intent: daemon
++confirm: RUN_FOREVER
++job:
++  name: "Redis to Rust port foundry"
++  objective: "Build a Rust replacement with reference parity."
++port:
++  target: "Redis"
++  replacement: "Jedis"
++  target_repo: "./references/redis"
++  replacement_repo: "."
++  worker_cap: 10
++  stage_strategy: runtime_generated_from_evidence
++advanced_reasoning:
++  enabled: true
++  worker_cap: 10
++  confidence_cap_without_executable_evidence: 0.35
++  store_raw_reasoning: false
++repo_graph:
++  enabled: true
++  store: sqlite
++  nodes: [files, modules, functions, tests, commands, parity_cases]
++  edges: [contains, calls, tests, parity_covers, changed_by]
++parity_lab:
++  enabled: true
++  style: redlinedb
++  fail_on: [zero_cases, missing_required_case, skipped_required_case, failed_case, missing_perf_data, perf_ratio_over_budget]
++  adapters:
++    reference:
++      target_kind: redis
++      command: "./src/redis-server --save '' --appendonly no"
++      read_only: true
++    candidate:
++      target_kind: jedis
++      command: "cargo run --bin jedis"
++workflow:
++  states: [capture_target, brainstorm_stages, finalize_master_plan, complete]
++done:
++  require: [phases_complete, parity_gate_passed]
++  forbid: [model_only_claim]
++<<<END_ZYAL id=redis-jedis-port-foundry>>>
++ZYAL_ARM RUN_FOREVER id=redis-jedis-port-foundry
++"#
++    }
++
++    #[test]
++    fn compiles_redis_like_request_to_ten_stage_plan() {
++        let plan = compile_port_super_plan(sample()).expect("compile");
++        assert_eq!(plan.target.name, "Redis");
++        assert_eq!(plan.replacement.name, "Jedis");
++        assert_eq!(plan.worker_cap, 10);
++        assert_eq!(plan.phases.len(), 10);
++        assert_eq!(plan.phases[0].id, "scope-contract");
++        assert!(plan
++            .phases
++            .iter()
++            .any(|phase| phase.id == "parity-harness"));
++        assert!(!plan.memory.store_raw_reasoning);
++        assert!(plan.parity_lab.enabled);
++    }
++
++    #[test]
++    fn rejects_raw_reasoning_storage() {
++        let body = sample().replace("store_raw_reasoning: false", "store_raw_reasoning: true");
++        let err = compile_port_super_plan(&body).unwrap_err();
++        assert!(format!("{err}").contains("store_raw_reasoning"));
++    }
++
++    #[test]
++    fn rejects_worker_cap_over_hard_limit() {
++        let body = sample().replace("worker_cap: 10", "worker_cap: 21");
++        let err = compile_port_super_plan(&body).unwrap_err();
++        assert!(format!("{err}").contains("worker cap"));
++    }
++
++    #[test]
++    fn plan_hash_is_stable() {
++        let a = compile_port_super_plan(sample()).expect("compile a");
++        let b = compile_port_super_plan(sample()).expect("compile b");
++        assert_eq!(a.plan_hash, b.plan_hash);
++    }
++}
+diff --git a/crates/jekko-runtime/src/lib.rs b/crates/jekko-runtime/src/lib.rs
+index 5c717242..17c88f39 100644
+--- a/crates/jekko-runtime/src/lib.rs
++++ b/crates/jekko-runtime/src/lib.rs
+@@ -42,6 +42,7 @@ pub mod snapshot;
+ pub mod status;
++pub mod super_agent;
+ pub mod tool;
+ pub mod watcher;
+ pub mod workspace;
+diff --git a/crates/jekko-runtime/src/super_agent.rs b/crates/jekko-runtime/src/super_agent.rs
+new file mode 100644
+index 00000000..447f859a
+--- /dev/null
++++ b/crates/jekko-runtime/src/super_agent.rs
+@@ -0,0 +1,360 @@
++//! Runtime bridge for ZYAL super-agent port workflows.
++//!
++//! The core compiler produces a pure, deterministic plan. This module seeds
++//! that plan into the existing daemon store tables so the host has durable
++//! phases, tasks, reasoning lanes, memory capsules, concepts, and repo-graph
++//! nodes before workers execute.
++
++use jekko_core::zyal_port_super::{CompiledPhase, CompiledPortSuperPlan, CompiledTaskSeed};
++use jekko_store::daemon::{
++    upsert_concept, upsert_concept_link, upsert_memory_capsule, upsert_port_phase,
++    upsert_port_target, upsert_port_task, upsert_reasoning_artifact, upsert_reasoning_edge,
++    upsert_reasoning_lane, upsert_repo_graph_edge, upsert_repo_graph_node, DaemonConceptLinkRow,
++    DaemonConceptRow, MemoryCapsuleRow, PortPhaseRow, PortTargetRow, PortTaskRow,
++    ReasoningArtifactRow, ReasoningEdgeRow, ReasoningLaneRow, RepoGraphEdgeRow,
++    RepoGraphNodeRow,
++};
++use jekko_store::{StoreError, StoreResult};
++use rusqlite::Connection;
++use serde::{Deserialize, Serialize};
++
++/// Receipt emitted after seeding a super-agent plan.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct SuperAgentSeedReceipt {
++    /// Run id.
++    pub run_id: String,
++    /// Stable plan hash.
++    pub plan_hash: String,
++    /// Port target row id.
++    pub target_id: String,
++    /// Number of seeded phases.
++    pub phase_count: usize,
++    /// Number of seeded task rows.
++    pub task_count: usize,
++    /// Number of seeded reasoning lanes.
++    pub lane_count: usize,
++    /// Number of seeded repo graph nodes.
++    pub repo_graph_node_count: usize,
++    /// Number of seeded repo graph edges.
++    pub repo_graph_edge_count: usize,
++    /// Number of initial memory capsules.
++    pub memory_capsule_count: usize,
++}
++
++/// Seed a compiled super-agent plan into the durable daemon tables.
++pub fn seed_super_agent_plan(
++    conn: &Connection,
++    plan: &CompiledPortSuperPlan,
++    now_ms: i64,
++) -> StoreResult<SuperAgentSeedReceipt> {
++    validate_plan(plan)?;
++
++    let target_id = format!("port-target-{}", &plan.plan_hash[..16]);
++    let artifact_id = format!("reasoning-plan-{}", &plan.plan_hash[..16]);
++    let plan_payload = serde_json::to_value(plan)?;
++
++    upsert_port_target(
++        conn,
++        &PortTargetRow {
++            id: target_id.clone(),
++            run_id: plan.run_id.clone(),
++            target: plan.target.name.clone(),
++            replacement: plan.replacement.name.clone(),
++            target_repo: plan.target.repo.clone(),
++            replacement_repo: plan.replacement.repo.clone(),
++            request: plan.objective.clone(),
++            status: "planned".to_string(),
++            current_phase_id: plan.phases.first().map(runtime_phase_id),
++            worker_cap: i64::from(plan.worker_cap),
++            last_audit_score: None,
++            last_parity_report_json: None,
++            last_perf_gap_json: None,
++            rollback_status: "required_when_risky".to_string(),
++            quarantine_status: "clean".to_string(),
++            time_created: now_ms,
++            time_updated: now_ms,
++        },
++    )?;
++
++    upsert_reasoning_artifact(
++        conn,
++        &ReasoningArtifactRow {
++            id: artifact_id.clone(),
++            run_id: plan.run_id.clone(),
++            role: "host".to_string(),
++            kind: "compiled_super_agent_plan".to_string(),
++            title: format!("{} → {} super-agent plan", plan.target.name, plan.replacement.name),
++            summary: format!(
++                "{} phases, {} lanes, worker cap {}",
++                plan.phases.len(),
++                plan.lanes.len(),
++                plan.worker_cap
++            ),
++            evidence_level: "E1".to_string(),
++            confidence: 1.0,
++            payload_json: Some(plan_payload),
++            content_hash: plan.plan_hash.clone(),
++            status: "verified".to_string(),
++            time_created: now_ms,
++            time_updated: now_ms,
++        },
++    )?;
++
++    upsert_memory_capsule(
++        conn,
++        &MemoryCapsuleRow {
++            id: format!("memory-plan-{}", &plan.plan_hash[..16]),
++            run_id: plan.run_id.clone(),
++            artifact_id: artifact_id.clone(),
++            scope: "run".to_string(),
++            status: "verified".to_string(),
++            summary: format!(
++                "Host compiled a {}-phase bounded port plan for {} → {}.",
++                plan.phases.len(),
++                plan.target.name,
++                plan.replacement.name
++            ),
++            evidence_level: "E1".to_string(),
++            confidence: 1.0,
++            payload_json: Some(serde_json::json!({
++                "plan_hash": plan.plan_hash.clone(),
++                "stage_strategy": plan.stage_strategy.clone(),
++                "done": plan.done.clone(),
++                "memory": plan.memory.clone(),
++            })),
++            content_hash: plan.plan_hash.clone(),
++            time_created: now_ms,
++            time_updated: now_ms,
++        },
++    )?;
++
++    let mut task_count = 0;
++    let mut graph_nodes = 0;
++    let mut graph_edges = 0;
++    seed_root_graph(conn, plan, &target_id, now_ms, &mut graph_nodes, &mut graph_edges)?;
++
++    for phase in &plan.phases {
++        let phase_id = runtime_phase_id(phase);
++        upsert_port_phase(conn, &phase_row(plan, phase, &target_id, now_ms)?)?;
++        seed_phase_concept(conn, plan, phase, &artifact_id, now_ms)?;
++        seed_phase_graph(conn, plan, phase, now_ms, &mut graph_nodes, &mut graph_edges)?;
++        for task in &phase.task_seeds {
++            upsert_port_task(conn, &task_row(plan, task, &phase_id, now_ms))?;
++            seed_task_graph(
++                conn,
++                plan,
++                phase,
++                task,
++                now_ms,
++                &mut graph_nodes,
++                &mut graph_edges,
++            )?;
++            task_count += 1;
++        }
++    }
++
++    for lane in &plan.lanes {
++        let lane_artifact = lane_artifact_id(plan, &lane.id);
++        upsert_reasoning_artifact(
++            conn,
++            &ReasoningArtifactRow {
++                id: lane_artifact.clone(),
++                run_id: plan.run_id.clone(),
++                role: lane.role.clone(),
++                kind: "reasoning_lane_seed".to_string(),
++                title: format!("{} lane", lane.role),
++                summary: format!(
++                    "Seeded {} lane with {} strategy and scratch-only writes.",
++                    lane.role, lane.strategy
++                ),
++                evidence_level: "E1".to_string(),
++                confidence: 1.0,
++                payload_json: Some(serde_json::to_value(lane)?),
++                content_hash: plan.plan_hash.clone(),
++                status: "verified".to_string(),
++                time_created: now_ms,
++                time_updated: now_ms,
++            },
++        )?;
++        upsert_reasoning_lane(
++            conn,
++            &ReasoningLaneRow {
++                id: format!("{}-{}", plan.run_id, lane.id),
++                run_id: plan.run_id.clone(),
++                role: lane.role.clone(),
++                strategy: lane.strategy.clone(),
++                status: "ready".to_string(),
++                artifact_ids: vec![artifact_id.clone(), lane_artifact],
++                write_scope: lane.write_scope.clone(),
++                worker_id: None,
++                confidence: 0.0,
++                time_created: now_ms,
++                time_updated: now_ms,
++            },
++        )?;
++    }
++
++    seed_reasoning_edges(conn, plan, &artifact_id, now_ms)?;
++
++    Ok(SuperAgentSeedReceipt {
++        run_id: plan.run_id.clone(),
++        plan_hash: plan.plan_hash.clone(),
++        target_id,
++        phase_count: plan.phases.len(),
++        task_count,
++        lane_count: plan.lanes.len(),
++        repo_graph_node_count: graph_nodes,
++        repo_graph_edge_count: graph_edges,
++        memory_capsule_count: 1,
++    })
++}
++
++fn validate_plan(plan: &CompiledPortSuperPlan) -> StoreResult<()> {
++    if !(9..=12).contains(&plan.phases.len()) {
++        return Err(StoreError::Invalid(format!(
++            "compiled super-agent plan must have 9-12 phases; got {}",
++            plan.phases.len()
++        )));
++    }
++    if plan.worker_cap == 0 || plan.worker_cap > 20 {
++        return Err(StoreError::Invalid(format!(
++            "worker cap must be between 1 and 20; got {}",
++            plan.worker_cap
++        )));
++    }
++    if plan.memory.store_raw_reasoning {
++        return Err(StoreError::Invalid(
++            "super-agent plans may not store raw reasoning".to_string(),
++        ));
++    }
++    Ok(())
++}
++
++fn phase_row(
++    plan: &CompiledPortSuperPlan,
++    phase: &CompiledPhase,
++    target_id: &str,
++    now_ms: i64,
++) -> StoreResult<PortPhaseRow> {
++    Ok(PortPhaseRow {
++        id: runtime_phase_id(phase),
++        run_id: plan.run_id.clone(),
++        target_id: target_id.to_string(),
++        ordinal: i64::from(phase.ordinal),
++        name: phase.name.clone(),
++        status: "pending".to_string(),
++        strategy: phase.strategy.clone(),
++        plan_json: Some(serde_json::to_value(phase)?),
++        task_count: phase.task_seeds.len() as i64,
++        last_audit_score: None,
++        last_parity_report_json: None,
++        time_created: now_ms,
++        time_updated: now_ms,
++    })
++}
++
++fn task_row(
++    plan: &CompiledPortSuperPlan,
++    task: &CompiledTaskSeed,
++    phase_id: &str,
++    now_ms: i64,
++) -> PortTaskRow {
++    PortTaskRow {
++        id: format!("{}-{}", plan.run_id, task.id),
++        run_id: plan.run_id.clone(),
++        phase_id: phase_id.to_string(),
++        title: task.title.clone(),
++        status: "pending".to_string(),
++        worker_id: None,
++        branch: Some(format!("zyal/{}/{}", plan.run_id, task.id)),
++        write_scope: task.write_scope.clone(),
++        proof_lane: Some(task.proof_lane.clone()),
++        attempt_count: 0,
++        rollback_status: "not_started".to_string(),
++        quarantine_reason: None,
++        last_error: None,
++        time_created: now_ms,
++        time_updated: now_ms,
++    }
++}
++
++fn seed_phase_concept(
++    conn: &Connection,
++    plan: &CompiledPortSuperPlan,
++    phase: &CompiledPhase,
++    artifact_id: &str,
++    now_ms: i64,
++) -> StoreResult<()> {
++    let concept_id = format!("phase:{}", phase.id);
++    upsert_concept(
++        conn,
++        &DaemonConceptRow {
++            id: format!("{}-{concept_id}", plan.run_id),
++            run_id: plan.run_id.clone(),
++            concept_id: concept_id.clone(),
++            definition: phase.objective.clone(),
++            derived_from_json: Some(serde_json::json!({
++                "artifact_id": artifact_id,
++                "plan_hash": plan.plan_hash.clone(),
++            })),
++            proof_refs_json: Some(serde_json::json!({
++                "phase_id": phase.id.clone(),
++                "gates": phase.gates.clone(),
++            })),
++            confidence: 1.0,
++            invalidated_at: None,
++            invalidated_reason: None,
++            time_created: now_ms,
++            time_updated: now_ms,
++        },
++    )?;
++    for dep in &phase.depends_on {
++        upsert_concept_link(
++            conn,
++            &DaemonConceptLinkRow {
++                run_id: plan.run_id.clone(),
++                parent_concept: format!("phase:{dep}"),
++                child_concept: concept_id.clone(),
++                relation: "depends_on".to_string(),
++                time_created: now_ms,
++            },
++        )?;
++    }
++    Ok(())
++}
++
++fn seed_root_graph(
++    conn: &Connection,
++    plan: &CompiledPortSuperPlan,
++    target_id: &str,
++    now_ms: i64,
++    node_count: &mut usize,
++    edge_count: &mut usize,
++) -> StoreResult<()> {
++    let target_node = format!("{}:target", plan.run_id);
++    let replacement_node = format!("{}:replacement", plan.run_id);
++    seed_node(
++        conn,
++        plan,
++        &target_node,
++        "target",
++        &plan.target.name,
++        serde_json::json!({ "repo": plan.target.repo.clone(), "port_target_id": target_id }),
++        now_ms,
++        node_count,
++    )?;
++    seed_node(
++        conn,
++        plan,
++        &replacement_node,
++        "replacement",
++        &plan.replacement.name,
++        serde_json::json!({ "repo": plan.replacement.repo.clone(), "port_target_id": target_id }),
++        now_ms,
++        node_count,
++    )?;
++    seed_edge(
++        conn,
++        plan,
++        &target_node,
++        &replacement_node,
++        "replaced_by",
++        serde_json::json!({ "plan_hash": plan.plan_hash.clone() }),
++        now_ms,
++        edge_count,
++    )
++}
++
++fn seed_phase_graph(
++    conn: &Connection,
++    plan: &CompiledPortSuperPlan,
++    phase: &CompiledPhase,
++    now_ms: i64,
++    node_count: &mut usize,
++    edge_count: &mut usize,
++) -> StoreResult<()> {
++    let phase_node = graph_phase_node_id(plan, phase);
++    seed_node(
++        conn,
++        plan,
++        &phase_node,
++        "stage",
++        &phase.name,
++        serde_json::to_value(phase)?,
++        now_ms,
++        node_count,
++    )?;
++    seed_edge(
++        conn,
++        plan,
++        &format!("{}:target", plan.run_id),
++        &phase_node,
++        "scoped_by",
++        serde_json::json!({ "ordinal": phase.ordinal }),
++        now_ms,
++        edge_count,
++    )?;
++    for dep in &phase.depends_on {
++        seed_edge(
++            conn,
++            plan,
++            &format!("{}:phase:{dep}", plan.run_id),
++            &phase_node,
++            "depends_on",
++            serde_json::json!({}),
++            now_ms,
++            edge_count,
++        )?;
++    }
++    Ok(())
++}
++
++fn seed_task_graph(
++    conn: &Connection,
++    plan: &CompiledPortSuperPlan,
++    phase: &CompiledPhase,
++    task: &CompiledTaskSeed,
++    now_ms: i64,
++    node_count: &mut usize,
++    edge_count: &mut usize,
++) -> StoreResult<()> {
++    let task_node = format!("{}:task:{}", plan.run_id, task.id);
++    seed_node(
++        conn,
++        plan,
++        &task_node,
++        "task",
++        &task.title,
++        serde_json::to_value(task)?,
++        now_ms,
++        node_count,
++    )?;
++    seed_edge(
++        conn,
++        plan,
++        &graph_phase_node_id(plan, phase),
++        &task_node,
++        "phase_owns",
++        serde_json::json!({ "proof_lane": task.proof_lane.clone() }),
++        now_ms,
++        edge_count,
++    )
++}
++
++fn seed_reasoning_edges(
++    conn: &Connection,
++    plan: &CompiledPortSuperPlan,
++    artifact_id: &str,
++    now_ms: i64,
++) -> StoreResult<()> {
++    for lane in &plan.lanes {
++        upsert_reasoning_edge(
++            conn,
++            &ReasoningEdgeRow {
++                run_id: plan.run_id.clone(),
++                src_artifact_id: artifact_id.to_string(),
++                dst_artifact_id: lane_artifact_id(plan, &lane.id),
++                kind: "assigned_to_lane".to_string(),
++                weight: Some(1.0),
++                payload_json: Some(serde_json::json!({ "role": lane.role.clone() })),
++                time_created: now_ms,
++            },
++        )?;
++    }
++    Ok(())
++}
++
++#[allow(clippy::too_many_arguments)]
++fn seed_node(
++    conn: &Connection,
++    plan: &CompiledPortSuperPlan,
++    id: &str,
++    kind: &str,
++    label: &str,
++    payload: serde_json::Value,
++    now_ms: i64,
++    count: &mut usize,
++) -> StoreResult<()> {
++    upsert_repo_graph_node(
++        conn,
++        &RepoGraphNodeRow {
++            id: id.to_string(),
++            run_id: plan.run_id.clone(),
++            kind: kind.to_string(),
++            key: id.to_string(),
++            label: label.to_string(),
++            payload_json: Some(payload),
++            time_created: now_ms,
++            time_updated: now_ms,
++        },
++    )?;
++    *count += 1;
++    Ok(())
++}
++
++#[allow(clippy::too_many_arguments)]
++fn seed_edge(
++    conn: &Connection,
++    plan: &CompiledPortSuperPlan,
++    src: &str,
++    dst: &str,
++    kind: &str,
++    payload: serde_json::Value,
++    now_ms: i64,
++    count: &mut usize,
++) -> StoreResult<()> {
++    upsert_repo_graph_edge(
++        conn,
++        &RepoGraphEdgeRow {
++            run_id: plan.run_id.clone(),
++            src_node_id: src.to_string(),
++            dst_node_id: dst.to_string(),
++            kind: kind.to_string(),
++            payload_json: Some(payload),
++            time_created: now_ms,
++        },
++    )?;
++    *count += 1;
++    Ok(())
++}
++
++fn runtime_phase_id(phase: &CompiledPhase) -> String {
++    format!("phase-{:02}-{}", phase.ordinal, phase.id)
++}
++
++fn lane_artifact_id(plan: &CompiledPortSuperPlan, lane_id: &str) -> String {
++    format!("{}:lane-artifact:{lane_id}", plan.run_id)
++}
++
++fn graph_phase_node_id(plan: &CompiledPortSuperPlan, phase: &CompiledPhase) -> String {
++    format!("{}:phase:{}", plan.run_id, phase.id)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use jekko_core::zyal_port_super::compile_port_super_plan;
++    use jekko_store::daemon::{
++        list_memory_capsules_for_run, list_port_phases_for_target, list_port_tasks_for_phase,
++        list_reasoning_lanes_for_run, list_repo_graph_edges_for_run, list_repo_graph_nodes_for_run,
++    };
++    use jekko_store::Db;
++
++    fn sample() -> &'static str {
++        r#"
++version: v1
++intent: daemon
++confirm: RUN_FOREVER
++id: generic-port-workflow-ultra
++job:
++  name: "Generic port workflow"
++  objective: "Build a replacement implementation with reference-target parity."
++port:
++  target: "MiniKV"
++  replacement: "MiniKV Rust"
++  worker_cap: 6
++advanced_reasoning:
++  enabled: true
++  worker_cap: 6
++  store_raw_reasoning: false
++parity_lab:
++  enabled: true
++  fail_on: [zero_cases, missing_required_case, skipped_required_case, failed_case, missing_perf_data]
++"#
++    }
++
++    #[test]
++    fn seeds_plan_into_existing_daemon_tables() {
++        let db = Db::open_in_memory().expect("db");
++        let plan = compile_port_super_plan(sample()).expect("compile");
++        let receipt = seed_super_agent_plan(db.connection(), &plan, 1_777_000_000_000)
++            .expect("seed plan");
++        assert_eq!(receipt.phase_count, 10);
++        assert_eq!(receipt.lane_count, 6);
++        assert_eq!(receipt.memory_capsule_count, 1);
++
++        let phases = list_port_phases_for_target(db.connection(), &receipt.target_id).unwrap();
++        assert_eq!(phases.len(), 10);
++        let tasks = list_port_tasks_for_phase(db.connection(), &phases[0].id).unwrap();
++        assert_eq!(tasks.len(), 4);
++        let lanes = list_reasoning_lanes_for_run(db.connection(), &plan.run_id).unwrap();
++        assert_eq!(lanes.len(), 6);
++        let capsules = list_memory_capsules_for_run(db.connection(), &plan.run_id).unwrap();
++        assert_eq!(capsules.len(), 1);
++        let graph_nodes = list_repo_graph_nodes_for_run(db.connection(), &plan.run_id).unwrap();
++        assert!(graph_nodes.len() >= 2 + plan.phases.len());
++        let graph_edges = list_repo_graph_edges_for_run(db.connection(), &plan.run_id).unwrap();
++        assert!(graph_edges.len() >= plan.phases.len());
++    }
++}
+diff --git a/docs/ZYAL/CHANGELOG.md b/docs/ZYAL/CHANGELOG.md
+index 2671c10b..69a9f3a2 100644
+--- a/docs/ZYAL/CHANGELOG.md
++++ b/docs/ZYAL/CHANGELOG.md
+@@ -4,6 +4,10 @@
+ 
+ - Added the canonical human-facing schema at `docs/ZYAL/SPEC.md` together with
+   generator/check tooling so parser/schema drift cannot go silent.
++- Added a runtime-wiring design for super-agent port workflows: the advanced
++  `port`, `advanced_reasoning`, `repo_graph`, `parity_lab`, and `model_policy`
++  blocks can compile into a bounded 10-stage master plan and seed the existing
++  daemon store tables before workers launch.
+ - Added three semantic bug-finder runbooks: basic, advanced, and ultra.
+ - Added three semantic improvement-finder runbooks: simple, advanced, and insane.
+ - Added three semantic feature-maker runbooks: simple, advanced, and insane.
+diff --git a/docs/ZYAL/SUPER_AGENT_WORKFLOWS.md b/docs/ZYAL/SUPER_AGENT_WORKFLOWS.md
+new file mode 100644
+index 00000000..af8d2a71
+--- /dev/null
++++ b/docs/ZYAL/SUPER_AGENT_WORKFLOWS.md
+@@ -0,0 +1,290 @@
++# ZYAL Super-Agent Workflows
++
++This document defines the runtime bridge that turns ambitious ZYAL port and
++reasoning runbooks into host-owned durable plans before worker agents execute.
++
++The goal is not a larger prompt. The goal is a **super-agent kernel**: a
++deterministic compiler and seeder that makes a swarm of weaker agents behave
++like a stronger engineering organization by enforcing decomposition, memory,
++evidence, parity, graph awareness, and phase sign-off.
++
++## Why this exists
++
++ZYAL examples already describe powerful flows such as generic replacement
++ports, advanced reasoning foundries, and Redis-scale porting. The Rust store
++already has tables for reasoning artifacts, memory capsules, concepts, port
++targets/phases/tasks, parity runs/results, performance budgets, repo graph
++nodes/edges, and model outcomes.
++
++The missing layer is the deterministic bridge between the declarative runbook
++and that durable substrate.
++
++Without this bridge, weak agents can begin work from a giant request and drift.
++With this bridge, the host first creates a bounded master plan, seeds phases and
++tasks, creates reasoning lanes, records the initial memory capsule, and exposes
++the plan in the run card.
++
++## Supported source blocks
++
++The first implementation consumes existing advanced runbook blocks:
++
++- `job`
++- `port`
++- `advanced_reasoning`
++- `repo_graph`
++- `parity_lab`
++- `model_policy`
++- `workflow`
++- `done`
++
++No Redis-specific field is required. Redis, SQLite, API rewrites, language
++ports, protocol reimplementations, and large feature builds use the same shape.
++
++## Default master plan
++
++The compiler emits a 10-stage master plan unless a later host-approved planner
++replaces it with an evidence-derived equivalent:
++
++| # | Stage | Purpose |
++|---:|---|---|
++| 1 | Scope contract | Capture objective, non-goals, success criteria, trust boundaries, budgets, and stop conditions. |
++| 2 | Reference inventory | Discover docs, tests, examples, behavior, APIs, protocol surfaces, and executable references. |
++| 3 | Repo graph and risk map | Seed graph, blast radius, generated zones, high-risk modules, and test ownership. |
++| 4 | Architecture plan | Reduce evidence into replacement architecture, module boundaries, rollback plan, and task graph. |
++| 5 | Core surface implementation | Build central interfaces, protocol/API shell, persistence shell, and minimal executable skeleton. |
++| 6 | Feature semantics waves | Implement behavior clusters in bounded worktrees. |
++| 7 | Parity harness and case library | Build reference/candidate adapters, approved cases, raw result capture, summary, and gaps. |
++| 8 | Integration and fusion | Merge verified worktrees, resolve conflicts, refresh graph, quarantine failures. |
++| 9 | Performance closure | Profile and close p95/p99/RSS/throughput gaps, then rerun parity. |
++| 10 | Release sign-off | Verify parity, performance, Jankurai, rollback, memory, graph, and clean tree. |
++
++This plan is intentionally generic. A Redis-like run later expands stage 6 into
++behavior clusters from evidence; the runbook must not bake a Redis stage list
++into YAML.
++
++## Reasoning lane policy
++
++The kernel seeds role lanes rather than a single undifferentiated swarm:
++
++- `framer`
++- `retriever`
++- `stage_planner`
++- `builder`
++- `parity_author`
++- `critic`
++- `verifier`
++- `reducer`
++- `performance_hunter`
++- `memory_curator`
++- `integrator`
++
++Lanes default to `blind_then_critic_then_reduce`. Permanent memory is written
++only by the curator after verifier/reducer approval or after falsifying evidence
++for negative memory.
++
++## Memory policy
++
++Super-agent runs must not store raw chain-of-thought. They store:
++
++- artifact summaries
++- evidence level
++- calibrated confidence
++- content hash
++- proof refs
++- contradictions and rejections
++- rollback notes
++- graph deltas
++
++Positive memory requires verifier or reducer approval. Negative memory requires
++falsifying evidence. Confidence is capped when executable evidence is absent.
++
++## Repo graph policy
++
++The first runtime bridge seeds graph nodes for:
++
++- target
++- replacement
++- stages
++- tasks
++
++and edges for:
++
++- target replaced by replacement
++- target scoped by stages
++- phase dependencies
++- phase owns tasks
++
++Future indexers should enrich the graph with file/module/function/test/call
++edges using language-aware extraction.
++
++## Parity lab policy
++
++The parity lab is target-switched:
++
++1. Reference adapter launches the original system.
++2. Candidate adapter launches the replacement.
++3. Approved cases execute against both.
++4. Raw JSONL captures observations.
++5. Summary binds to raw results and case manifest.
++6. Gaps become tasks.
++7. Perf budgets fail closed when declared.
++
++Required fail-closed conditions are:
++
++- `zero_cases`
++- `missing_required_case`
++- `skipped_required_case`
++- `failed_case`
++
++Recommended additional conditions are:
++
++- `missing_perf_data`
++- `perf_ratio_over_budget`
++
++For speed, parity runners should support in-memory mode and RamDisk/tmpfs temp
++roots. The ZYAL kernel does not require a specific target.
++
++## Sandbox policy
++
++Workers operate in isolated worktrees by default:
++
++```text
++.zyal/worktrees/<run_id>/<task_id>/
++```
++
++Each task has a declared write scope and branch name. The target/reference repo
++is read-only. Fusion into the primary tree happens only during the integration
++phase after proof gates pass.
++
++## Store mapping
++
++The compiler and runtime seeder use existing tables:
++
++| Plan object | Store rows |
++|---|---|
++| Whole plan | `daemon_reasoning_artifact`, `daemon_memory_capsule` |
++| Port request | `daemon_port_target` |
++| Macro stages | `daemon_port_phase`, `daemon_concept` |
++| Stage dependencies | `daemon_concept_link`, `daemon_repo_graph_edge` |
++| Tasks | `daemon_port_task`, `daemon_repo_graph_node` |
++| Lanes | `daemon_reasoning_lane`, `daemon_reasoning_edge` |
++| Graph seeds | `daemon_repo_graph_node`, `daemon_repo_graph_edge` |
++| Future parity runs | `daemon_parity_case`, `daemon_parity_run`, `daemon_parity_result`, `daemon_perf_budget` |
++| Future model routing | `daemon_model_outcome`, `daemon_model_reliability` |
++
++No schema migration is required for the first bridge.
++
++## Phase sign-off
++
++A phase cannot close until the host sees evidence for:
++
++- no unresolved critical objections
++- proof commands pass
++- memory capsules verified or rejected
++- repo graph updated
++- rollback known when risky
++- parity/performance gaps routed or closed
++- worktrees fused or quarantined
++
++The final phase also requires the run-level `done` predicates and forbids
++model-only claims, raw reasoning storage, missing/skipped required parity cases,
++and unchecked performance budgets.
++
++## Runtime surfaces to add next
++
++The patch adds compile+seed functions. The next runtime wiring should expose:
++
++```text
++GET  /daemon/:runID/super-agent/plan
++GET  /daemon/:runID/super-agent/graph
++GET  /daemon/:runID/super-agent/memory
++POST /daemon/:runID/super-agent/phase/:phaseID/signoff
++```
++
++The TUI run card should show:
++
++- target and replacement
++- worker cap
++- phase count
++- raw-reasoning storage policy
++- confidence cap
++- parity fail-on list
++- graph enabled/store
++- memory write gates
++- first checkpoint commands
++
++## Validation commands
++
++```sh
++cargo test -p jekko-core --locked zyal_port_super
++cargo test -p jekko-runtime --locked super_agent
++cargo run -p zyalc -- compile --all --check
++just fast
++```
++
++## Example: ambitious port without target-specific schema
++
++```yaml
++port:
++  target: "Redis"
++  replacement: "Jedis"
++  target_repo: "./references/redis"
++  replacement_repo: "."
++  worker_cap: 10
++  stage_strategy: runtime_generated_from_evidence
++
++advanced_reasoning:
++  enabled: true
++  worker_cap: 10
++  confidence_cap_without_executable_evidence: 0.35
++  store_raw_reasoning: false
++  blind_lanes: true
++  strategy_diversity_required: true
++
++repo_graph:
++  enabled: true
++  store: sqlite
++  nodes: [files, docs, tests, modules, functions, commands, parity_cases]
++  edges: [contains, imports, calls, tests, parity_covers, changed_by]
++  feed_workers: true
++
++parity_lab:
++  enabled: true
++  style: redlinedb
++  approved_cases_only: true
++  fail_on:
++    - zero_cases
++    - missing_required_case
++    - skipped_required_case
++    - failed_case
++    - missing_perf_data
++    - perf_ratio_over_budget
++```
++
++The runbook names Redis only as a target descriptor. The runtime plan remains
++generic and evidence-driven.
++
++## Non-goals
++
++- Do not hard-code Redis phases.
++- Do not store raw chain-of-thought.
++- Do not let model confidence promote a phase.
++- Do not add new database tables until existing daemon tables are fully used.
++- Do not launch workers before the compiled plan is stored and visible.
++
++## Acceptance criteria
++
++1. The runbook compiles into a stable 9–12 stage plan.
++2. The runtime seeds target, phase, task, lane, artifact, memory, concept, and graph rows.
++3. Seed counts are deterministic.
++4. The run card can preview the plan before launch.
++5. Workers launch only from seeded tasks with write scopes.
++6. Phase sign-off is host-evaluated from evidence, not model claims.
+diff --git a/docs/ZYAL/examples/README.md b/docs/ZYAL/examples/README.md
+index d4e4cb4d..7c1ac8e2 100644
+--- a/docs/ZYAL/examples/README.md
++++ b/docs/ZYAL/examples/README.md
+@@ -1,6 +1,6 @@
+ # ZYAL Powerful Examples
+ 
+-Forty-two flagship runbooks that show what ZYAL v2.6 makes possible. Each is a complete `<<<ZYAL v1:daemon>>>` block — paste any of them into a trusted Jekko prompt to preview the runtime plan, then explicitly arm to execute.
++Forty-three flagship runbooks that show what ZYAL v2.6 makes possible. Each is a complete `<<<ZYAL v1:daemon>>>` block — paste any of them into a trusted Jekko prompt to preview the runtime plan, then explicitly arm to execute.
+@@ -42,6 +42,7 @@ Forty-two flagship runbooks that show what ZYAL v2.6 makes possible. Each is a c
+ | [`31-advanced-reasoning-foundry.zyal`](31-advanced-reasoning-foundry.zyal) | Generic host-controlled reasoning foundry with blind lanes, critics, reducers, verifier-gated memory, confidence caps, and no raw chain-of-thought storage | `advanced_reasoning`, `repo_graph`, `parity_lab`, `model_policy`, `workflow`, `memory`, `jankurai_gate` |
+ | [`32-redis-jedis-port-foundry.zyal`](32-redis-jedis-port-foundry.zyal) | Ambitious Redis-to-Jedis port request with runtime-generated stages, ten workers, read-only reference target, RedlineDB-style parity artifacts, and perf gap closure | `port`, `advanced_reasoning`, `repo_graph`, `parity_lab`, `sandbox`, `fleet`, `model_policy`, `observability` |
+ | [`33-redis-jedis-live-proof.zyal`](33-redis-jedis-live-proof.zyal) | Bounded live proof for Redis/Jedis Stage-0 planning plus a deterministic baseline-vs-tournament reasoning benchmark | `port`, `advanced_reasoning`, `evidence_inputs`, `live_call_budget`, `proofs`, `parity_lab`, `model_policy`, `observability` |
++| [`34-super-agent-port-kernel.zyal`](34-super-agent-port-kernel.zyal) | Runtime-wired generic port kernel that compiles `port` + reasoning + repo graph + parity lab into durable phases, tasks, lanes, graph seeds, and memory before workers launch | `port`, `advanced_reasoning`, `repo_graph`, `parity_lab`, `model_policy`, `workflow`, `done` |
+ | [`memory-benchmark/prompt-scoring.zyal`](memory-benchmark/prompt-scoring.zyal) | Judge-population prompt scoring for the tracked memory benchmark corpus | `fan_out`, `memory`, `evidence`, `security`, `observability` |
+diff --git a/docs/ZYAL/examples/34-super-agent-port-kernel.zyal b/docs/ZYAL/examples/34-super-agent-port-kernel.zyal
+new file mode 100644
+index 00000000..5509ae4e
+--- /dev/null
++++ b/docs/ZYAL/examples/34-super-agent-port-kernel.zyal
+@@ -0,0 +1,151 @@
++# Runtime-wired generic super-agent port kernel. This is intentionally not
++# target-specific: replace MiniKV with Redis, SQLite, a public API, or any other
++# reference system without changing the workflow shape.
++<<<ZYAL v1:daemon id=super-agent-port-kernel>>>
++version: v1
++intent: daemon
++confirm: RUN_FOREVER
++
++job:
++  name: "Super-agent port kernel"
++  objective: |
++    Build a replacement implementation with reference-target parity. Before
++    launching workers, compile a host-owned 10-stage master plan, seed durable
++    phases/tasks/lanes/memory/graph rows, then execute bounded worktree workers
++    with parity, performance, Jankurai, rollback, and memory sign-off.
++  risk:
++    - "Do not launch workers before the compiled plan is durable."
++    - "Do not store raw chain-of-thought."
++    - "Do not accept model-only parity claims."
++
++port:
++  target: "MiniKV"
++  replacement: "MiniKV Rust"
++  target_repo: "./fixtures/minikv-reference"
++  replacement_repo: "."
++  worker_cap: 10
++  resume_store: sqlite
++  require_clean_start: true
++  stage_strategy: runtime_generated_from_evidence
++  stop_on:
++    - dirty_primary_worktree
++    - destructive_target_repo_operation
++    - budget_expired
++    - repeated_worker_quarantine
++
++advanced_reasoning:
++  enabled: true
++  worker_cap: 10
++  confidence_cap_without_executable_evidence: 0.35
++  store_raw_reasoning: false
++  blind_lanes: true
++  strategy_diversity_required: true
++  roles:
++    - framer
++    - retriever
++    - stage_planner
++    - builder
++    - parity_author
++    - critic
++    - verifier
++    - reducer
++    - performance_hunter
++    - memory_curator
++  memory:
++    write_positive_after: verifier_or_reducer_approval
++    write_negative_after: falsifying_evidence
++    poison_guard: true
++
++repo_graph:
++  enabled: true
++  store: sqlite
++  export: "target/zyal/reasoning/${run.id}/repo-graph.json"
++  nodes: [target, replacement, stage, task, files, modules, functions, commands, tests, parity_cases, perf_budgets]
++  edges: [contains, imports, calls, tests, implements, depends_on, phase_owns, task_touches, parity_covers, changed_by, supports, critiques, reduces]
++  feed_workers: true
++
++parity_lab:
++  enabled: true
++  style: target_switched
++  artifact_dir: "target/zyal/parity/${run.id}"
++  cases_dir: "tests/parity/minikv"
++  approved_cases_only: true
++  raw_results: raw.jsonl
++  summary: summary.json
++  gaps: gaps.json
++  adapters:
++    reference:
++      target_kind: minikv
++      repo: "./fixtures/minikv-reference"
++      command: "./fixtures/minikv-reference/minikv --in-memory"
++      read_only: true
++    candidate:
++      target_kind: minikv-rust
++      repo: "."
++      command: "cargo run --bin minikv-rs -- --in-memory"
++  required_tags: [required, approved]
++  perf_budget:
++    default_p95_ms_max_ratio: 1.25
++  fail_on:
++    - zero_cases
++    - missing_required_case
++    - skipped_required_case
++    - failed_case
++    - missing_perf_data
++    - perf_ratio_over_budget
++
++model_policy:
++  routine: jnoccio/routine
++  power: jnoccio/power-winner
++  use_routine_for: [frame, retrieve, phase_brainstorm, verifier, memory_curate, parity_generate]
++  use_power_for: [stage_reduce, critic, perf_close, hard_escalation]
++  record_reliability: true
++  paid_live_calls_default: false
++
++sandbox:
++  workers:
++    isolation: git_worktree
++    root: ".zyal/worktrees/${run.id}"
++    max_workers: 10
++    disjoint_write_scopes_required: true
++  target_repos:
++    default: read_only
++    destructive_operations: deny
++
++workflow:
++  states:
++    - compile_super_plan
++    - seed_durable_plan
++    - capture_target
++    - reference_inventory
++    - repo_graph_risk
++    - architecture_plan
++    - core_surface
++    - feature_semantics
++    - parity_harness
++    - integration_fusion
++    - performance_closure
++    - release_signoff
++    - complete
++  persist: sqlite
++  receipts: "target/zyal/runs/${run.id}/events.jsonl"
++  stop_file: "target/zyal/runs/${run.id}/STOP"
++
++checkpoint:
++  when: after_verified_change
++  noop_if_clean: true
++  verify:
++    - command: "rtk just zyal-superagent-fast"
++      timeout: 30m
++    - command: "rtk git diff --check"
++      timeout: 2m
++  git:
++    add: ["declared_worker_paths_only"]
++    commit_message: "zyal(super-agent): ${task.id}"
++    push: ask
++
++done:
++  require:
++    - target_request_captured
++    - master_plan_generated_from_runtime_evidence
++    - phases_complete
++    - jankurai_gate_passed
++    - parity_gate_passed
++    - perf_budgets_checked
++    - memory_capsules_verified_or_rejected
++  forbid:
++    - model_only_claim
++    - raw_chain_of_thought_storage
++    - missing_required_parity_case
++    - skipped_required_parity_case
++    - unchecked_perf_budget
++<<<END_ZYAL id=super-agent-port-kernel>>>
++ZYAL_ARM RUN_FOREVER id=super-agent-port-kernel
+diff --git a/Justfile b/Justfile
+index c00b57ee..b02b8a90 100644
+--- a/Justfile
++++ b/Justfile
+@@ -62,6 +62,13 @@ workspace-fast:
+ 	just workspace-build-fast
+ 	just workspace-test-fast
+ 
++# Narrow lane for the ZYAL super-agent port compiler/runtime bridge.
++# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
++zyal-superagent-fast:
++	rtk cargo test -p jekko-core --locked zyal_port_super
++	rtk cargo test -p jekko-runtime --locked super_agent
++	rtk cargo run -p zyalc -- compile --all --check
++
+ # Narrow lane for workspace typecheck-only feedback.
+ # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
+ workspace-typecheck-fast:

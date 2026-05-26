@@ -1,0 +1,3101 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 189dcf1..b27b0b8 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -14,5 +14,6 @@ members = [
+   "crates/xtask",
+   "crates/zyalc",
++  "crates/zyal-supervisor",
+   "crates/jankurai",
+   "crates/jankurai-runner",
+   "crates/memory-benchmark",
+diff --git a/agent/generated-zones.toml b/agent/generated-zones.toml
+index 13356cd..6b6f9dd 100644
+--- a/agent/generated-zones.toml
++++ b/agent/generated-zones.toml
+@@ -5,6 +5,12 @@ path = "agent/sandbox-lanes.toml"
+ read_only = true
+ source = "zyalc"
+ 
++[[zone]]
++command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/ambitious-superworkflow.zyal --out agent/superworkflows/ambitious-superworkflow.superworkflow.json"
++path = "agent/superworkflows/ambitious-superworkflow.superworkflow.json"
++read_only = true
++source = "zyalc"
++
+ [[zone]]
+ path = "agent/jankurai-badge.svg"
+ command = "jankurai audit . --json .jankurai/repo-score.json --md .jankurai/repo-score.md --no-score-history"
+diff --git a/crates/zyalc/Cargo.toml b/crates/zyalc/Cargo.toml
+index 879519e..d18f832 100644
+--- a/crates/zyalc/Cargo.toml
++++ b/crates/zyalc/Cargo.toml
+@@ -3,7 +3,7 @@ name = "zyalc"
+ version = "0.1.0"
+ edition = "2021"
+ publish = false
+-description = "Compile .zyal source files to TOML or GitHub Actions YAML (Profiles B/C)"
++description = "Compile .zyal source files to TOML, GitHub Actions YAML, or SuperWorkflow JSON"
+ 
+ [lib]
+ name = "zyalc"
+diff --git a/crates/zyalc/src/lib.rs b/crates/zyalc/src/lib.rs
+index 8bdd346..817b5fe 100644
+--- a/crates/zyalc/src/lib.rs
++++ b/crates/zyalc/src/lib.rs
+@@ -1,9 +1,10 @@
+ //! zyalc — `.zyal` source compiler.
+ //!
+-//! Three profiles, disambiguated by top-of-file pragma:
++//! Four profiles, disambiguated by top-of-file pragma:
+ //! - Profile A — runbook (sentinel-wrapped strict YAML, validation-only).
+ //! - Profile B — declarative (`# zyal: declarative target=toml ...`), emits TOML.
+ //! - Profile C — workflow (`# zyal: declarative target=github-workflow ...`), emits YAML.
++//! - Profile D — SuperWorkflow (`# zyal: declarative target=superworkflow ...`), emits JSON.
+ 
+ pub mod compile;
+ pub mod profile;
+diff --git a/crates/zyalc/src/main.rs b/crates/zyalc/src/main.rs
+index cd467f7..4a3b78e 100644
+--- a/crates/zyalc/src/main.rs
++++ b/crates/zyalc/src/main.rs
+@@ -8,7 +8,7 @@ use zyalc::compile;
+ #[command(
+     name = "zyalc",
+     version,
+-    about = "Compile .zyal source files to TOML or GitHub Actions YAML"
++    about = "Compile .zyal source files to TOML, GitHub Actions YAML, or SuperWorkflow JSON"
+ )]
+ struct Cli {
+     #[command(subcommand)]
+diff --git a/crates/zyalc/src/profile.rs b/crates/zyalc/src/profile.rs
+index 3624d08..3e375c3 100644
+--- a/crates/zyalc/src/profile.rs
++++ b/crates/zyalc/src/profile.rs
+@@ -4,6 +4,8 @@
+ //!   `# zyal: declarative target=toml schema=<name>@<ver>`.
+ //! - Profile C — workflow: first non-blank line is
+ //!   `# zyal: declarative target=github-workflow schema=actions/workflow@<ver>`.
++//! - Profile D — SuperWorkflow: first non-blank line is
++//!   `# zyal: declarative target=superworkflow schema=zyal/superworkflow@<ver>`.
+ //!
+ //! Anything else is rejected so silent format drift cannot happen.
+ 
+@@ -25,6 +27,8 @@ pub enum Profile {
+     Workflow { schema: String },
+     /// Declarative daemon runbook. Validated by `compile --all --check`, not emitted.
+     Daemon { schema: String },
++    /// Declarative SuperWorkflow manifest. Emits canonical JSON.
++    SuperWorkflow { schema: String },
+ }
+ 
+ impl std::fmt::Display for Profile {
+@@ -35,6 +39,7 @@ impl std::fmt::Display for Profile {
+             Profile::DeclarativeToml { .. } => write!(f, "declarative-toml"),
+             Profile::Workflow { .. } => write!(f, "workflow"),
+             Profile::Daemon { .. } => write!(f, "daemon"),
++            Profile::SuperWorkflow { .. } => write!(f, "superworkflow"),
+         }
+     }
+ }
+@@ -76,6 +81,7 @@ pub fn parse_header(raw: &str) -> Result<(Profile, usize)> {
+             "toml" => Profile::DeclarativeToml { schema },
+             "github-workflow" => Profile::Workflow { schema },
+             "daemon" => Profile::Daemon { schema },
++            "superworkflow" => Profile::SuperWorkflow { schema },
+             other => return Err(anyhow!("unsupported target '{other}'")),
+         };
+         let pragma_offset = raw.find(pragma_line).unwrap_or(0) + pragma_line.len();
+@@ -130,6 +136,15 @@ mod tests {
+         assert!(matches!(p, Profile::Daemon { .. }));
+     }
+ 
++    #[test]
++    fn detects_superworkflow_target() {
++        let (p, _) = parse_header(
++            "# zyal: declarative target=superworkflow schema=zyal/superworkflow@1",
++        )
++        .expect("superworkflow target");
++        assert!(matches!(p, Profile::SuperWorkflow { .. }));
++    }
++
+     #[test]
+     fn rejects_no_pragma_no_sentinel() {
+         let err = parse_header("just yaml\n  - 1").unwrap_err();
+diff --git a/crates/zyalc/src/compile.rs b/crates/zyalc/src/compile.rs
+index 2bfda63..62c8379 100644
+--- a/crates/zyalc/src/compile.rs
++++ b/crates/zyalc/src/compile.rs
+@@ -44,7 +44,12 @@ pub fn compile_one(source: &Path, out_override: Option<&Path>, check: bool) -> R
+         src = source_name,
+         hash = sha256(&info.raw),
+     );
+-    let final_bytes = match info.profile {
++    let final_bytes = match &info.profile {
+         Profile::Runbook => body, // runbook passthrough — sentinels are strict
+-        _ => format!("{banner}{body}"),
++        Profile::SuperWorkflow { .. } => {
++            validate_superworkflow_profile(source, &info.raw)?;
++            body
++        }
++        _ if header.is_empty() => body,
++        _ => format!("{banner}{body}"),
+     };
+@@ -113,7 +118,8 @@ pub fn inspect(source: &Path) -> Result<InspectInfo> {
+     };
+     let schema = match &info.profile {
+         Profile::DeclarativeToml { schema }
+         | Profile::Workflow { schema }
+-        | Profile::Daemon { schema } => Some(schema.clone()),
++        | Profile::Daemon { schema }
++        | Profile::SuperWorkflow { schema } => Some(schema.clone()),
+         Profile::Runbook => None,
+     };
+@@ -145,5 +153,13 @@ fn default_target(source: &Path, profile: &Profile) -> PathBuf {
+         }
+         Profile::Runbook => source.with_extension("yml"),
+         Profile::Daemon { .. } => source.to_path_buf(),
++        Profile::SuperWorkflow { .. } => {
++            let stem = source.file_stem().and_then(|s| s.to_str()).unwrap_or("workflow");
++            if let Some(parent) = source.parent().and_then(|p| p.parent()) {
++                parent.join("superworkflows").join(format!("{stem}.superworkflow.json"))
++            } else {
++                source.with_extension("superworkflow.json")
++            }
++        }
+     }
+ }
+@@ -166,5 +186,6 @@ fn emit(profile: &Profile, raw: &str) -> Result<(String, String)> {
+         Profile::DeclarativeToml { .. } => Ok((emit_toml(raw)?, "# ".into())),
+         Profile::Workflow { .. } => Ok((emit_workflow(raw)?, "# ".into())),
+         Profile::Daemon { .. } => Err(anyhow!("daemon profiles are validation-only")),
++        Profile::SuperWorkflow { .. } => Ok((emit_superworkflow(raw)?, String::new())),
+     }
+ }
+@@ -198,2 +219,151 @@ fn validate_runbook_profile(source: &Path, raw: &str) -> Result<()> {
+     Ok(())
+ }
++
++fn validate_superworkflow_profile(source: &Path, raw: &str) -> Result<()> {
++    let body = strip_pragmas(raw);
++    let parsed: serde_yaml::Value = serde_yaml::from_str(&body)
++        .with_context(|| format!("parse superworkflow YAML body in {}", source.display()))?;
++    validate_superworkflow_value(source, &parsed)
++}
++
++fn emit_superworkflow(raw: &str) -> Result<String> {
++    let body = strip_pragmas(raw);
++    let parsed: serde_yaml::Value =
++        serde_yaml::from_str(&body).context("parse superworkflow YAML body")?;
++    validate_superworkflow_value(Path::new("<memory>"), &parsed)?;
++    let rendered = serde_json::to_string_pretty(&parsed).context("render SuperWorkflow JSON")?;
++    Ok(format!("{rendered}\n"))
++}
++
++fn validate_superworkflow_value(source: &Path, value: &serde_yaml::Value) -> Result<()> {
++    let root = value
++        .as_mapping()
++        .ok_or_else(|| anyhow!("superworkflow body in {} must be a YAML mapping", source.display()))?;
++    require_scalar(root, "version", "v1")?;
++    require_scalar(root, "intent", "daemon")?;
++    require_scalar(root, "confirm", "RUN_FOREVER")?;
++    require_present(root, "id")?;
++
++    let job = require_map(root, "job")?;
++    require_present(job, "name")?;
++    require_present(job, "objective")?;
++
++    let sw = require_map(root, "superworkflow")?;
++    let phases = require_seq(sw, "phases")?;
++    if !(9..=12).contains(&phases.len()) {
++        return Err(anyhow!(
++            "superworkflow in {} requires 9-12 phases, got {}",
++            source.display(),
++            phases.len()
++        ));
++    }
++    if let Some(stage_count) = lookup(sw, "stage_count") {
++        if stage_count.as_u64().map(|v| v as usize) != Some(phases.len()) {
++            return Err(anyhow!(
++                "superworkflow stage_count must equal phases length in {}",
++                source.display()
++            ));
++        }
++    }
++
++    let mut ids = std::collections::BTreeSet::new();
++    for phase in phases {
++        let phase = phase
++            .as_mapping()
++            .ok_or_else(|| anyhow!("superworkflow phase must be a mapping"))?;
++        let id = lookup(phase, "id")
++            .and_then(|v| v.as_str())
++            .ok_or_else(|| anyhow!("superworkflow phase missing id"))?;
++        if !ids.insert(id.to_string()) {
++            return Err(anyhow!("duplicate superworkflow phase id {id}"));
++        }
++        require_present(phase, "objective")?;
++        let exit = require_map(phase, "exit")?;
++        if require_seq(exit, "required_artifacts")?.is_empty() {
++            return Err(anyhow!("phase {id} must declare required_artifacts"));
++        }
++        if require_seq(exit, "gates")?.is_empty() {
++            return Err(anyhow!("phase {id} must declare exit gates"));
++        }
++    }
++
++    for phase in phases {
++        let phase = phase.as_mapping().expect("checked above");
++        let id = lookup(phase, "id").and_then(|v| v.as_str()).expect("checked above");
++        if let Some(depends_on) = lookup(phase, "depends_on") {
++            for dep in depends_on.as_sequence().cloned().unwrap_or_default() {
++                let dep = dep.as_str().ok_or_else(|| anyhow!("phase {id} dependency must be string"))?;
++                if dep == id {
++                    return Err(anyhow!("phase {id} depends on itself"));
++                }
++                if !ids.contains(dep) {
++                    return Err(anyhow!("phase {id} depends on unknown phase {dep}"));
++                }
++            }
++        }
++    }
++    if !superworkflow_dependencies_are_acyclic(phases)? {
++        return Err(anyhow!("superworkflow phase dependency graph contains a cycle"));
++    }
++    Ok(())
++}
++
++fn superworkflow_dependencies_are_acyclic(phases: &[serde_yaml::Value]) -> Result<bool> {
++    use std::collections::{BTreeMap, VecDeque};
++
++    let mut indegree: BTreeMap<String, usize> = BTreeMap::new();
++    let mut outgoing: BTreeMap<String, Vec<String>> = BTreeMap::new();
++    for phase in phases {
++        let phase = phase.as_mapping().ok_or_else(|| anyhow!("superworkflow phase must be a mapping"))?;
++        let id = lookup(phase, "id")
++            .and_then(|v| v.as_str())
++            .ok_or_else(|| anyhow!("superworkflow phase missing id"))?
++            .to_string();
++        indegree.entry(id.clone()).or_insert(0);
++        if let Some(depends_on) = lookup(phase, "depends_on") {
++            for dep in depends_on.as_sequence().cloned().unwrap_or_default() {
++                let dep = dep.as_str().ok_or_else(|| anyhow!("phase dependency must be string"))?.to_string();
++                outgoing.entry(dep).or_default().push(id.clone());
++                *indegree.entry(id.clone()).or_insert(0) += 1;
++            }
++        }
++    }
++
++    let mut ready: VecDeque<String> = indegree
++        .iter()
++        .filter_map(|(id, degree)| if *degree == 0 { Some(id.clone()) } else { None })
++        .collect();
++    let mut visited = 0usize;
++    while let Some(id) = ready.pop_front() {
++        visited += 1;
++        for next in outgoing.get(&id).cloned().unwrap_or_default() {
++            let degree = indegree.get_mut(&next).expect("known node");
++            *degree -= 1;
++            if *degree == 0 {
++                ready.push_back(next);
++            }
++        }
++    }
++    Ok(visited == indegree.len())
++}
++
++fn lookup<'a>(map: &'a serde_yaml::Mapping, key: &str) -> Option<&'a serde_yaml::Value> {
++    map.get(&serde_yaml::Value::String(key.to_string()))
++}
++
++fn require_present<'a>(map: &'a serde_yaml::Mapping, key: &str) -> Result<&'a serde_yaml::Value> {
++    lookup(map, key).ok_or_else(|| anyhow!("missing required key `{key}`"))
++}
++
++fn require_map<'a>(map: &'a serde_yaml::Mapping, key: &str) -> Result<&'a serde_yaml::Mapping> {
++    require_present(map, key)?.as_mapping().ok_or_else(|| anyhow!("`{key}` must be a mapping"))
++}
++
++fn require_seq<'a>(map: &'a serde_yaml::Mapping, key: &str) -> Result<&'a Vec<serde_yaml::Value>> {
++    require_present(map, key)?.as_sequence().ok_or_else(|| anyhow!("`{key}` must be a sequence"))
++}
++
++fn require_scalar(map: &serde_yaml::Mapping, key: &str, expected: &str) -> Result<()> {
++    let actual = require_present(map, key)?.as_str().unwrap_or_default();
++    if actual == expected { Ok(()) } else { Err(anyhow!("`{key}` must be `{expected}`")) }
++}
+@@ -360,4 +478,32 @@ mod tests {
+             "agent/zyal/sandbox-lanes.zyal"
+         );
+     }
++
++    #[test]
++    fn superworkflow_emit_requires_nine_to_twelve_phases() {
++        let mut raw = String::from(
++            "# zyal: declarative target=superworkflow schema=zyal/superworkflow@1\n\
++             version: v1\nintent: daemon\nconfirm: RUN_FOREVER\nid: smoke\n\
++             job:\n  name: smoke\n  objective: smoke\n\
++             superworkflow:\n  stage_count: 9\n  phases:\n",
++        );
++        for idx in 0..9 {
++            raw.push_str(&format!(
++                "    - id: p{idx}\n      name: p{idx}\n      objective: p{idx}\n      exit:\n        required_artifacts: [target/p{idx}.json]\n        gates:\n          - kind: artifact_exists\n"
++            ));
++        }
++        let out = emit_superworkflow(&raw).expect("superworkflow json");
++        assert!(out.contains("\"superworkflow\""));
++        assert!(out.contains("\"phases\""));
++    }
++
++    #[test]
++    fn superworkflow_rejects_too_few_phases() {
++        let raw = "# zyal: declarative target=superworkflow schema=zyal/superworkflow@1\n\
++version: v1\nintent: daemon\nconfirm: RUN_FOREVER\nid: smoke\n\
++job:\n  name: smoke\n  objective: smoke\n\
++superworkflow:\n  stage_count: 1\n  phases:\n    - id: p0\n      name: p0\n      objective: p0\n      exit:\n        required_artifacts: [target/p0.json]\n        gates:\n          - kind: artifact_exists\n";
++        let err = emit_superworkflow(raw).unwrap_err();
++        assert!(format!("{err}").contains("requires 9-12 phases"));
++    }
+ }
+diff --git a/crates/zyal-supervisor/Cargo.toml b/crates/zyal-supervisor/Cargo.toml
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/crates/zyal-supervisor/Cargo.toml
+@@ -0,0 +1,27 @@
++[package]
++name = "zyal-supervisor"
++version.workspace = true
++edition.workspace = true
++license.workspace = true
++publish = false
++description = "Durable supervisor substrate for ambitious ZYAL super-reasoning workflows"
++
++[lib]
++path = "src/lib.rs"
++
++[[bin]]
++name = "zyal-supervisor"
++path = "src/main.rs"
++
++[dependencies]
++anyhow = { workspace = true }
++chrono = { workspace = true, features = ["clock", "serde"] }
++clap = { workspace = true, features = ["derive"] }
++rusqlite = { version = "0.32", features = ["bundled"] }
++serde = { workspace = true }
++serde_json = { workspace = true }
++serde_yaml = { workspace = true }
++thiserror = { workspace = true }
++
++[dev-dependencies]
++tempfile = "3"
+diff --git a/crates/zyal-supervisor/src/lib.rs b/crates/zyal-supervisor/src/lib.rs
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/crates/zyal-supervisor/src/lib.rs
+@@ -0,0 +1,18 @@
++//! zyal-supervisor — durable substrate for ambitious ZYAL SuperWorkflows.
++//!
++//! This crate intentionally starts small: it validates a SuperWorkflow manifest,
++//! computes phase readiness from the dependency DAG, and persists run/phase/task
++//! memory/evidence/sign-off state in SQLite. Host runtimes can wire this into
++//! fleet scheduling, sandboxctl, cogcore, and parity harnesses without making the
++//! ZYAL compiler itself a long-running process.
++
++#![deny(rust_2018_idioms)]
++#![warn(missing_docs)]
++
++pub mod model;
++pub mod planner;
++pub mod store;
++
++pub use model::{PhaseStatus, SuperWorkflowManifest};
++pub use planner::{execution_layers, ready_phases, validate_manifest, ValidationError};
++pub use store::{SupervisorStore, TaskStatus};
+diff --git a/crates/zyal-supervisor/src/model.rs b/crates/zyal-supervisor/src/model.rs
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/crates/zyal-supervisor/src/model.rs
+@@ -0,0 +1,293 @@
++//! Manifest model for ZYAL SuperWorkflow JSON.
++
++use std::collections::BTreeMap;
++
++use serde::{Deserialize, Serialize};
++
++/// Top-level SuperWorkflow manifest emitted by `zyalc target=superworkflow`.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SuperWorkflowManifest {
++    /// Runtime sentinel. Currently `v1`.
++    pub version: String,
++    /// ZYAL intent. SuperWorkflows are daemon-oriented.
++    pub intent: String,
++    /// Confirmation literal. Long-running workflows require explicit forever confirmation.
++    pub confirm: String,
++    /// Stable runbook id.
++    pub id: String,
++    /// Job framing.
++    pub job: Job,
++    /// SuperWorkflow orchestration block.
++    pub superworkflow: SuperWorkflow,
++}
++
++/// Human-readable job framing.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Job {
++    /// Human-readable name.
++    pub name: String,
++    /// Objective text.
++    pub objective: String,
++    /// Risk notes.
++    #[serde(default)]
++    pub risk: Vec<String>,
++}
++
++/// SuperWorkflow orchestration contract.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct SuperWorkflow {
++    /// Declared phase count. Must match `phases.len()` when present.
++    #[serde(default)]
++    pub stage_count: Option<usize>,
++    /// High-level strategy label.
++    #[serde(default)]
++    pub strategy: String,
++    /// Controller policy.
++    #[serde(default)]
++    pub controller: ControllerPolicy,
++    /// Active memory policy.
++    #[serde(default)]
++    pub memory: MemoryPolicy,
++    /// Persistent sandbox policy.
++    #[serde(default)]
++    pub sandbox: SandboxPolicy,
++    /// Repo graph policy.
++    #[serde(default)]
++    pub repo_graph: RepoGraphPolicy,
++    /// Parity/differential testing policy.
++    #[serde(default)]
++    pub parity: ParityPolicy,
++    /// Macro phases. Must contain 9-12 phases.
++    pub phases: Vec<Phase>,
++}
++
++/// Supervisor execution policy.
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++pub struct ControllerPolicy {
++    /// Controller mode, e.g. `supervisor_dag`.
++    #[serde(default)]
++    pub mode: String,
++    /// Maximum ready phases allowed to run at once.
++    #[serde(default)]
++    pub max_parallel_phases: Option<u32>,
++    /// Maximum tasks per phase allowed to run at once.
++    #[serde(default)]
++    pub max_parallel_tasks_per_phase: Option<u32>,
++    /// Require explicit sign-off before completing a phase.
++    #[serde(default)]
++    pub require_phase_signoff: bool,
++    /// Retry until all exit gates pass.
++    #[serde(default)]
++    pub retry_until_exit_gates_pass: bool,
++    /// Park unresolved tasks with summary instead of dropping them.
++    #[serde(default)]
++    pub park_unresolved_tasks_with_summary: bool,
++    /// Enable touched-file/task-scope sprawl checks.
++    #[serde(default)]
++    pub prevent_scope_sprawl: bool,
++}
++
++/// Active memory policy.
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++pub struct MemoryPolicy {
++    /// Path to append-only run WAL.
++    #[serde(default)]
++    pub run_wal: String,
++    /// Glob/path pattern for phase summaries.
++    #[serde(default)]
++    pub phase_summaries: String,
++    /// Durable knowledge store path.
++    #[serde(default)]
++    pub knowledge_store: String,
++    /// Preserve negative lessons and failed plans.
++    #[serde(default)]
++    pub negative_memory: bool,
++    /// Memory classes injected at phase start.
++    #[serde(default)]
++    pub inject_at_phase_start: Vec<String>,
++    /// Task compaction cadence.
++    #[serde(default)]
++    pub compact_every_tasks: Option<u32>,
++}
++
++/// Sandbox policy.
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++pub struct SandboxPolicy {
++    /// Sandbox mode.
++    #[serde(default)]
++    pub mode: String,
++    /// Workspace root template.
++    #[serde(default)]
++    pub workspace_root: String,
++    /// Isolation backend.
++    #[serde(default)]
++    pub isolation: String,
++    /// Preserve workspace across phases.
++    #[serde(default)]
++    pub preserve_between_phases: bool,
++    /// Export a patch per task.
++    #[serde(default)]
++    pub export_patch_per_task: bool,
++    /// Destroy unmerged worktrees after archival.
++    #[serde(default)]
++    pub destroy_unmerged_worktrees_after_archive: bool,
++}
++
++/// Repo graph policy.
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++pub struct RepoGraphPolicy {
++    /// Backend, e.g. sqlite.
++    #[serde(default)]
++    pub backend: String,
++    /// Graph database path.
++    #[serde(default)]
++    pub path: String,
++    /// Index categories.
++    #[serde(default)]
++    pub indexes: Vec<String>,
++    /// Refresh triggers.
++    #[serde(default)]
++    pub refresh_on: Vec<String>,
++}
++
++/// Parity/differential testing policy.
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++pub struct ParityPolicy {
++    /// Enable parity harness support.
++    #[serde(default)]
++    pub enabled: bool,
++    /// Reference adapter path/command.
++    #[serde(default)]
++    pub reference_adapter: String,
++    /// Candidate adapter path/command.
++    #[serde(default)]
++    pub candidate_adapter: String,
++    /// Evidence JSONL path.
++    #[serde(default)]
++    pub evidence_jsonl: String,
++    /// Temporary execution mode, e.g. ramdisk_or_memory.
++    #[serde(default)]
++    pub tmp_mode: String,
++    /// Cluster failures into actionable buckets.
++    #[serde(default)]
++    pub cluster_failures: bool,
++    /// Promote fixed parity gaps into regression tests.
++    #[serde(default)]
++    pub promote_fixed_gap_to_regression: bool,
++}
++
++/// Macro phase definition.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Phase {
++    /// Stable phase id.
++    pub id: String,
++    /// Human-readable phase name.
++    pub name: String,
++    /// Objective text.
++    pub objective: String,
++    /// Phase ids that must complete before this phase can run.
++    #[serde(default)]
++    pub depends_on: Vec<String>,
++    /// Optional parallel group label.
++    #[serde(default)]
++    pub parallel_group: String,
++    /// Agent-role counts.
++    #[serde(default)]
++    pub agents: BTreeMap<String, u32>,
++    /// Optional phase budget.
++    #[serde(default)]
++    pub budget: PhaseBudget,
++    /// Exit contract.
++    pub exit: ExitPlan,
++}
++
++/// Phase budget.
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++pub struct PhaseBudget {
++    /// Maximum wall-clock duration label, e.g. `12h`.
++    #[serde(default)]
++    pub max_wall_time: String,
++    /// Maximum attempts.
++    #[serde(default)]
++    pub max_attempts: Option<u32>,
++    /// Maximum accepted touched files.
++    #[serde(default)]
++    pub max_touched_files: Option<u32>,
++}
++
++/// Exit plan for a phase.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct ExitPlan {
++    /// Required artifacts before a phase can close.
++    #[serde(default)]
++    pub required_artifacts: Vec<String>,
++    /// Machine/human gates.
++    #[serde(default)]
++    pub gates: Vec<Gate>,
++    /// Required sign-off roles.
++    #[serde(default)]
++    pub signoff: Vec<String>,
++}
++
++/// Flexible gate payload. `kind` selects semantics; extra keys are kept.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++pub struct Gate {
++    /// Gate kind, e.g. `shell`, `parity_pass_rate`, `review_quorum`.
++    pub kind: String,
++    /// Extra gate parameters.
++    #[serde(flatten)]
++    pub params: BTreeMap<String, serde_json::Value>,
++}
++
++/// Persisted phase status.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum PhaseStatus {
++    /// Phase is not ready because dependencies remain.
++    Pending,
++    /// Phase dependencies are complete and it can be scheduled.
++    Ready,
++    /// Phase is actively running.
++    Running,
++    /// Phase is blocked.
++    Blocked,
++    /// Phase awaits sign-off/review.
++    Review,
++    /// Phase completed all gates and sign-offs.
++    Complete,
++    /// Phase was parked with summary and follow-up tasks.
++    Parked,
++    /// Phase failed irrecoverably.
++    Failed,
++}
++
++impl PhaseStatus {
++    /// Stable storage string.
++    pub fn as_str(self) -> &'static str {
++        match self {
++            PhaseStatus::Pending => "pending",
++            PhaseStatus::Ready => "ready",
++            PhaseStatus::Running => "running",
++            PhaseStatus::Blocked => "blocked",
++            PhaseStatus::Review => "review",
++            PhaseStatus::Complete => "complete",
++            PhaseStatus::Parked => "parked",
++            PhaseStatus::Failed => "failed",
++        }
++    }
++
++    /// Parse from storage string.
++    pub fn parse(value: &str) -> Option<Self> {
++        Some(match value {
++            "pending" => PhaseStatus::Pending,
++            "ready" => PhaseStatus::Ready,
++            "running" => PhaseStatus::Running,
++            "blocked" => PhaseStatus::Blocked,
++            "review" => PhaseStatus::Review,
++            "complete" => PhaseStatus::Complete,
++            "parked" => PhaseStatus::Parked,
++            "failed" => PhaseStatus::Failed,
++            _ => return None,
++        })
++    }
++}
+diff --git a/crates/zyal-supervisor/src/planner.rs b/crates/zyal-supervisor/src/planner.rs
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/crates/zyal-supervisor/src/planner.rs
+@@ -0,0 +1,277 @@
++//! Phase-DAG validation and readiness helpers.
++
++use std::collections::{BTreeMap, BTreeSet, VecDeque};
++
++use thiserror::Error;
++
++use crate::model::{Phase, SuperWorkflowManifest};
++
++/// Validation errors for SuperWorkflow manifests.
++#[derive(Debug, Error, PartialEq, Eq)]
++pub enum ValidationError {
++    /// Invalid required top-level literal.
++    #[error("expected {field}={expected:?}, got {actual:?}")]
++    InvalidLiteral {
++        /// Field name.
++        field: &'static str,
++        /// Expected value.
++        expected: &'static str,
++        /// Actual value.
++        actual: String,
++    },
++    /// The phase count must be between 9 and 12.
++    #[error("superworkflow requires 9-12 phases, got {0}")]
++    InvalidPhaseCount(usize),
++    /// Declared stage_count does not match actual phases.
++    #[error("stage_count={declared} does not match phases.len()={actual}")]
++    StageCountMismatch {
++        /// Declared count.
++        declared: usize,
++        /// Actual count.
++        actual: usize,
++    },
++    /// Duplicate phase id.
++    #[error("duplicate phase id {0}")]
++    DuplicatePhaseId(String),
++    /// A dependency references an unknown phase.
++    #[error("phase {phase_id} depends on unknown phase {depends_on}")]
++    UnknownDependency {
++        /// Phase id.
++        phase_id: String,
++        /// Missing dependency.
++        depends_on: String,
++    },
++    /// A phase depends on itself.
++    #[error("phase {0} depends on itself")]
++    SelfDependency(String),
++    /// A cycle was found.
++    #[error("phase dependency graph contains a cycle")]
++    Cycle,
++    /// A phase is missing an objective.
++    #[error("phase {0} is missing objective")]
++    MissingObjective(String),
++    /// A phase has no required artifacts.
++    #[error("phase {0} has no required artifacts")]
++    MissingArtifacts(String),
++    /// A phase has no exit gates.
++    #[error("phase {0} has no exit gates")]
++    MissingGates(String),
++}
++
++/// Validate a manifest with runtime-grade constraints.
++pub fn validate_manifest(manifest: &SuperWorkflowManifest) -> Result<(), ValidationError> {
++    expect_literal("version", "v1", &manifest.version)?;
++    expect_literal("intent", "daemon", &manifest.intent)?;
++    expect_literal("confirm", "RUN_FOREVER", &manifest.confirm)?;
++
++    let len = manifest.superworkflow.phases.len();
++    if !(9..=12).contains(&len) {
++        return Err(ValidationError::InvalidPhaseCount(len));
++    }
++    if let Some(declared) = manifest.superworkflow.stage_count {
++        if declared != len {
++            return Err(ValidationError::StageCountMismatch {
++                declared,
++                actual: len,
++            });
++        }
++    }
++
++    let mut ids = BTreeSet::new();
++    for phase in &manifest.superworkflow.phases {
++        if !ids.insert(phase.id.clone()) {
++            return Err(ValidationError::DuplicatePhaseId(phase.id.clone()));
++        }
++        if phase.objective.trim().is_empty() {
++            return Err(ValidationError::MissingObjective(phase.id.clone()));
++        }
++        if phase.exit.required_artifacts.is_empty() {
++            return Err(ValidationError::MissingArtifacts(phase.id.clone()));
++        }
++        if phase.exit.gates.is_empty() {
++            return Err(ValidationError::MissingGates(phase.id.clone()));
++        }
++    }
++
++    for phase in &manifest.superworkflow.phases {
++        for dep in &phase.depends_on {
++            if dep == &phase.id {
++                return Err(ValidationError::SelfDependency(phase.id.clone()));
++            }
++            if !ids.contains(dep) {
++                return Err(ValidationError::UnknownDependency {
++                    phase_id: phase.id.clone(),
++                    depends_on: dep.clone(),
++                });
++            }
++        }
++    }
++
++    if execution_layers(manifest).is_none() {
++        return Err(ValidationError::Cycle);
++    }
++    Ok(())
++}
++
++fn expect_literal(
++    field: &'static str,
++    expected: &'static str,
++    actual: &str,
++) -> Result<(), ValidationError> {
++    if actual == expected {
++        Ok(())
++    } else {
++        Err(ValidationError::InvalidLiteral {
++            field,
++            expected,
++            actual: actual.to_string(),
++        })
++    }
++}
++
++/// Return topological execution layers. Each inner vector can run in parallel.
++pub fn execution_layers(manifest: &SuperWorkflowManifest) -> Option<Vec<Vec<String>>> {
++    let phases = &manifest.superworkflow.phases;
++    let by_id: BTreeMap<&str, &Phase> = phases.iter().map(|phase| (phase.id.as_str(), phase)).collect();
++    let mut indegree: BTreeMap<&str, usize> = BTreeMap::new();
++    let mut outgoing: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
++
++    for phase in phases {
++        indegree.entry(phase.id.as_str()).or_insert(0);
++        for dep in &phase.depends_on {
++            if !by_id.contains_key(dep.as_str()) {
++                return None;
++            }
++            outgoing.entry(dep.as_str()).or_default().push(phase.id.as_str());
++            *indegree.entry(phase.id.as_str()).or_insert(0) += 1;
++        }
++    }
++
++    let mut ready: VecDeque<&str> = indegree
++        .iter()
++        .filter_map(|(id, degree)| if *degree == 0 { Some(*id) } else { None })
++        .collect();
++    let mut layers = Vec::new();
++    let mut visited = 0usize;
++
++    while !ready.is_empty() {
++        let mut layer = Vec::new();
++        for _ in 0..ready.len() {
++            let id = ready.pop_front().expect("ready len checked");
++            visited += 1;
++            layer.push(id.to_string());
++            for next in outgoing.get(id).cloned().unwrap_or_default() {
++                let degree = indegree.get_mut(next).expect("known phase");
++                *degree -= 1;
++                if *degree == 0 {
++                    ready.push_back(next);
++                }
++            }
++        }
++        layers.push(layer);
++    }
++
++    if visited == phases.len() {
++        Some(layers)
++    } else {
++        None
++    }
++}
++
++/// Compute phases ready to run given completed and blocked phase ids.
++pub fn ready_phases(
++    manifest: &SuperWorkflowManifest,
++    completed: &BTreeSet<String>,
++    blocked: &BTreeSet<String>,
++) -> Vec<String> {
++    manifest
++        .superworkflow
++        .phases
++        .iter()
++        .filter(|phase| !completed.contains(&phase.id))
++        .filter(|phase| !blocked.contains(&phase.id))
++        .filter(|phase| phase.depends_on.iter().all(|dep| completed.contains(dep)))
++        .map(|phase| phase.id.clone())
++        .collect()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::model::{ExitPlan, Gate, Job, SuperWorkflow, SuperWorkflowManifest};
++
++    fn phase(id: &str, deps: &[&str]) -> crate::model::Phase {
++        crate::model::Phase {
++            id: id.to_string(),
++            name: id.to_string(),
++            objective: format!("objective for {id}"),
++            depends_on: deps.iter().map(|s| s.to_string()).collect(),
++            parallel_group: String::new(),
++            agents: Default::default(),
++            budget: Default::default(),
++            exit: ExitPlan {
++                required_artifacts: vec![format!("target/{id}.json")],
++                gates: vec![Gate {
++                    kind: "artifact_exists".into(),
++                    params: Default::default(),
++                }],
++                signoff: vec!["supervisor".into()],
++            },
++        }
++    }
++
++    fn manifest() -> SuperWorkflowManifest {
++        let phases = vec![
++            phase("p00", &[]),
++            phase("p01", &["p00"]),
++            phase("p02", &["p00"]),
++            phase("p03", &["p01", "p02"]),
++            phase("p04", &["p01"]),
++            phase("p05", &["p03", "p04"]),
++            phase("p06", &["p03"]),
++            phase("p07", &["p05", "p06"]),
++            phase("p08", &["p07"]),
++        ];
++        SuperWorkflowManifest {
++            version: "v1".into(),
++            intent: "daemon".into(),
++            confirm: "RUN_FOREVER".into(),
++            id: "test".into(),
++            job: Job {
++                name: "test".into(),
++                objective: "test".into(),
++                risk: vec![],
++            },
++            superworkflow: SuperWorkflow {
++                stage_count: Some(phases.len()),
++                strategy: "test".into(),
++                controller: Default::default(),
++                memory: Default::default(),
++                sandbox: Default::default(),
++                repo_graph: Default::default(),
++                parity: Default::default(),
++                phases,
++            },
++        }
++    }
++
++    #[test]
++    fn validates_nine_phase_manifest() {
++        validate_manifest(&manifest()).expect("valid manifest");
++    }
++
++    #[test]
++    fn computes_ready_phases() {
++        let manifest = manifest();
++        let completed = BTreeSet::from(["p00".to_string()]);
++        let ready = ready_phases(&manifest, &completed, &BTreeSet::new());
++        assert_eq!(ready, vec!["p01".to_string(), "p02".to_string()]);
++    }
++
++    #[test]
++    fn rejects_cycle() {
++        let mut m = manifest();
++        m.superworkflow.phases[0].depends_on.push("p08".into());
++        assert_eq!(validate_manifest(&m), Err(ValidationError::Cycle));
++    }
++}
+diff --git a/crates/zyal-supervisor/src/store.rs b/crates/zyal-supervisor/src/store.rs
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/crates/zyal-supervisor/src/store.rs
+@@ -0,0 +1,631 @@
++//! SQLite persistence for SuperWorkflow runs.
++
++use std::collections::{BTreeMap, BTreeSet};
++use std::path::Path;
++
++use chrono::Utc;
++use rusqlite::{params, Connection, OptionalExtension};
++use serde_json::json;
++
++use crate::model::{PhaseStatus, SuperWorkflowManifest};
++use crate::planner::ready_phases;
++
++/// Persisted task status.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum TaskStatus {
++    /// Task is available.
++    Pending,
++    /// Task is leased to an agent.
++    Running,
++    /// Task is blocked.
++    Blocked,
++    /// Task is under review.
++    Review,
++    /// Task completed.
++    Complete,
++    /// Task parked with summary.
++    Parked,
++    /// Task failed.
++    Failed,
++}
++
++impl TaskStatus {
++    /// Stable storage string.
++    pub fn as_str(self) -> &'static str {
++        match self {
++            TaskStatus::Pending => "pending",
++            TaskStatus::Running => "running",
++            TaskStatus::Blocked => "blocked",
++            TaskStatus::Review => "review",
++            TaskStatus::Complete => "complete",
++            TaskStatus::Parked => "parked",
++            TaskStatus::Failed => "failed",
++        }
++    }
++}
++
++/// SQLite-backed supervisor store.
++pub struct SupervisorStore {
++    conn: Connection,
++}
++
++impl SupervisorStore {
++    /// Open a store at a path.
++    pub fn open(path: impl AsRef<Path>) -> rusqlite::Result<Self> {
++        let conn = Connection::open(path)?;
++        let store = Self { conn };
++        store.init_schema()?;
++        Ok(store)
++    }
++
++    /// Open an in-memory store for tests and ramdisk-like workflows.
++    pub fn open_in_memory() -> rusqlite::Result<Self> {
++        let conn = Connection::open_in_memory()?;
++        let store = Self { conn };
++        store.init_schema()?;
++        Ok(store)
++    }
++
++    /// Borrow the raw connection for advanced host integration.
++    pub fn connection(&self) -> &Connection {
++        &self.conn
++    }
++
++    /// Create tables and indexes. Idempotent.
++    pub fn init_schema(&self) -> rusqlite::Result<()> {
++        self.conn.execute_batch(
++            r#"
++            PRAGMA journal_mode = WAL;
++            PRAGMA synchronous = NORMAL;
++            PRAGMA busy_timeout = 5000;
++            PRAGMA foreign_keys = ON;
++
++            CREATE TABLE IF NOT EXISTS zyal_super_runs (
++                run_id TEXT PRIMARY KEY,
++                manifest_id TEXT NOT NULL,
++                objective TEXT NOT NULL,
++                workspace_root TEXT NOT NULL,
++                manifest_json TEXT NOT NULL,
++                status TEXT NOT NULL,
++                created_at TEXT NOT NULL,
++                updated_at TEXT NOT NULL
++            );
++
++            CREATE TABLE IF NOT EXISTS zyal_super_phases (
++                run_id TEXT NOT NULL,
++                phase_id TEXT NOT NULL,
++                name TEXT NOT NULL,
++                objective TEXT NOT NULL,
++                depends_on_json TEXT NOT NULL,
++                status TEXT NOT NULL,
++                summary TEXT NOT NULL DEFAULT '',
++                started_at TEXT,
++                completed_at TEXT,
++                updated_at TEXT NOT NULL,
++                PRIMARY KEY (run_id, phase_id),
++                FOREIGN KEY (run_id) REFERENCES zyal_super_runs(run_id) ON DELETE CASCADE
++            );
++
++            CREATE TABLE IF NOT EXISTS zyal_super_tasks (
++                run_id TEXT NOT NULL,
++                task_id TEXT NOT NULL,
++                phase_id TEXT NOT NULL,
++                title TEXT NOT NULL,
++                scope_json TEXT NOT NULL DEFAULT '{}',
++                status TEXT NOT NULL,
++                owner TEXT,
++                lease_until TEXT,
++                summary TEXT NOT NULL DEFAULT '',
++                created_at TEXT NOT NULL,
++                updated_at TEXT NOT NULL,
++                PRIMARY KEY (run_id, task_id),
++                FOREIGN KEY (run_id, phase_id) REFERENCES zyal_super_phases(run_id, phase_id) ON DELETE CASCADE
++            );
++
++            CREATE TABLE IF NOT EXISTS zyal_super_memory (
++                id INTEGER PRIMARY KEY AUTOINCREMENT,
++                run_id TEXT NOT NULL,
++                phase_id TEXT,
++                task_id TEXT,
++                scope TEXT NOT NULL,
++                kind TEXT NOT NULL,
++                body TEXT NOT NULL,
++                tags_json TEXT NOT NULL,
++                source_ref TEXT,
++                created_at TEXT NOT NULL,
++                FOREIGN KEY (run_id) REFERENCES zyal_super_runs(run_id) ON DELETE CASCADE
++            );
++
++            CREATE TABLE IF NOT EXISTS zyal_super_evidence (
++                id INTEGER PRIMARY KEY AUTOINCREMENT,
++                run_id TEXT NOT NULL,
++                phase_id TEXT,
++                task_id TEXT,
++                kind TEXT NOT NULL,
++                uri TEXT,
++                content_hash TEXT,
++                payload_json TEXT NOT NULL,
++                created_at TEXT NOT NULL,
++                FOREIGN KEY (run_id) REFERENCES zyal_super_runs(run_id) ON DELETE CASCADE
++            );
++
++            CREATE TABLE IF NOT EXISTS zyal_super_repo_symbols (
++                run_id TEXT NOT NULL,
++                symbol_id TEXT NOT NULL,
++                kind TEXT NOT NULL,
++                path TEXT NOT NULL,
++                name TEXT NOT NULL,
++                span_json TEXT NOT NULL DEFAULT '{}',
++                metadata_json TEXT NOT NULL DEFAULT '{}',
++                updated_at TEXT NOT NULL,
++                PRIMARY KEY (run_id, symbol_id),
++                FOREIGN KEY (run_id) REFERENCES zyal_super_runs(run_id) ON DELETE CASCADE
++            );
++
++            CREATE TABLE IF NOT EXISTS zyal_super_repo_edges (
++                run_id TEXT NOT NULL,
++                edge_id TEXT NOT NULL,
++                src_symbol_id TEXT NOT NULL,
++                dst_symbol_id TEXT NOT NULL,
++                kind TEXT NOT NULL,
++                weight REAL NOT NULL DEFAULT 1.0,
++                evidence_json TEXT NOT NULL DEFAULT '{}',
++                updated_at TEXT NOT NULL,
++                PRIMARY KEY (run_id, edge_id),
++                FOREIGN KEY (run_id) REFERENCES zyal_super_runs(run_id) ON DELETE CASCADE
++            );
++
++            CREATE TABLE IF NOT EXISTS zyal_super_signoffs (
++                id INTEGER PRIMARY KEY AUTOINCREMENT,
++                run_id TEXT NOT NULL,
++                phase_id TEXT NOT NULL,
++                kind TEXT NOT NULL,
++                agent TEXT NOT NULL,
++                verdict TEXT NOT NULL,
++                notes TEXT NOT NULL DEFAULT '',
++                created_at TEXT NOT NULL,
++                FOREIGN KEY (run_id, phase_id) REFERENCES zyal_super_phases(run_id, phase_id) ON DELETE CASCADE
++            );
++
++            CREATE INDEX IF NOT EXISTS zyal_super_phase_status_idx
++                ON zyal_super_phases(run_id, status);
++            CREATE INDEX IF NOT EXISTS zyal_super_task_status_idx
++                ON zyal_super_tasks(run_id, phase_id, status);
++            CREATE INDEX IF NOT EXISTS zyal_super_memory_lookup_idx
++                ON zyal_super_memory(run_id, scope, kind);
++            CREATE INDEX IF NOT EXISTS zyal_super_evidence_lookup_idx
++                ON zyal_super_evidence(run_id, kind, content_hash);
++            CREATE INDEX IF NOT EXISTS zyal_super_repo_symbol_path_idx
++                ON zyal_super_repo_symbols(run_id, path);
++            CREATE INDEX IF NOT EXISTS zyal_super_repo_edge_kind_idx
++                ON zyal_super_repo_edges(run_id, kind);
++            "#,
++        )?;
++        Ok(())
++    }
++
++    /// Initialize a run and seed all phases as pending.
++    pub fn init_run(
++        &self,
++        manifest: &SuperWorkflowManifest,
++        run_id: &str,
++        workspace_root: &str,
++    ) -> rusqlite::Result<()> {
++        let now = Utc::now().to_rfc3339();
++        let manifest_json = serde_json::to_string(manifest)
++            .map_err(|err| rusqlite::Error::ToSqlConversionFailure(Box::new(err)))?;
++        self.conn.execute(
++            r#"
++            INSERT OR REPLACE INTO zyal_super_runs (
++                run_id, manifest_id, objective, workspace_root, manifest_json, status, created_at, updated_at
++            ) VALUES (?1, ?2, ?3, ?4, ?5, 'running', ?6, ?6)
++            "#,
++            params![run_id, manifest.id, manifest.job.objective, workspace_root, manifest_json, now],
++        )?;
++        for phase in &manifest.superworkflow.phases {
++            let depends = serde_json::to_string(&phase.depends_on)
++                .map_err(|err| rusqlite::Error::ToSqlConversionFailure(Box::new(err)))?;
++            self.conn.execute(
++                r#"
++                INSERT OR REPLACE INTO zyal_super_phases (
++                    run_id, phase_id, name, objective, depends_on_json, status, updated_at
++                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
++                "#,
++                params![
++                    run_id,
++                    phase.id,
++                    phase.name,
++                    phase.objective,
++                    depends,
++                    PhaseStatus::Pending.as_str(),
++                    now,
++                ],
++            )?;
++        }
++        self.refresh_ready_phases(manifest, run_id)?;
++        Ok(())
++    }
++
++    /// Mark dependency-satisfied pending phases as ready.
++    pub fn refresh_ready_phases(
++        &self,
++        manifest: &SuperWorkflowManifest,
++        run_id: &str,
++    ) -> rusqlite::Result<Vec<String>> {
++        let completed = self.completed_phases(run_id)?;
++        let blocked = self.blocked_phases(run_id)?;
++        let ready = ready_phases(manifest, &completed, &blocked);
++        let now = Utc::now().to_rfc3339();
++        for phase_id in &ready {
++            self.conn.execute(
++                r#"
++                UPDATE zyal_super_phases
++                SET status = ?1, updated_at = ?2
++                WHERE run_id = ?3 AND phase_id = ?4 AND status = 'pending'
++                "#,
++                params![PhaseStatus::Ready.as_str(), now, run_id, phase_id],
++            )?;
++        }
++        Ok(ready)
++    }
++
++    /// Return completed phase ids.
++    pub fn completed_phases(&self, run_id: &str) -> rusqlite::Result<BTreeSet<String>> {
++        self.phase_ids_with_status(run_id, PhaseStatus::Complete)
++    }
++
++    /// Return blocked phase ids.
++    pub fn blocked_phases(&self, run_id: &str) -> rusqlite::Result<BTreeSet<String>> {
++        self.phase_ids_with_status(run_id, PhaseStatus::Blocked)
++    }
++
++    fn phase_ids_with_status(
++        &self,
++        run_id: &str,
++        status: PhaseStatus,
++    ) -> rusqlite::Result<BTreeSet<String>> {
++        let mut stmt = self.conn.prepare(
++            "SELECT phase_id FROM zyal_super_phases WHERE run_id = ?1 AND status = ?2 ORDER BY phase_id",
++        )?;
++        let rows = stmt.query_map(params![run_id, status.as_str()], |row| row.get::<_, String>(0))?;
++        let mut out = BTreeSet::new();
++        for row in rows {
++            out.insert(row?);
++        }
++        Ok(out)
++    }
++
++    /// Return phase statuses.
++    pub fn phase_statuses(&self, run_id: &str) -> rusqlite::Result<BTreeMap<String, PhaseStatus>> {
++        let mut stmt = self.conn.prepare(
++            "SELECT phase_id, status FROM zyal_super_phases WHERE run_id = ?1 ORDER BY phase_id",
++        )?;
++        let rows = stmt.query_map(params![run_id], |row| {
++            let id: String = row.get(0)?;
++            let raw: String = row.get(1)?;
++            let status = PhaseStatus::parse(&raw).unwrap_or(PhaseStatus::Failed);
++            Ok((id, status))
++        })?;
++        let mut out = BTreeMap::new();
++        for row in rows {
++            let (id, status) = row?;
++            out.insert(id, status);
++        }
++        Ok(out)
++    }
++
++    /// Record a phase status update.
++    pub fn record_phase_status(
++        &self,
++        run_id: &str,
++        phase_id: &str,
++        status: PhaseStatus,
++        summary: &str,
++    ) -> rusqlite::Result<()> {
++        let now = Utc::now().to_rfc3339();
++        let completed_at = if status == PhaseStatus::Complete { Some(now.clone()) } else { None };
++        self.conn.execute(
++            r#"
++            UPDATE zyal_super_phases
++            SET status = ?1,
++                summary = CASE WHEN ?2 = '' THEN summary ELSE ?2 END,
++                completed_at = COALESCE(?3, completed_at),
++                updated_at = ?4
++            WHERE run_id = ?5 AND phase_id = ?6
++            "#,
++            params![status.as_str(), summary, completed_at, now, run_id, phase_id],
++        )?;
++        Ok(())
++    }
++
++    /// Append memory.
++    pub fn append_memory(
++        &self,
++        run_id: &str,
++        phase_id: Option<&str>,
++        task_id: Option<&str>,
++        scope: &str,
++        kind: &str,
++        body: &str,
++        tags: &[String],
++        source_ref: Option<&str>,
++    ) -> rusqlite::Result<i64> {
++        let now = Utc::now().to_rfc3339();
++        let tags_json = serde_json::to_string(tags)
++            .map_err(|err| rusqlite::Error::ToSqlConversionFailure(Box::new(err)))?;
++        self.conn.execute(
++            r#"
++            INSERT INTO zyal_super_memory (
++                run_id, phase_id, task_id, scope, kind, body, tags_json, source_ref, created_at
++            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
++            "#,
++            params![run_id, phase_id, task_id, scope, kind, body, tags_json, source_ref, now],
++        )?;
++        Ok(self.conn.last_insert_rowid())
++    }
++
++    /// Append evidence.
++    pub fn append_evidence(
++        &self,
++        run_id: &str,
++        phase_id: Option<&str>,
++        task_id: Option<&str>,
++        kind: &str,
++        uri: Option<&str>,
++        content_hash: Option<&str>,
++        payload: &serde_json::Value,
++    ) -> rusqlite::Result<i64> {
++        let now = Utc::now().to_rfc3339();
++        self.conn.execute(
++            r#"
++            INSERT INTO zyal_super_evidence (
++                run_id, phase_id, task_id, kind, uri, content_hash, payload_json, created_at
++            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
++            "#,
++            params![run_id, phase_id, task_id, kind, uri, content_hash, payload.to_string(), now],
++        )?;
++        Ok(self.conn.last_insert_rowid())
++    }
++
++    /// Upsert a repo graph symbol.
++    pub fn upsert_repo_symbol(
++        &self,
++        run_id: &str,
++        symbol_id: &str,
++        kind: &str,
++        path: &str,
++        name: &str,
++        span: &serde_json::Value,
++        metadata: &serde_json::Value,
++    ) -> rusqlite::Result<()> {
++        let now = Utc::now().to_rfc3339();
++        self.conn.execute(
++            r#"
++            INSERT INTO zyal_super_repo_symbols (
++                run_id, symbol_id, kind, path, name, span_json, metadata_json, updated_at
++            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
++            ON CONFLICT(run_id, symbol_id) DO UPDATE SET
++                kind = excluded.kind,
++                path = excluded.path,
++                name = excluded.name,
++                span_json = excluded.span_json,
++                metadata_json = excluded.metadata_json,
++                updated_at = excluded.updated_at
++            "#,
++            params![run_id, symbol_id, kind, path, name, span.to_string(), metadata.to_string(), now],
++        )?;
++        Ok(())
++    }
++
++    /// Append or update a repo graph edge.
++    pub fn append_repo_edge(
++        &self,
++        run_id: &str,
++        edge_id: &str,
++        src_symbol_id: &str,
++        dst_symbol_id: &str,
++        kind: &str,
++        weight: f64,
++        evidence: &serde_json::Value,
++    ) -> rusqlite::Result<()> {
++        let now = Utc::now().to_rfc3339();
++        self.conn.execute(
++            r#"
++            INSERT INTO zyal_super_repo_edges (
++                run_id, edge_id, src_symbol_id, dst_symbol_id, kind, weight, evidence_json, updated_at
++            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
++            ON CONFLICT(run_id, edge_id) DO UPDATE SET
++                src_symbol_id = excluded.src_symbol_id,
++                dst_symbol_id = excluded.dst_symbol_id,
++                kind = excluded.kind,
++                weight = excluded.weight,
++                evidence_json = excluded.evidence_json,
++                updated_at = excluded.updated_at
++            "#,
++            params![run_id, edge_id, src_symbol_id, dst_symbol_id, kind, weight, evidence.to_string(), now],
++        )?;
++        Ok(())
++    }
++
++    /// Record a sign-off verdict.
++    pub fn sign_off(
++        &self,
++        run_id: &str,
++        phase_id: &str,
++        kind: &str,
++        agent: &str,
++        verdict: &str,
++        notes: &str,
++    ) -> rusqlite::Result<i64> {
++        let now = Utc::now().to_rfc3339();
++        self.conn.execute(
++            r#"
++            INSERT INTO zyal_super_signoffs (
++                run_id, phase_id, kind, agent, verdict, notes, created_at
++            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
++            "#,
++            params![run_id, phase_id, kind, agent, verdict, notes, now],
++        )?;
++        Ok(self.conn.last_insert_rowid())
++    }
++
++    /// Load the stored manifest for a run.
++    pub fn load_manifest(&self, run_id: &str) -> rusqlite::Result<Option<SuperWorkflowManifest>> {
++        let raw: Option<String> = self
++            .conn
++            .query_row(
++                "SELECT manifest_json FROM zyal_super_runs WHERE run_id = ?1",
++                params![run_id],
++                |row| row.get(0),
++            )
++            .optional()?;
++        raw.map(|text| {
++            serde_json::from_str(&text)
++                .map_err(|err| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(err)))
++        })
++        .transpose()
++    }
++
++    /// Insert an example task for hosts that want lightweight task materialization.
++    pub fn insert_task(
++        &self,
++        run_id: &str,
++        phase_id: &str,
++        task_id: &str,
++        title: &str,
++        scope: &serde_json::Value,
++    ) -> rusqlite::Result<()> {
++        let now = Utc::now().to_rfc3339();
++        self.conn.execute(
++            r#"
++            INSERT OR IGNORE INTO zyal_super_tasks (
++                run_id, task_id, phase_id, title, scope_json, status, created_at, updated_at
++            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
++            "#,
++            params![run_id, task_id, phase_id, title, scope.to_string(), TaskStatus::Pending.as_str(), now],
++        )?;
++        Ok(())
++    }
++
++    /// Convenience: append a compact run event to evidence.
++    pub fn append_run_event(
++        &self,
++        run_id: &str,
++        kind: &str,
++        payload: serde_json::Value,
++    ) -> rusqlite::Result<i64> {
++        self.append_evidence(run_id, None, None, kind, None, None, &json!(payload))
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::model::{ExitPlan, Gate, Job, Phase, SuperWorkflow};
++
++    fn manifest() -> SuperWorkflowManifest {
++        let phases = (0..9)
++            .map(|idx| Phase {
++                id: format!("p{idx:02}"),
++                name: format!("phase {idx}"),
++                objective: "objective".into(),
++                depends_on: if idx == 0 { vec![] } else { vec![format!("p{:02}", idx - 1)] },
++                parallel_group: String::new(),
++                agents: Default::default(),
++                budget: Default::default(),
++                exit: ExitPlan {
++                    required_artifacts: vec![format!("target/p{idx:02}.json")],
++                    gates: vec![Gate { kind: "artifact_exists".into(), params: Default::default() }],
++                    signoff: vec!["supervisor".into()],
++                },
++            })
++            .collect::<Vec<_>>();
++        SuperWorkflowManifest {
++            version: "v1".into(),
++            intent: "daemon".into(),
++            confirm: "RUN_FOREVER".into(),
++            id: "manifest".into(),
++            job: Job { name: "job".into(), objective: "objective".into(), risk: vec![] },
++            superworkflow: SuperWorkflow {
++                stage_count: Some(phases.len()),
++                strategy: "test".into(),
++                controller: Default::default(),
++                memory: Default::default(),
++                sandbox: Default::default(),
++                repo_graph: Default::default(),
++                parity: Default::default(),
++                phases,
++            },
++        }
++    }
++
++    #[test]
++    fn initializes_run_and_refreshes_ready_phase() {
++        let store = SupervisorStore::open_in_memory().unwrap();
++        let m = manifest();
++        store.init_run(&m, "run-1", ".zyal/sandboxes/run-1").unwrap();
++        let statuses = store.phase_statuses("run-1").unwrap();
++        assert_eq!(statuses.get("p00"), Some(&PhaseStatus::Ready));
++        assert_eq!(statuses.get("p01"), Some(&PhaseStatus::Pending));
++        store.record_phase_status("run-1", "p00", PhaseStatus::Complete, "done").unwrap();
++        let ready = store.refresh_ready_phases(&m, "run-1").unwrap();
++        assert!(ready.contains(&"p01".to_string()));
++    }
++
++    #[test]
++    fn persists_memory_evidence_graph_and_signoff() {
++        let store = SupervisorStore::open_in_memory().unwrap();
++        let m = manifest();
++        store.init_run(&m, "run-1", ".zyal/sandboxes/run-1").unwrap();
++        let memory_id = store
++            .append_memory(
++                "run-1",
++                Some("p00"),
++                None,
++                "phase",
++                "negative_lesson",
++                "Do not merge without parity evidence.",
++                &["parity".into()],
++                None,
++            )
++            .unwrap();
++        assert!(memory_id > 0);
++        store
++            .append_evidence(
++                "run-1",
++                Some("p00"),
++                None,
++                "proof",
++                Some("target/proof.json"),
++                Some("sha256:test"),
++                &json!({"ok": true}),
++            )
++            .unwrap();
++        store
++            .upsert_repo_symbol(
++                "run-1",
++                "sym:main",
++                "function",
++                "src/main.rs",
++                "main",
++                &json!({"start": 1, "end": 10}),
++                &json!({"public": false}),
++            )
++            .unwrap();
++        store
++            .append_repo_edge(
++                "run-1",
++                "edge:main:handler",
++                "sym:main",
++                "sym:handler",
++                "calls",
++                1.0,
++                &json!({"source": "static"}),
++            )
++            .unwrap();
++        let signoff = store
++            .sign_off("run-1", "p00", "phase", "critic", "approved", "looks bounded")
++            .unwrap();
++        assert!(signoff > 0);
++    }
++}
+diff --git a/crates/zyal-supervisor/src/main.rs b/crates/zyal-supervisor/src/main.rs
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/crates/zyal-supervisor/src/main.rs
+@@ -0,0 +1,211 @@
++use std::path::PathBuf;
++
++use anyhow::{Context, Result};
++use clap::{Parser, Subcommand};
++use serde_json::json;
++use zyal_supervisor::{validate_manifest, PhaseStatus, SupervisorStore, SuperWorkflowManifest};
++
++#[derive(Parser, Debug)]
++#[command(
++    name = "zyal-supervisor",
++    version,
++    about = "Durable supervisor substrate for ambitious ZYAL SuperWorkflows"
++)]
++struct Cli {
++    #[command(subcommand)]
++    cmd: Cmd,
++}
++
++#[derive(Subcommand, Debug)]
++enum Cmd {
++    /// Validate a SuperWorkflow manifest.
++    Validate {
++        /// Manifest path (JSON or YAML).
++        #[arg(long)]
++        manifest: PathBuf,
++    },
++    /// Initialize persistent run state.
++    InitRun {
++        /// Manifest path (JSON or YAML).
++        #[arg(long)]
++        manifest: PathBuf,
++        /// SQLite DB path.
++        #[arg(long)]
++        db: PathBuf,
++        /// Run id.
++        #[arg(long)]
++        run_id: String,
++        /// Persistent workspace root.
++        #[arg(long)]
++        workspace_root: String,
++    },
++    /// Print ready phases as JSON.
++    Ready {
++        /// SQLite DB path.
++        #[arg(long)]
++        db: PathBuf,
++        /// Run id.
++        #[arg(long)]
++        run_id: String,
++    },
++    /// Record phase status.
++    RecordPhase {
++        /// SQLite DB path.
++        #[arg(long)]
++        db: PathBuf,
++        /// Run id.
++        #[arg(long)]
++        run_id: String,
++        /// Phase id.
++        #[arg(long)]
++        phase_id: String,
++        /// Status: pending|ready|running|blocked|review|complete|parked|failed.
++        #[arg(long)]
++        status: String,
++        /// Optional summary.
++        #[arg(long, default_value = "")]
++        summary: String,
++    },
++    /// Append a memory record.
++    Remember {
++        /// SQLite DB path.
++        #[arg(long)]
++        db: PathBuf,
++        /// Run id.
++        #[arg(long)]
++        run_id: String,
++        /// Optional phase id.
++        #[arg(long)]
++        phase_id: Option<String>,
++        /// Optional task id.
++        #[arg(long)]
++        task_id: Option<String>,
++        /// Memory scope.
++        #[arg(long, default_value = "run")]
++        scope: String,
++        /// Memory kind.
++        #[arg(long)]
++        kind: String,
++        /// Body.
++        #[arg(long)]
++        body: String,
++        /// Comma-separated tags.
++        #[arg(long, default_value = "")]
++        tags: String,
++    },
++    /// Record a phase sign-off verdict.
++    Signoff {
++        /// SQLite DB path.
++        #[arg(long)]
++        db: PathBuf,
++        /// Run id.
++        #[arg(long)]
++        run_id: String,
++        /// Phase id.
++        #[arg(long)]
++        phase_id: String,
++        /// Sign-off kind.
++        #[arg(long, default_value = "phase")]
++        kind: String,
++        /// Agent or role.
++        #[arg(long)]
++        agent: String,
++        /// Verdict.
++        #[arg(long)]
++        verdict: String,
++        /// Notes.
++        #[arg(long, default_value = "")]
++        notes: String,
++    },
++}
++
++fn main() {
++    let cli = Cli::parse();
++    let code = match dispatch(cli) {
++        Ok(code) => code,
++        Err(err) => {
++            eprintln!("zyal-supervisor: {err:#}");
++            1
++        }
++    };
++    std::process::exit(code);
++}
++
++fn dispatch(cli: Cli) -> Result<i32> {
++    match cli.cmd {
++        Cmd::Validate { manifest } => {
++            let manifest = load_manifest(&manifest)?;
++            validate_manifest(&manifest).context("validate manifest")?;
++            println!("{}", json!({"ok": true, "id": manifest.id, "phases": manifest.superworkflow.phases.len()}));
++            Ok(0)
++        }
++        Cmd::InitRun { manifest, db, run_id, workspace_root } => {
++            let manifest = load_manifest(&manifest)?;
++            validate_manifest(&manifest).context("validate manifest")?;
++            let store = SupervisorStore::open(db).context("open supervisor store")?;
++            store.init_run(&manifest, &run_id, &workspace_root).context("init run")?;
++            println!("{}", json!({"ok": true, "run_id": run_id, "manifest_id": manifest.id}));
++            Ok(0)
++        }
++        Cmd::Ready { db, run_id } => {
++            let store = SupervisorStore::open(db).context("open supervisor store")?;
++            let manifest = store
++                .load_manifest(&run_id)
++                .context("load manifest")?
++                .context("unknown run id")?;
++            let ready = store.refresh_ready_phases(&manifest, &run_id).context("refresh ready")?;
++            println!("{}", json!({"run_id": run_id, "ready": ready}));
++            Ok(0)
++        }
++        Cmd::RecordPhase { db, run_id, phase_id, status, summary } => {
++            let status = PhaseStatus::parse(&status).context("invalid status")?;
++            let store = SupervisorStore::open(db).context("open supervisor store")?;
++            store.record_phase_status(&run_id, &phase_id, status, &summary).context("record phase")?;
++            if let Some(manifest) = store.load_manifest(&run_id).context("load manifest")? {
++                store.refresh_ready_phases(&manifest, &run_id).context("refresh ready phases")?;
++            }
++            println!("{}", json!({"ok": true, "run_id": run_id, "phase_id": phase_id, "status": status.as_str()}));
++            Ok(0)
++        }
++        Cmd::Remember { db, run_id, phase_id, task_id, scope, kind, body, tags } => {
++            let tags = tags
++                .split(',')
++                .map(str::trim)
++                .filter(|tag| !tag.is_empty())
++                .map(str::to_string)
++                .collect::<Vec<_>>();
++            let store = SupervisorStore::open(db).context("open supervisor store")?;
++            let id = store
++                .append_memory(
++                    &run_id,
++                    phase_id.as_deref(),
++                    task_id.as_deref(),
++                    &scope,
++                    &kind,
++                    &body,
++                    &tags,
++                    None,
++                )
++                .context("append memory")?;
++            println!("{}", json!({"ok": true, "id": id}));
++            Ok(0)
++        }
++        Cmd::Signoff { db, run_id, phase_id, kind, agent, verdict, notes } => {
++            let store = SupervisorStore::open(db).context("open supervisor store")?;
++            let id = store
++                .sign_off(&run_id, &phase_id, &kind, &agent, &verdict, &notes)
++                .context("signoff")?;
++            println!("{}", json!({"ok": true, "id": id}));
++            Ok(0)
++        }
++    }
++}
++
++fn load_manifest(path: &PathBuf) -> Result<SuperWorkflowManifest> {
++    let text = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
++    if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
++        serde_json::from_str(&text).context("parse JSON manifest")
++    } else {
++        serde_yaml::from_str(&text).context("parse YAML manifest")
++    }
++}
+diff --git a/agent/zyal/ambitious-superworkflow.zyal b/agent/zyal/ambitious-superworkflow.zyal
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/agent/zyal/ambitious-superworkflow.zyal
+@@ -0,0 +1,358 @@
++# zyal: declarative target=superworkflow schema=zyal/superworkflow@1
++# zyalc: emits agent/superworkflows/ambitious-superworkflow.superworkflow.json
++version: v1
++intent: daemon
++confirm: RUN_FOREVER
++id: ambitious-superworkflow-template
++job:
++  name: Ambitious challenge superworkflow template
++  objective: Drive a many-hour or many-day challenge from ambition framing through
++    implementation, parity, performance, hardening, release, and durable memory archive.
++  risk:
++  - agent swarm sprawl
++  - partial parity mistaken for completion
++  - lost context across long runs
++  - performance regressions masked by functionality wins
++  - unreviewed sandbox artifacts leaking into primary checkout
++superworkflow:
++  stage_count: 11
++  strategy: macro_plan_then_parallel_phases_then_fusion_hardening
++  controller:
++    mode: supervisor_dag
++    max_parallel_phases: 3
++    max_parallel_tasks_per_phase: 16
++    require_phase_signoff: true
++    retry_until_exit_gates_pass: true
++    park_unresolved_tasks_with_summary: true
++    prevent_scope_sprawl: true
++  memory:
++    run_wal: target/zyal/superworkflow/run.wal.jsonl
++    phase_summaries: target/zyal/superworkflow/phases/*.summary.md
++    knowledge_store: target/zyal/superworkflow/memory.sqlite
++    negative_memory: true
++    inject_at_phase_start:
++    - invariants
++    - open_gaps
++    - recent_failures
++    - repo_graph_hotspots
++    compact_every_tasks: 8
++  sandbox:
++    mode: persistent_project_sandbox
++    workspace_root: .zyal/sandboxes/{run_id}
++    isolation: git_worktree
++    preserve_between_phases: true
++    export_patch_per_task: true
++    destroy_unmerged_worktrees_after_archive: true
++  repo_graph:
++    backend: sqlite
++    path: target/zyal/superworkflow/repo-graph.sqlite
++    indexes:
++    - symbols
++    - calls
++    - imports
++    - tests
++    - fixtures
++    - public_api
++    - performance_hotspots
++    refresh_on:
++    - phase_start
++    - merge
++    - test_failure_cluster
++  parity:
++    enabled: true
++    reference_adapter: target/zyal/parity/reference-adapter
++    candidate_adapter: target/zyal/parity/candidate-adapter
++    evidence_jsonl: target/zyal/parity/evidence.jsonl
++    tmp_mode: ramdisk_or_memory
++    cluster_failures: true
++    promote_fixed_gap_to_regression: true
++  phases:
++  - id: P00_frame_ambition
++    name: Frame ambition and invariants
++    objective: Convert the user objective into explicit invariants, non-goals, acceptance
++      gates, threat model, and a durable phase DAG.
++    depends_on: []
++    parallel_group: planning
++    agents:
++      planner: 3
++      critic: 2
++      memory_curator: 1
++    exit:
++      required_artifacts:
++      - target/zyal/superworkflow/problem-framing.md
++      - target/zyal/superworkflow/invariants.json
++      - target/zyal/superworkflow/phase-dag.json
++      gates:
++      - kind: artifact_exists
++        path: target/zyal/superworkflow/problem-framing.md
++      - kind: review_quorum
++        reviewers:
++        - critic
++        - planner
++        min_approvals: 2
++      signoff:
++      - supervisor
++      - critic
++  - id: P01_reference_and_acceptance
++    name: Reference and acceptance model
++    objective: Build reference behavior inventory, command/API surface, compatibility
++      tiers, canonical fixtures, and parity acceptance thresholds.
++    depends_on:
++    - P00_frame_ambition
++    parallel_group: planning
++    agents:
++      reference_mapper: 4
++      tester: 2
++      critic: 1
++    exit:
++      required_artifacts:
++      - target/zyal/superworkflow/reference-surface.json
++      - target/zyal/superworkflow/acceptance-matrix.json
++      gates:
++      - kind: artifact_exists
++        path: target/zyal/superworkflow/acceptance-matrix.json
++      - kind: coverage_floor
++        metric: surface_inventory_complete
++        gte: 0.8
++      signoff:
++      - supervisor
++      - parity_judge
++  - id: P02_architecture_and_graph_index
++    name: Architecture and repo graph index
++    objective: Create the target architecture and initialize a repo graph that maps
++      symbols, files, tests, APIs, and dependencies for future edits.
++    depends_on:
++    - P00_frame_ambition
++    parallel_group: planning
++    agents:
++      architect: 3
++      graph_indexer: 2
++      critic: 1
++    exit:
++      required_artifacts:
++      - target/zyal/superworkflow/architecture.md
++      - target/zyal/superworkflow/repo-graph.sqlite
++      gates:
++      - kind: repo_graph_min_symbols
++        gte: 50
++      - kind: review_quorum
++        reviewers:
++        - architect
++        - critic
++        min_approvals: 2
++      signoff:
++      - supervisor
++      - architect
++  - id: P03_foundation_runtime
++    name: Foundation runtime vertical slice
++    objective: Implement the smallest end-to-end runtime slice that compiles, starts,
++      accepts core I/O, exposes observability, and can be tested deterministically.
++    depends_on:
++    - P01_reference_and_acceptance
++    - P02_architecture_and_graph_index
++    parallel_group: implementation
++    agents:
++      implementer: 6
++      reviewer: 2
++      tester: 2
++    exit:
++      required_artifacts:
++      - target/zyal/superworkflow/foundation-proof.json
++      - target/zyal/superworkflow/foundation.patch
++      gates:
++      - kind: shell
++        command: cargo test --workspace
++        timeout: 30m
++      - kind: parity_case_floor
++        gte: 25
++      signoff:
++      - supervisor
++      - reviewer
++      - tester
++  - id: P04_feature_ledger
++    name: Feature ledger and task bank
++    objective: Explode the compatibility surface into independently claimable tasks
++      with owners, dependencies, expected tests, and bounded change scopes.
++    depends_on:
++    - P01_reference_and_acceptance
++    - P02_architecture_and_graph_index
++    parallel_group: implementation
++    agents:
++      planner: 2
++      reference_mapper: 3
++      memory_curator: 1
++    exit:
++      required_artifacts:
++      - target/zyal/superworkflow/task-bank.jsonl
++      - target/zyal/superworkflow/feature-ledger.json
++      gates:
++      - kind: task_bank_min_items
++        gte: 100
++      - kind: task_bank_has_tests
++        gte: 0.7
++      signoff:
++      - supervisor
++      - planner
++  - id: P05_parallel_implementation
++    name: Parallel implementation swarm
++    objective: Run bounded worktree agents over independent tasks, merge through graph-aware
++      dependency ordering, and preserve negative lessons.
++    depends_on:
++    - P03_foundation_runtime
++    - P04_feature_ledger
++    parallel_group: implementation
++    agents:
++      implementer: 12
++      reviewer: 4
++      tester: 4
++      critic: 2
++    exit:
++      required_artifacts:
++      - target/zyal/superworkflow/merge-report.json
++      - target/zyal/superworkflow/task-completion.json
++      gates:
++      - kind: task_completion_floor
++        gte: 0.65
++      - kind: shell
++        command: cargo test --workspace
++        timeout: 45m
++      - kind: no_unmerged_high_value_worktrees
++      signoff:
++      - supervisor
++      - reviewer
++      - tester
++  - id: P06_parity_harness
++    name: Parity harness and corpus engine
++    objective: Build the reference-vs-target differential harness, in-memory/ramdisk
++      test execution, corpus manifest, evidence JSONL, and report generator.
++    depends_on:
++    - P03_foundation_runtime
++    - P04_feature_ledger
++    parallel_group: testing
++    agents:
++      tester: 5
++      parity_judge: 3
++      performance_lead: 1
++    exit:
++      required_artifacts:
++      - target/zyal/parity/corpus-manifest.json
++      - target/zyal/parity/evidence.jsonl
++      - target/zyal/parity/report.md
++      gates:
++      - kind: parity_case_floor
++        gte: 500
++      - kind: reference_target_diff_harness
++        must_exist: true
++      - kind: ramdisk_or_memory_mode
++        must_exist: true
++      signoff:
++      - supervisor
++      - parity_judge
++  - id: P07_gap_closure
++    name: Parity gap closure loop
++    objective: Iteratively close mismatches by clustering failures, assigning focused
++      agents, and preserving each fix as a durable memory and regression test.
++    depends_on:
++    - P05_parallel_implementation
++    - P06_parity_harness
++    parallel_group: hardening
++    agents:
++      implementer: 10
++      tester: 5
++      parity_judge: 3
++      memory_curator: 1
++    exit:
++      required_artifacts:
++      - target/zyal/parity/gap-ledger.json
++      - target/zyal/parity/closure-report.md
++      gates:
++      - kind: parity_pass_rate
++        gte: 0.98
++      - kind: unexplained_gap_count
++        lte: 0
++      - kind: regression_tests_added_for_fixed_gaps
++        gte: 0.95
++      signoff:
++      - supervisor
++      - parity_judge
++      - tester
++  - id: P08_performance_stabilization
++    name: Performance stabilization
++    objective: Benchmark reference and candidate, identify hotspots through graph/profile
++      evidence, and close material regressions without sacrificing parity.
++    depends_on:
++    - P07_gap_closure
++    parallel_group: hardening
++    agents:
++      performance_lead: 3
++      implementer: 6
++      tester: 2
++      critic: 1
++    exit:
++      required_artifacts:
++      - target/zyal/perf/baseline.json
++      - target/zyal/perf/report.md
++      gates:
++      - kind: perf_regression_ceiling
++        metric: p95_latency_ratio
++        lte: 1.2
++      - kind: parity_pass_rate
++        gte: 0.98
++      signoff:
++      - supervisor
++      - performance_lead
++      - parity_judge
++  - id: P09_security_reliability_docs
++    name: Security, reliability, and docs hardening
++    objective: Run adversarial review, fuzz/property tests, failure injection, operational
++      docs, and rollback/release readiness checks.
++    depends_on:
++    - P07_gap_closure
++    parallel_group: hardening
++    agents:
++      security_reviewer: 2
++      tester: 4
++      writer: 2
++      critic: 2
++    exit:
++      required_artifacts:
++      - target/zyal/security/review.md
++      - target/zyal/reliability/failure-injection.json
++      - target/zyal/docs/release-notes.md
++      gates:
++      - kind: no_critical_security_findings
++      - kind: docs_cover_acceptance_matrix
++        gte: 0.9
++      signoff:
++      - supervisor
++      - security_reviewer
++      - writer
++  - id: P10_release_and_long_tail
++    name: Release, archive, and long-tail loop
++    objective: Fuse all branches, run final proof lanes, archive memory/evidence,
++      publish remaining known gaps, and convert unresolved gaps into durable follow-up
++      tasks.
++    depends_on:
++    - P08_performance_stabilization
++    - P09_security_reliability_docs
++    parallel_group: release
++    agents:
++      release_captain: 2
++      tester: 4
++      memory_curator: 2
++      critic: 2
++    exit:
++      required_artifacts:
++      - target/zyal/release/final-proof.json
++      - target/zyal/release/memory-archive.jsonl
++      - target/zyal/release/known-gaps.md
++      gates:
++      - kind: shell
++        command: cargo test --workspace
++        timeout: 60m
++      - kind: final_parity_report_approved
++      - kind: memory_archive_written
++      signoff:
++      - supervisor
++      - release_captain
++      - critic
+diff --git a/agent/superworkflows/ambitious-superworkflow.superworkflow.json b/agent/superworkflows/ambitious-superworkflow.superworkflow.json
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/agent/superworkflows/ambitious-superworkflow.superworkflow.json
+@@ -0,0 +1,498 @@
++{
++  "version": "v1",
++  "intent": "daemon",
++  "confirm": "RUN_FOREVER",
++  "id": "ambitious-superworkflow-template",
++  "job": {
++    "name": "Ambitious challenge superworkflow template",
++    "objective": "Drive a many-hour or many-day challenge from ambition framing through implementation, parity, performance, hardening, release, and durable memory archive.",
++    "risk": [
++      "agent swarm sprawl",
++      "partial parity mistaken for completion",
++      "lost context across long runs",
++      "performance regressions masked by functionality wins",
++      "unreviewed sandbox artifacts leaking into primary checkout"
++    ]
++  },
++  "superworkflow": {
++    "stage_count": 11,
++    "strategy": "macro_plan_then_parallel_phases_then_fusion_hardening",
++    "controller": {
++      "mode": "supervisor_dag",
++      "max_parallel_phases": 3,
++      "max_parallel_tasks_per_phase": 16,
++      "require_phase_signoff": true,
++      "retry_until_exit_gates_pass": true,
++      "park_unresolved_tasks_with_summary": true,
++      "prevent_scope_sprawl": true
++    },
++    "memory": {
++      "run_wal": "target/zyal/superworkflow/run.wal.jsonl",
++      "phase_summaries": "target/zyal/superworkflow/phases/*.summary.md",
++      "knowledge_store": "target/zyal/superworkflow/memory.sqlite",
++      "negative_memory": true,
++      "inject_at_phase_start": [
++        "invariants",
++        "open_gaps",
++        "recent_failures",
++        "repo_graph_hotspots"
++      ],
++      "compact_every_tasks": 8
++    },
++    "sandbox": {
++      "mode": "persistent_project_sandbox",
++      "workspace_root": ".zyal/sandboxes/{run_id}",
++      "isolation": "git_worktree",
++      "preserve_between_phases": true,
++      "export_patch_per_task": true,
++      "destroy_unmerged_worktrees_after_archive": true
++    },
++    "repo_graph": {
++      "backend": "sqlite",
++      "path": "target/zyal/superworkflow/repo-graph.sqlite",
++      "indexes": [
++        "symbols",
++        "calls",
++        "imports",
++        "tests",
++        "fixtures",
++        "public_api",
++        "performance_hotspots"
++      ],
++      "refresh_on": [
++        "phase_start",
++        "merge",
++        "test_failure_cluster"
++      ]
++    },
++    "parity": {
++      "enabled": true,
++      "reference_adapter": "target/zyal/parity/reference-adapter",
++      "candidate_adapter": "target/zyal/parity/candidate-adapter",
++      "evidence_jsonl": "target/zyal/parity/evidence.jsonl",
++      "tmp_mode": "ramdisk_or_memory",
++      "cluster_failures": true,
++      "promote_fixed_gap_to_regression": true
++    },
++    "phases": [
++      {
++        "id": "P00_frame_ambition",
++        "name": "Frame ambition and invariants",
++        "objective": "Convert the user objective into explicit invariants, non-goals, acceptance gates, threat model, and a durable phase DAG.",
++        "depends_on": [],
++        "parallel_group": "planning",
++        "agents": {
++          "planner": 3,
++          "critic": 2,
++          "memory_curator": 1
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/superworkflow/problem-framing.md",
++            "target/zyal/superworkflow/invariants.json",
++            "target/zyal/superworkflow/phase-dag.json"
++          ],
++          "gates": [
++            {
++              "kind": "artifact_exists",
++              "path": "target/zyal/superworkflow/problem-framing.md"
++            },
++            {
++              "kind": "review_quorum",
++              "reviewers": [
++                "critic",
++                "planner"
++              ],
++              "min_approvals": 2
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "critic"
++          ]
++        }
++      },
++      {
++        "id": "P01_reference_and_acceptance",
++        "name": "Reference and acceptance model",
++        "objective": "Build reference behavior inventory, command/API surface, compatibility tiers, canonical fixtures, and parity acceptance thresholds.",
++        "depends_on": [
++          "P00_frame_ambition"
++        ],
++        "parallel_group": "planning",
++        "agents": {
++          "reference_mapper": 4,
++          "tester": 2,
++          "critic": 1
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/superworkflow/reference-surface.json",
++            "target/zyal/superworkflow/acceptance-matrix.json"
++          ],
++          "gates": [
++            {
++              "kind": "artifact_exists",
++              "path": "target/zyal/superworkflow/acceptance-matrix.json"
++            },
++            {
++              "kind": "coverage_floor",
++              "metric": "surface_inventory_complete",
++              "gte": 0.8
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "parity_judge"
++          ]
++        }
++      },
++      {
++        "id": "P02_architecture_and_graph_index",
++        "name": "Architecture and repo graph index",
++        "objective": "Create the target architecture and initialize a repo graph that maps symbols, files, tests, APIs, and dependencies for future edits.",
++        "depends_on": [
++          "P00_frame_ambition"
++        ],
++        "parallel_group": "planning",
++        "agents": {
++          "architect": 3,
++          "graph_indexer": 2,
++          "critic": 1
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/superworkflow/architecture.md",
++            "target/zyal/superworkflow/repo-graph.sqlite"
++          ],
++          "gates": [
++            {
++              "kind": "repo_graph_min_symbols",
++              "gte": 50
++            },
++            {
++              "kind": "review_quorum",
++              "reviewers": [
++                "architect",
++                "critic"
++              ],
++              "min_approvals": 2
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "architect"
++          ]
++        }
++      },
++      {
++        "id": "P03_foundation_runtime",
++        "name": "Foundation runtime vertical slice",
++        "objective": "Implement the smallest end-to-end runtime slice that compiles, starts, accepts core I/O, exposes observability, and can be tested deterministically.",
++        "depends_on": [
++          "P01_reference_and_acceptance",
++          "P02_architecture_and_graph_index"
++        ],
++        "parallel_group": "implementation",
++        "agents": {
++          "implementer": 6,
++          "reviewer": 2,
++          "tester": 2
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/superworkflow/foundation-proof.json",
++            "target/zyal/superworkflow/foundation.patch"
++          ],
++          "gates": [
++            {
++              "kind": "shell",
++              "command": "cargo test --workspace",
++              "timeout": "30m"
++            },
++            {
++              "kind": "parity_case_floor",
++              "gte": 25
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "reviewer",
++            "tester"
++          ]
++        }
++      },
++      {
++        "id": "P04_feature_ledger",
++        "name": "Feature ledger and task bank",
++        "objective": "Explode the compatibility surface into independently claimable tasks with owners, dependencies, expected tests, and bounded change scopes.",
++        "depends_on": [
++          "P01_reference_and_acceptance",
++          "P02_architecture_and_graph_index"
++        ],
++        "parallel_group": "implementation",
++        "agents": {
++          "planner": 2,
++          "reference_mapper": 3,
++          "memory_curator": 1
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/superworkflow/task-bank.jsonl",
++            "target/zyal/superworkflow/feature-ledger.json"
++          ],
++          "gates": [
++            {
++              "kind": "task_bank_min_items",
++              "gte": 100
++            },
++            {
++              "kind": "task_bank_has_tests",
++              "gte": 0.7
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "planner"
++          ]
++        }
++      },
++      {
++        "id": "P05_parallel_implementation",
++        "name": "Parallel implementation swarm",
++        "objective": "Run bounded worktree agents over independent tasks, merge through graph-aware dependency ordering, and preserve negative lessons.",
++        "depends_on": [
++          "P03_foundation_runtime",
++          "P04_feature_ledger"
++        ],
++        "parallel_group": "implementation",
++        "agents": {
++          "implementer": 12,
++          "reviewer": 4,
++          "tester": 4,
++          "critic": 2
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/superworkflow/merge-report.json",
++            "target/zyal/superworkflow/task-completion.json"
++          ],
++          "gates": [
++            {
++              "kind": "task_completion_floor",
++              "gte": 0.65
++            },
++            {
++              "kind": "shell",
++              "command": "cargo test --workspace",
++              "timeout": "45m"
++            },
++            {
++              "kind": "no_unmerged_high_value_worktrees"
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "reviewer",
++            "tester"
++          ]
++        }
++      },
++      {
++        "id": "P06_parity_harness",
++        "name": "Parity harness and corpus engine",
++        "objective": "Build the reference-vs-target differential harness, in-memory/ramdisk test execution, corpus manifest, evidence JSONL, and report generator.",
++        "depends_on": [
++          "P03_foundation_runtime",
++          "P04_feature_ledger"
++        ],
++        "parallel_group": "testing",
++        "agents": {
++          "tester": 5,
++          "parity_judge": 3,
++          "performance_lead": 1
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/parity/corpus-manifest.json",
++            "target/zyal/parity/evidence.jsonl",
++            "target/zyal/parity/report.md"
++          ],
++          "gates": [
++            {
++              "kind": "parity_case_floor",
++              "gte": 500
++            },
++            {
++              "kind": "reference_target_diff_harness",
++              "must_exist": true
++            },
++            {
++              "kind": "ramdisk_or_memory_mode",
++              "must_exist": true
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "parity_judge"
++          ]
++        }
++      },
++      {
++        "id": "P07_gap_closure",
++        "name": "Parity gap closure loop",
++        "objective": "Iteratively close mismatches by clustering failures, assigning focused agents, and preserving each fix as a durable memory and regression test.",
++        "depends_on": [
++          "P05_parallel_implementation",
++          "P06_parity_harness"
++        ],
++        "parallel_group": "hardening",
++        "agents": {
++          "implementer": 10,
++          "tester": 5,
++          "parity_judge": 3,
++          "memory_curator": 1
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/parity/gap-ledger.json",
++            "target/zyal/parity/closure-report.md"
++          ],
++          "gates": [
++            {
++              "kind": "parity_pass_rate",
++              "gte": 0.98
++            },
++            {
++              "kind": "unexplained_gap_count",
++              "lte": 0
++            },
++            {
++              "kind": "regression_tests_added_for_fixed_gaps",
++              "gte": 0.95
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "parity_judge",
++            "tester"
++          ]
++        }
++      },
++      {
++        "id": "P08_performance_stabilization",
++        "name": "Performance stabilization",
++        "objective": "Benchmark reference and candidate, identify hotspots through graph/profile evidence, and close material regressions without sacrificing parity.",
++        "depends_on": [
++          "P07_gap_closure"
++        ],
++        "parallel_group": "hardening",
++        "agents": {
++          "performance_lead": 3,
++          "implementer": 6,
++          "tester": 2,
++          "critic": 1
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/perf/baseline.json",
++            "target/zyal/perf/report.md"
++          ],
++          "gates": [
++            {
++              "kind": "perf_regression_ceiling",
++              "metric": "p95_latency_ratio",
++              "lte": 1.2
++            },
++            {
++              "kind": "parity_pass_rate",
++              "gte": 0.98
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "performance_lead",
++            "parity_judge"
++          ]
++        }
++      },
++      {
++        "id": "P09_security_reliability_docs",
++        "name": "Security, reliability, and docs hardening",
++        "objective": "Run adversarial review, fuzz/property tests, failure injection, operational docs, and rollback/release readiness checks.",
++        "depends_on": [
++          "P07_gap_closure"
++        ],
++        "parallel_group": "hardening",
++        "agents": {
++          "security_reviewer": 2,
++          "tester": 4,
++          "writer": 2,
++          "critic": 2
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/security/review.md",
++            "target/zyal/reliability/failure-injection.json",
++            "target/zyal/docs/release-notes.md"
++          ],
++          "gates": [
++            {
++              "kind": "no_critical_security_findings"
++            },
++            {
++              "kind": "docs_cover_acceptance_matrix",
++              "gte": 0.9
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "security_reviewer",
++            "writer"
++          ]
++        }
++      },
++      {
++        "id": "P10_release_and_long_tail",
++        "name": "Release, archive, and long-tail loop",
++        "objective": "Fuse all branches, run final proof lanes, archive memory/evidence, publish remaining known gaps, and convert unresolved gaps into durable follow-up tasks.",
++        "depends_on": [
++          "P08_performance_stabilization",
++          "P09_security_reliability_docs"
++        ],
++        "parallel_group": "release",
++        "agents": {
++          "release_captain": 2,
++          "tester": 4,
++          "memory_curator": 2,
++          "critic": 2
++        },
++        "exit": {
++          "required_artifacts": [
++            "target/zyal/release/final-proof.json",
++            "target/zyal/release/memory-archive.jsonl",
++            "target/zyal/release/known-gaps.md"
++          ],
++          "gates": [
++            {
++              "kind": "shell",
++              "command": "cargo test --workspace",
++              "timeout": "60m"
++            },
++            {
++              "kind": "final_parity_report_approved"
++            },
++            {
++              "kind": "memory_archive_written"
++            }
++          ],
++          "signoff": [
++            "supervisor",
++            "release_captain",
++            "critic"
++          ]
++        }
++      }
++    ]
++  }
++}
+diff --git a/docs/ZYAL/SUPER_REASONING_WORKFLOWS.md b/docs/ZYAL/SUPER_REASONING_WORKFLOWS.md
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/docs/ZYAL/SUPER_REASONING_WORKFLOWS.md
+@@ -0,0 +1,375 @@
++# ZYAL Super Reasoning Workflows — Engineering Spec
++
++## Goal
++
++Add a first-class ZYAL workflow substrate for extremely ambitious, long-running challenges where many weaker agents must compound knowledge, coordinate safely, and converge all the way to a verified result. The target class is not one domain such as Redis; it is any project that needs macro planning, parallel work, durable memory, reference-vs-target evaluation, performance hardening, and final sign-off.
++
++Examples of target classes:
++
++- Greenfield parity rewrites of complex systems.
++- Multi-month-scale refactors compressed into an autonomous swarm run.
++- Open-ended scientific or mathematical research programs where hypotheses, evidence, contradictions, and negative results must survive compaction.
++- Large compatibility ports where the true finish line is “reference behavior plus performance plus operational quality,” not merely “it builds.”
++
++## Current-state reading
++
++Jekko already has unusually strong primitives for this direction:
++
++- Rust-native CLI/TUI/server/runtime/store/provider architecture.
++- `zyalc` with strict source-profile detection and generated-zone support.
++- `sandboxctl` and declarative sandbox lanes for isolated worktrees and artifact export.
++- `jekko-store` SQLite persistence with migration discipline and in-memory support.
++- `cogcore`, which already models append-only memory, concept/index state, feedback, contradiction pressure, forgetting, and deterministic rebuild.
++- `agent-search`, which already separates search/provider transport from provenance and deduped evidence records.
++- Advanced memory and QBank/benchmark assets that can be reused as gates for long-horizon memory quality.
++
++The missing piece is a contract that turns these primitives into a durable “ambitious challenge supervisor.” Existing ZYAL has many useful blocks, but huge projects need a single high-level DAG that binds phases, agents, memory, evidence, repo graph, parity testing, performance loops, and sign-off into one runtime object.
++
++## Proposed patch summary
++
++The companion patch introduces:
++
++1. **ZYAL Profile D: `target=superworkflow`**  
++   A source-level ZYAL profile that compiles an ambitious workflow YAML body into a canonical JSON manifest.
++
++2. **`zyal-supervisor` crate**  
++   A minimal runtime substrate that validates manifests, computes phase readiness from dependency DAGs, persists run/phase/task/memory/evidence/sign-off state in SQLite, and exposes a CLI for host/runtime integration.
++
++3. **Generic ambitious workflow template**  
++   `agent/zyal/ambitious-superworkflow.zyal` captures an 11-phase macro plan suitable for parity rewrites, large ports, or serious research workflows without encoding Redis-specific behavior.
++
++4. **Engineering documentation**  
++   A new `docs/ZYAL/SUPER_REASONING_WORKFLOWS.md` describes the architecture, memory model, swarm coordination, phase gates, parity harness pattern, and rollout plan.
++
++## Design principles
++
++### 1. Make the macro plan explicit before coding
++
++The supervisor requires 9–12 macro phases. This constraint intentionally forces decomposition before implementation starts. A good ambitious run should include:
++
++1. Problem framing and invariants.
++2. Reference and acceptance modeling.
++3. Architecture and code/repo graph indexing.
++4. Foundation runtime vertical slice.
++5. Feature/task ledger generation.
++6. Parallel implementation.
++7. Differential/parity harness.
++8. Gap closure loop.
++9. Performance stabilization.
++10. Security/reliability/docs hardening.
++11. Release, archive, and long-tail task capture.
++
++Nine phases are enough for simpler projects; twelve leave room for domain-specific splits. Fewer phases hides risk; more phases tends to create sprawl.
++
++### 2. Split planning, execution, and sign-off
++
++Weak agents become powerful only when roles are separated:
++
++- **Planner agents** create phase/task decomposition.
++- **Reference mappers** enumerate expected behavior.
++- **Implementers** make scoped changes in isolated worktrees.
++- **Reviewers/critics** challenge assumptions and catch sprawl.
++- **Parity judges** own reference-vs-target diffs.
++- **Performance leads** own profile and regression evidence.
++- **Memory curators** distill lessons, failures, and decisions.
++- **Graph indexers** maintain code-symbol/test/dependency graph state.
++- **Release captains** fuse, prove, archive, and publish residual gaps.
++
++The supervisor should not allow a phase to close just because an implementer says it is done. Closure requires artifacts, gates, and sign-off.
++
++### 3. Treat memory as an active runtime, not a transcript
++
++Every long run needs several memory layers:
++
++| Layer | Purpose | Persistence |
++|---|---|---|
++| Run WAL | Immutable action/decision/evidence history | JSONL/SQLite append-only |
++| Working memory | Current phase plan, owners, blockers | SQLite phase/task tables |
++| Knowledge memory | Durable lessons, invariants, negative results, design decisions | SQLite + cogcore-backed recall |
++| Evidence memory | External sources, benchmark reports, parity evidence, citations | provenance tables / JSONL |
++| Repo graph memory | Symbols, files, tests, call/import edges, hotspots | SQLite graph tables |
++
++Memory must be injectable at phase start and task assignment time. It should not require the entire raw transcript to fit into context.
++
++### 4. Make negative memory first-class
++
++For huge projects, failed attempts are valuable. The system should preserve:
++
++- Rejected designs and the reason they failed.
++- Parity gaps that were misdiagnosed.
++- Performance fixes that hurt correctness.
++- Tests that exposed flawed assumptions.
++- Source evidence that contradicted the current plan.
++
++Negative memory prevents a swarm of weaker agents from repeatedly rediscovering the same dead ends.
++
++### 5. Use a repo graph to reduce future edit cost
++
++The proposed `zyal_super_repo_symbols` and `zyal_super_repo_edges` tables are intentionally simple. They can be populated by tree-sitter, LSP, SCIP, rustdoc JSON, cargo metadata, language-specific analyzers, or direct grep fallbacks.
++
++Minimum useful graph nodes:
++
++- Files.
++- Functions/methods/types.
++- Public APIs.
++- Tests and fixtures.
++- Benchmarks.
++- Protocol/command handlers.
++- Performance hotspots.
++
++Minimum useful graph edges:
++
++- `contains` file → symbol.
++- `calls` symbol → symbol.
++- `imports` file → module/file.
++- `tests` test → symbol/API.
++- `covers` fixture/corpus → behavior/API.
++- `regresses` benchmark → symbol/hotspot.
++
++The graph allows future agents to ask, “What tests cover this behavior?”, “What code is near this parity gap?”, and “What should I not touch without retesting?”
++
++### 6. Keep parallelism bounded by dependencies and merge risk
++
++Parallelism is powerful but dangerous. The supervisor should enforce:
++
++- Phase DAG dependencies.
++- Task-level leases.
++- Worktree isolation.
++- Maximum touched-file budgets.
++- Maximum parallel phases and tasks.
++- Required merge reports.
++- Graph-aware conflict detection.
++- No unmerged high-value worktree cleanup without archival.
++
++A swarm should not be a pile of unsynchronized patches.
++
++### 7. Promote parity and performance to first-class gates
++
++For compatibility projects, tests are not enough. The workflow needs an explicit reference-vs-target harness:
++
++- Reference adapter.
++- Candidate adapter.
++- Corpus manifest.
++- Deterministic evidence JSONL.
++- Failure clustering.
++- Regression promotion for fixed gaps.
++- In-memory or ramdisk execution mode.
++- Report generator tied to evidence rather than opinion.
++
++The same pattern also works outside Redis-like systems: reference implementation vs new implementation, baseline proof vs new theorem attempt, old behavior vs refactored behavior, or simulation oracle vs optimized engine.
++
++### 8. Preserve human-compatible sign-off
++
++The supervisor should write artifacts a human can inspect:
++
++- Problem framing.
++- Phase DAG.
++- Architecture proposal.
++- Feature/task ledger.
++- Merge report.
++- Parity report.
++- Performance report.
++- Security/reliability report.
++- Final proof report.
++- Known gaps.
++- Memory archive.
++
++The goal is autonomous progress, not opaque autonomy.
++
++## Runtime model
++
++### Manifest lifecycle
++
++1. Author `agent/zyal/<name>.zyal` with `target=superworkflow`.
++2. `zyalc compile` validates phase shape and emits `agent/superworkflows/<name>.superworkflow.json`.
++3. `zyal-supervisor validate` performs runtime-grade validation.
++4. `zyal-supervisor init-run` creates a persistent run row and phase rows in SQLite.
++5. Host runtime asks `zyal-supervisor ready` for executable phases.
++6. Agents claim tasks inside ready phases.
++7. Agents write evidence, memory, repo graph updates, and patches.
++8. Phase gates run.
++9. Reviewers sign off.
++10. Supervisor marks phase complete and unlocks dependent phases.
++11. Final phase archives memory and remaining known gaps.
++
++### Store schema
++
++The patch adds these SQLite tables:
++
++- `zyal_super_runs`
++- `zyal_super_phases`
++- `zyal_super_tasks`
++- `zyal_super_memory`
++- `zyal_super_evidence`
++- `zyal_super_repo_symbols`
++- `zyal_super_repo_edges`
++- `zyal_super_signoffs`
++
++This is intentionally small. It can later be integrated into `jekko-store` migrations once the API stabilizes.
++
++### Phase state machine
++
++Allowed states:
++
++- `pending`
++- `ready`
++- `running`
++- `blocked`
++- `review`
++- `complete`
++- `parked`
++- `failed`
++
++Recommended transitions:
++
++```text
++pending -> ready -> running -> review -> complete
++pending -> blocked -> ready
++running -> blocked
++running -> failed
++running -> parked
++review -> running
++review -> complete
++```
++
++The host should reject `complete` unless required artifacts and gates pass.
++
++## Phase template for ambitious parity/rewrite work
++
++The proposed default has 11 phases:
++
++1. `P00_frame_ambition`
++2. `P01_reference_and_acceptance`
++3. `P02_architecture_and_graph_index`
++4. `P03_foundation_runtime`
++5. `P04_feature_ledger`
++6. `P05_parallel_implementation`
++7. `P06_parity_harness`
++8. `P07_gap_closure`
++9. `P08_performance_stabilization`
++10. `P09_security_reliability_docs`
++11. `P10_release_and_long_tail`
++
++For a Redis-like challenge, these phases would map naturally to command/API inventory, protocol semantics, persistence behavior, replication/cluster semantics, differential command corpus, latency/throughput benchmarks, and final known-gap closure. But those details belong in task ledgers and adapters, not the generic ZYAL contract.
++
++## Parity harness pattern
++
++The Redline-style pattern should be generalized:
++
++```text
++case -> reference adapter -> normalized result
++case -> candidate adapter -> normalized result
++normalized diff -> evidence JSONL -> report -> gap ledger -> regression test
++```
++
++Key requirements:
++
++- Deterministic corpus manifest.
++- Explicit reference and candidate adapters.
++- Per-case raw evidence.
++- Normalized diff schema.
++- Clustered gap ledger.
++- Promotion of fixed gaps into regression tests.
++- In-memory or ramdisk temp roots for high-volume test execution.
++- Separate correctness and performance reports.
++
++## Memory injection policy
++
++At phase start, inject:
++
++- Objective and invariants.
++- Phase-specific acceptance criteria.
++- Recently fixed gaps.
++- Recently failed approaches.
++- Graph hotspots for touched areas.
++- Relevant prior sign-offs.
++- Current parity/performance/security deltas.
++
++At task assignment, inject only:
++
++- Task scope.
++- Related symbols/tests from repo graph.
++- Relevant memory snippets.
++- Required artifacts/gates.
++- Known blockers and negative memories.
++
++This keeps weaker agents focused and prevents context bloat.
++
++## Anti-sprawl controls
++
++The system should enforce or at least record:
++
++- Scope contract per phase and task.
++- Touched-file budget.
++- No primary-checkout edits by default.
++- Worktree lease ownership.
++- Required patch export.
++- Merge report and conflict summary.
++- Review quorum for phase completion.
++- Automatic parking of unresolved long-tail tasks.
++- No final “done” without known-gap report.
++
++## Rollout plan
++
++### Milestone 1 — Compile and validate
++
++- Add Profile D to `zyalc`.
++- Add manifest validation.
++- Add example template and generated zone.
++- Add documentation.
++
++### Milestone 2 — Durable run state
++
++- Land `zyal-supervisor` store and CLI.
++- Add phase readiness and sign-off commands.
++- Add smoke tests around manifest validation and SQLite state.
++
++### Milestone 3 — Host integration
++
++- Wire the runtime to create runs from SuperWorkflow manifests.
++- Expose ready phases/tasks to the swarm controller.
++- Route memory/evidence writes into the store.
++
++### Milestone 4 — Repo graph and parity harness
++
++- Add graph indexer adapters.
++- Add reference-vs-target parity runner contract.
++- Add report schemas and corpus manifests.
++
++### Milestone 5 — Full autonomous hardening loop
++
++- Add failure clustering.
++- Add performance regression loop.
++- Add release/archive gates.
++- Add final proof bundle generation.
++
++## Acceptance criteria
++
++The implementation is good enough when it can run a large generic challenge and produce:
++
++- A phase DAG with 9–12 phases.
++- Persistent run and phase state across restarts.
++- Parallel worktree task execution without scope sprawl.
++- Durable memory of decisions, evidence, failures, and sign-offs.
++- Repo graph entries that help future edits.
++- Reference-vs-target parity evidence.
++- Gap closure reports.
++- Performance reports.
++- Final proof bundle and known-gap archive.
++
++## Risks and mitigations
++
++| Risk | Mitigation |
++|---|---|
++| The swarm creates incoherent patches | Worktree isolation, task leases, graph-aware merge reports, review quorum |
++| Agents lose context after compaction | Phase summaries, memory injection, run WAL, negative memory |
++| False “done” from shallow tests | Parity harness, evidence JSONL, gap ledger, final proof bundle |
++| Over-engineering one domain | Keep domain specifics in adapters/task ledgers, not the SuperWorkflow schema |
++| Graph database slows the run | Start with SQLite graph tables; allow optional Kuzu/Neo4j adapters later |
++| Weak agents repeat mistakes | Negative memory and failure-cluster injection |
++| Performance ignored until too late | Dedicated performance phase plus parity-preserving perf gates |
++| Long-tail gaps disappear | Required known-gap archive and parked task ledger |
++
++## Why this is the right next layer
++
++Jekko already has source compilation, sandboxing, persistence, memory primitives, evidence provenance, and benchmark assets. A SuperWorkflow layer turns those into an operating system for ambitious reasoning: explicit plans, durable state, active memory, parallel work with bounded risk, and proof-driven convergence.

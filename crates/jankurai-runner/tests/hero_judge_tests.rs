@@ -193,9 +193,7 @@ fn read_model_attempt_outcome_states(events_path: &Path, kind: &str) -> Vec<Stri
         .unwrap()
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
-        .filter(|event| {
-            event["kind"] == "model_attempt_outcome" && event["data"]["kind"] == kind
-        })
+        .filter(|event| event["kind"] == "model_attempt_outcome" && event["data"]["kind"] == kind)
         .map(|event| event["data"]["state"].as_str().unwrap().to_string())
         .collect()
 }

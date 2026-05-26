@@ -1,0 +1,973 @@
+diff --git a/crates/jankurai-runner/src/port.rs b/crates/jankurai-runner/src/port.rs
+index 9404b66b6..9f4b7f2d1 100644
+--- a/crates/jankurai-runner/src/port.rs
++++ b/crates/jankurai-runner/src/port.rs
+@@ -8,6 +8,9 @@ use crate::model_policy::ModelPolicy;
+ /// Maximum worker cap for autonomous port runs.
+ pub const MAX_PORT_WORKERS: usize = 10;
+ 
++/// Canonical macro-stage count for ambitious replacement/port workflows.
++pub const DEFAULT_SUPER_REASONING_STAGE_COUNT: usize = 12;
++
+ /// Port target request captured from a ZYAL file or CLI prompt.
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ pub struct PortTargetRequest {
+@@ -226,31 +229,26 @@ fn default_live_max_parallel() -> usize {
+     10
+ }
+ 
+-/// Build a generic starter plan without target-specific hard-coding.
++/// Build a generic, evidence-first starter plan without target-specific hard-coding.
++///
++/// This is deliberately not Redis-, SQLite-, or protocol-specific. A live
++/// reducer may refine the plan from target evidence, but the deterministic
++/// fallback must still give weaker agents a disciplined 9-12 stage macro plan:
++/// discover the contract, build an atlas, plan, decompose, implement bounded
++/// slices, fuse, then close parity/perf gaps before release signoff.
+ pub fn draft_master_plan(target: PortTargetRequest) -> PortMasterPlan {
+-    let names = [
+-        (
+-            "discover",
+-            "Discover target behavior, docs, tests, and public contracts.",
+-        ),
+-        (
+-            "skeleton",
+-            "Create the replacement project skeleton and compatibility adapters.",
+-        ),
+-        (
+-            "correctness",
+-            "Implement required behavior behind target-switched parity cases.",
+-        ),
+-        (
+-            "integration",
+-            "Fuse phases and heal cross-phase regressions.",
+-        ),
+-        (
+-            "parity",
+-            "Close exhaustive correctness and performance parity gaps.",
+-        ),
+-    ];
++    let names = super_reasoning_stage_blueprint();
+     let stages: Vec<PortStage> = names
+         .iter()
+         .enumerate()
+         .map(|(idx, (id, objective))| PortStage {
+             id: format!("stage-{}", id),
+             ordinal: idx + 1,
+             name: id.to_string(),
+             objective: (*objective).to_string(),
+             status: if idx == 0 {
+                 PhaseStatus::Drafting
+@@ -277,6 +275,60 @@ pub fn draft_master_plan(target: PortTargetRequest) -> PortMasterPlan {
+     }
+ }
+ 
++/// Canonical generic stage blueprint for super-reasoning port/rewrite work.
++///
++/// The names are intentionally abstract so a Redis-compatible server, a
++/// database engine, a compiler, or a small fixture all enter the same host-
++/// controlled workflow. Target-specific behavior is discovered through the
++/// repo graph, evidence inputs, parity cases, and model/reducer artifacts.
++pub fn super_reasoning_stage_blueprint(
++) -> [(&'static str, &'static str); DEFAULT_SUPER_REASONING_STAGE_COUNT] {
++    [
++        (
++            "target_contract",
++            "Capture target/replacement request, reference safety boundaries, and success metrics.",
++        ),
++        (
++            "evidence_atlas",
++            "Build repo, docs, tests, benchmark, and reference-behavior atlas with provenance receipts.",
++        ),
++        (
++            "behavior_inventory",
++            "Inventory externally observable behavior, APIs, protocols, persistence, errors, and edge cases.",
++        ),
++        (
++            "macro_plan_tournament",
++            "Run blind stage-plan lanes, critique them, and reduce to one ordered macro plan.",
++        ),
++        (
++            "phase_dag",
++            "Decompose the macro plan into dependency-aware tasks with disjoint write scopes and proof lanes.",
++        ),
++        (
++            "scaffold",
++            "Create or repair skeleton, adapters, parity harnesses, CI lanes, and graph export plumbing.",
++        ),
++        (
++            "vertical_slices",
++            "Implement bounded behavior slices behind approved parity tests and scoped worker branches.",
++        ),
++        (
++            "integration_fusion",
++            "Merge compatible worktree lanes, resolve graph conflicts, and heal cross-phase regressions.",
++        ),
++        (
++            "parity_expansion",
++            "Generate, review, and approve target-switched parity cases until behavior coverage is explicit.",
++        ),
++        (
++            "correctness_gap_closure",
++            "Close missing, skipped, failed, or uncovered parity gaps through follow-up tasks.",
++        ),
++        (
++            "performance_gap_closure",
++            "Close latency, throughput, memory, and resource gaps against reference budgets without correctness regression.",
++        ),
++        (
++            "release_readiness",
++            "Run final hardening, Jankurai gate, rollback proof, docs, clean tree, and acceptance receipts.",
++        ),
++    ]
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+@@ -304,10 +356,13 @@ mod tests {
+         };
+         let plan = draft_master_plan(req);
+-        assert_eq!(plan.stages.first().unwrap().name, "discover");
+-        assert_eq!(plan.stages.last().unwrap().name, "parity");
++        assert_eq!(plan.stages.len(), DEFAULT_SUPER_REASONING_STAGE_COUNT);
++        assert_eq!(plan.stages.first().unwrap().name, "target_contract");
++        assert_eq!(plan.stages.last().unwrap().name, "release_readiness");
+         assert_eq!(plan.tasks.len(), plan.stages.len());
+         assert!(plan
+             .tasks
+             .iter()
+             .all(|t| t.status == MasterTaskStatus::Queued));
++        assert!(plan.tasks.iter().all(|t| t.proof_lane.contains("zyal-port-fast")));
+     }
+ }
+diff --git a/crates/jankurai-runner/src/port_runner.rs b/crates/jankurai-runner/src/port_runner.rs
+index 76b7d94ef..e2b77d92b 100644
+--- a/crates/jankurai-runner/src/port_runner.rs
++++ b/crates/jankurai-runner/src/port_runner.rs
+@@ -13,7 +13,9 @@ use crate::jankurai_gate::{self, AuditSnapshot, JankuraiGatePolicy};
+ use crate::model_client::{ModelCallReceipt, ModelClient};
+ use crate::model_policy::ModelTaskKind;
+-use crate::port::{draft_master_plan, PortMasterPlan, PortRuntimeOptions, PortTargetRequest};
++use crate::port::{
++    draft_master_plan, PortMasterPlan, PortRuntimeOptions, PortTargetRequest, DEFAULT_SUPER_REASONING_STAGE_COUNT,
++};
+ use crate::reasoning::AdvancedReasoningConfig;
+ use crate::reasoning_runner::{run_advanced_reasoning_tick_with_db, AdvancedReasoningSummary};
+ use crate::repo_graph::{build_repo_graph, RepoGraph};
+@@ -334,8 +336,8 @@ mod tests {
+         .await
+         .unwrap();
+ 
+-        assert_eq!(report.plan.stages.len(), 5);
+-        assert_eq!(report.fake_task_completed.as_deref(), Some("task-discover"));
++        assert_eq!(report.plan.stages.len(), DEFAULT_SUPER_REASONING_STAGE_COUNT);
++        assert_eq!(report.fake_task_completed.as_deref(), Some("task-target_contract"));
+         let event_path = dir.path().join("target/zyal/runs/run-port-1/events.jsonl");
+         let events = fs::read_to_string(event_path).unwrap();
+         assert!(events.contains("model_outcome"));
+diff --git a/crates/jankurai-runner/src/reasoning.rs b/crates/jankurai-runner/src/reasoning.rs
+index a8e790473..88ed7aa91 100644
+--- a/crates/jankurai-runner/src/reasoning.rs
++++ b/crates/jankurai-runner/src/reasoning.rs
+@@ -111,6 +111,10 @@ pub enum ReasoningArtifactKind {
+     ContextPack,
+     /// Candidate stage plan.
+     StageProposal,
++    /// Reduced macro plan after blind-lane tournament and critique.
++    MacroPlan,
++    /// Dependency-aware phase/task graph with write scopes and proof lanes.
++    PhaseDag,
+     /// Critique or objection set.
+     Critique,
+     /// Final master plan decision.
+@@ -123,10 +127,22 @@ pub enum ReasoningArtifactKind {
+     BuildReceipt,
+     /// Verification receipt.
+     VerificationReceipt,
++    /// Repository/function relationship graph snapshot.
++    FunctionGraph,
++    /// Candidate or approved target-switched parity case.
++    ParityCase,
+     /// Parity gap report.
+     ParityGap,
++    /// Performance gap report.
++    PerfGap,
++    /// Human/critic/reducer signoff receipt for a phase or final gate.
++    SignoffReceipt,
++    /// Explicit contradiction between two claims/artifacts that must be resolved.
++    Contradiction,
+     /// Baseline-vs-tournament reasoning benchmark.
+     ReasoningBenchmark,
+     /// Durable memory candidate.
+@@ -391,10 +407,25 @@ impl MemoryCapsule {
+     /// Return true if this capsule is eligible for permanent memory.
+     pub fn can_write_permanent(&self) -> bool {
+-        matches!(self.status.as_str(), "verified" | "rejected")
+-            && self.evidence_level >= EvidenceLevel::ExternalGrounding
+-            && !self.artifact_id.trim().is_empty()
++        self.is_verified_or_rejected()
++            && self.has_grounded_evidence()
++            && self.has_nonempty_provenance()
+     }
++
++    /// Verified positive memory and rejected/negative memory are both useful;
++    /// unreviewed candidate memory is not allowed to compound.
++    pub fn is_verified_or_rejected(&self) -> bool {
++        matches!(self.status.as_str(), "verified" | "rejected")
++    }
++
++    /// Permanent memory needs at least source/log/code grounding.
++    pub fn has_grounded_evidence(&self) -> bool {
++        self.evidence_level >= EvidenceLevel::ExternalGrounding
++    }
++
++    /// Permanent memory must point back to a durable artifact.
++    pub fn has_nonempty_provenance(&self) -> bool {
++        !self.artifact_id.trim().is_empty()
++    }
+ }
+ 
+ /// Per-model reliability accumulator.
+@@ -547,5 +568,32 @@ mod tests {
+             content_hash: "hash".into(),
+         };
+         assert!(capsule.can_write_permanent());
++
++        let mut candidate = capsule.clone();
++        candidate.status = "candidate".into();
++        assert!(!candidate.can_write_permanent());
++
++        let mut unsupported = capsule.clone();
++        unsupported.evidence_level = EvidenceLevel::IndependentAgreement;
++        assert!(!unsupported.can_write_permanent());
++
++        let mut missing_provenance = capsule;
++        missing_provenance.artifact_id.clear();
++        assert!(!missing_provenance.can_write_permanent());
++    }
++
++    #[test]
++    fn super_reasoning_artifact_kinds_are_storage_safe() {
++        let mut artifact = ReasoningArtifact::new(
++            "macro-plan-1",
++            "run",
++            ReasoningRole::Reducer,
++            ReasoningArtifactKind::MacroPlan,
++            "12-stage macro plan",
++            "Reduced from blind planner lanes and critic objections.",
++            EvidenceLevel::ExternalGrounding,
++            0.9,
++            json!({"stage_count": 12}),
++        );
++        artifact.prepare_for_storage(&AdvancedReasoningConfig::default());
++        assert_eq!(artifact.raw_reasoning, None);
++        assert!(artifact.confidence <= DEFAULT_CONFIDENCE_CAP);
+     }
+ }
+diff --git a/docs/ZYAL/CHANGELOG.md b/docs/ZYAL/CHANGELOG.md
+index 2671c10bf..e76b0d11a 100644
+--- a/docs/ZYAL/CHANGELOG.md
++++ b/docs/ZYAL/CHANGELOG.md
+@@ -7,6 +7,10 @@
+ - Added three semantic improvement-finder runbooks: simple, advanced, and insane.
+ - Added three semantic feature-maker runbooks: simple, advanced, and insane.
++- Added the target-agnostic super-reasoning port swarm runbook plus the
++  `docs/ZYAL/SUPER_REASONING_WORKFLOWS.md` engineering spec for ambitious
++  replacement builds with graph-fed workers, verified memory compounding,
++  phase signoff, parity generation, and performance gap closure.
+ - Kept the contract version at `2.6.0`; this is a docs/spec-governance update,
+   not a schema bump.
+ 
+diff --git a/docs/ZYAL/PORT_WORKFLOW.md b/docs/ZYAL/PORT_WORKFLOW.md
+index fb6ba7c64..889e90d45 100644
+--- a/docs/ZYAL/PORT_WORKFLOW.md
++++ b/docs/ZYAL/PORT_WORKFLOW.md
+@@ -37,6 +37,47 @@ Invalid JSON from a live advanced model call is retried twice and then blocks th
+ run with the parse error recorded in SQLite. Fake deterministic runs may synthesize a structured fallback so local tests do not spend provider budget.
+ 
++## Super Reasoning / Ambitious Port Mode
++
++For replacement builds that are too large for a single agent — for example a
++database, protocol server, compiler, runtime, or major subsystem rewrite — the
++port runner should use a host-owned 12-stage macro plan. The plan is generic and
++target-derived: the runbook names the target and replacement, but the stage
++details come from evidence, repo graph summaries, parity cases, and reducer
++receipts rather than baked target-specific phases.
++
++The deterministic starter plan is:
++
++1. `target_contract` — capture target/replacement request, reference safety boundaries, success metrics.
++2. `evidence_atlas` — build repo/docs/tests/benchmark/reference-behavior atlas with provenance.
++3. `behavior_inventory` — inventory observable APIs, protocols, commands, persistence, errors, edge cases.
++4. `macro_plan_tournament` — run blind stage-plan lanes, critique, and reduce to one ordered macro plan.
++5. `phase_dag` — decompose the macro plan into dependency-aware tasks with disjoint write scopes and proof lanes.
++6. `scaffold` — create skeleton, adapters, parity harnesses, CI lanes, and graph export plumbing.
++7. `vertical_slices` — implement bounded behavior slices behind approved parity tests.
++8. `integration_fusion` — merge compatible worktree lanes, resolve graph conflicts, and heal regressions.
++9. `parity_expansion` — generate, review, and approve target-switched parity cases until behavior coverage is explicit.
++10. `correctness_gap_closure` — close missing, skipped, failed, or uncovered parity gaps.
++11. `performance_gap_closure` — close latency, throughput, memory, and resource gaps without correctness regression.
++12. `release_readiness` — run final hardening, Jankurai gate, rollback proof, docs, clean tree, and acceptance receipts.
++
++Promotion between stages is host-gated. A reducer may combine only verified
++artifacts; memory writes require verified or rejected status plus provenance;
++reference repositories are read-only; and every parallel worker must declare a
++write scope that the repo graph can prove does not conflict with active work.
++
++The graph database should be treated as the working nervous system for the run:
++files/modules/functions/methods/tests/docs/parity cases/phases/tasks become
++nodes, and contains/imports/calls/tests/parity_covers/phase_owns/changed_by/
++depends_on edges decide affected tests, blast radius, parallel-safety, and gap
++ownership. Lightweight graph export already exists; ambitious mode hardens it
++into a persisted query surface for workers and merge gates.
++
++Parity execution should prefer in-memory or RamDisk/tmpfs execution when the
++target adapter supports it. Missing, skipped, failed, perfless, or
++performance-over-budget required cases are converted into follow-up tasks and
++block final completion until `summary.json` reports `passed` and `gaps.json` is
++empty.
++
+ ## Safety Rules
+ 
+ - Primary worktree must be clean unless the run explicitly allows dirty.
+diff --git a/docs/ZYAL/SUPER_REASONING_WORKFLOWS.md b/docs/ZYAL/SUPER_REASONING_WORKFLOWS.md
+new file mode 100644
+index 000000000..1a92aa6fb
+--- /dev/null
++++ b/docs/ZYAL/SUPER_REASONING_WORKFLOWS.md
+@@ -0,0 +1,235 @@
++# ZYAL Super-Reasoning Workflows
++
++This document defines the target-agnostic workflow for using ZYAL to carry very
++large, multi-hour or multi-day projects through planning, implementation,
++parity, performance, hardening, and final signoff. Redis-in-Rust is a useful
++stress case, but this spec intentionally does not encode Redis phases.
++
++## Invariants
++
++1. The host owns the loop, stages, gates, budgets, sandbox, memory, and final
++   acceptance.
++2. Models produce structured artifacts, not authority. Model-only claims cannot
++   promote code or memory.
++3. Raw chain-of-thought is never stored. Durable memory is summary + evidence +
++   provenance only.
++4. Every phase has a signoff receipt before the next phase can advance.
++5. Parallel workers need declared disjoint write scopes and graph approval.
++6. Reference target repositories are read-only unless a human explicitly grants
++   a temporary destructive-operation lease.
++7. Required parity cases fail closed when absent, skipped, failed, or missing
++   required performance data.
++8. Performance closure must re-run correctness parity before promotion.
++9. Positive and negative memories both compound, but only after verifier or
++   reducer approval.
++10. A clean integration tree, rollback receipt, Jankurai gate, parity pass, and
++    phase signoffs are required for final done.
++
++## Canonical macro stages
++
++| # | Stage | Receipt |
++|---:|---|---|
++| 1 | `target_contract` | target/replacement request, success metrics, reference safety policy |
++| 2 | `evidence_atlas` | repo/docs/tests/benchmarks/reference evidence with hashes |
++| 3 | `behavior_inventory` | behavior map with APIs/protocols/storage/errors/edge cases |
++| 4 | `macro_plan_tournament` | blind planner candidates, critiques, reducer winner |
++| 5 | `phase_dag` | task DAG, dependencies, write scopes, proof lanes |
++| 6 | `scaffold` | skeleton/adapters/parity harness/CI graph plumbing |
++| 7 | `vertical_slices` | scoped implementation slices with parity-backed proof |
++| 8 | `integration_fusion` | merged lanes, conflict resolutions, graph refresh |
++| 9 | `parity_expansion` | generated and approved parity manifest |
++| 10 | `correctness_gap_closure` | missing/skipped/failed gap tasks closed |
++| 11 | `performance_gap_closure` | perf gaps closed without correctness regression |
++| 12 | `release_readiness` | final audit, rollback, docs, clean tree, acceptance packet |
++
++## Agent roles
++
++- `supervisor`: host-owned runner that schedules and gates work.
++- `framer`: turns the user request into success criteria and non-goals.
++- `atlas_worker`: retrieves repo/docs/tests/benchmark/reference evidence.
++- `planner`: proposes stage/task plans in blind lanes.
++- `critic`: falsifies plans, evidence, parity claims, and merge proposals.
++- `reducer`: combines only verified artifacts into host-owned decisions.
++- `builder`: implements bounded task slices in isolated worktrees.
++- `verifier`: runs proof lanes, parity, graph checks, and rollback checks.
++- `memory_curator`: writes verified/rejected capsules only.
++- `parity_generator`: generates target-switched cases and manifests.
++- `perf_auditor`: profiles candidate/reference deltas and creates perf tasks.
++
++## Graph database contract
++
++The graph database should persist at least these nodes:
++
++- files, modules, packages, functions, structs, enums, traits, impls, methods;
++- tests, benchmarks, docs, commands, protocol messages;
++- phases, tasks, parity cases, perf cases;
++- reasoning artifacts, memory capsules, model outcomes.
++
++Required edges:
++
++- contains, imports, calls, tests, implements, derives_from;
++- phase_owns, task_depends_on, reads, writes, changed_by;
++- parity_covers, benchmark_covers, verifies, supports, contradicts, reduces;
++- regressed_by and fixed_by for gap closure.
++
++Required queries:
++
++- `affected_tests(paths)` for checkpoint selection.
++- `parallel_safe(task_a, task_b)` for worker scheduling.
++- `blast_radius(diff)` for anti-sprawl pauses.
++- `parity_coverage(behavior_node)` for missing-case detection.
++- `gap_to_task(gap)` for correctness/perf closure.
++- `memory_recall(query)` for verified positive/negative memory.
++
++## Memory compounding
++
++Memory stores should split by purpose:
++
++- `target_contract_memory`: target facts and success criteria.
++- `phase_decision_memory`: signed decisions and reviewer objections.
++- `negative_memory`: failed plans, falsified assumptions, rejected designs.
++- `contradiction_log`: unresolved claim conflicts.
++- `parity_gap_memory`: missing/skipped/failed case history.
++- `perf_gap_memory`: perf regressions and successful mitigations.
++- `graph_memory`: durable function/test/parity relationships.
++
++Permanent write policy:
++
++```text
++status in {verified, rejected}
++AND evidence_level >= external_grounding
++AND source artifact id is non-empty
++AND raw reasoning is absent
++```
++
++Negative memory requires falsifying evidence. A rejected idea without an actual
++receipt is only scratch memory.
++
++## Parity and performance closure
++
++Each target adapter should declare whether it can run in memory/RamDisk mode.
++When available, parity should use that mode by default for speed and isolation.
++
++Required artifacts:
++
++```text
++target/zyal/parity/<run_id>/generated_manifest.json
++target/zyal/parity/<run_id>/approved-ci.txt
++target/zyal/parity/<run_id>/raw.jsonl
++target/zyal/parity/<run_id>/summary.json
++target/zyal/parity/<run_id>/gaps.json
++```
++
++The host converts each gap into a task with category, priority, graph scope,
++proof lane, rollback instructions, and reviewer requirements. The run cannot
++complete while `gaps.json` is non-empty.
++
++## Anti-sprawl rules
++
++- Initial edit scope must be declared before code changes.
++- Expanding scope requires graph evidence or human approval.
++- Diff budgets are checked per task, phase, and checkpoint.
++- Test deletion, assertion weakening, fake fallback data, and silent catches
++  block promotion.
++- Integration fusion may merge only branches whose proof lanes and graph
++  conflict checks passed.
++- Broad rewrites must be decomposed into phase-owned vertical slices.
++
++## Runtime acceptance checklist
++
++For a super-reasoning run to be considered complete, the host must verify:
++
++- target request captured;
++- evidence atlas written and hashed;
++- macro plan reduced from blind lanes;
++- all phases signed off;
++- graph export current after final checkpoint;
++- parity summary passed;
++- gaps file empty;
++- perf budgets checked;
++- Jankurai gate passed;
++- rollback proof recorded;
++- memory capsules verified/rejected;
++- final worktree clean;
++- no raw chain-of-thought stored.
++
++## Recommended proof lanes
++
++```bash
++rtk cargo test -p jankurai-runner port::tests port_runner::tests reasoning::tests
++rtk just zyal-port-fast
++rtk git diff --check
++rtk jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md
++```
++
++For live model proof, require explicit budget and fail closed on missing
++credentials, invalid JSON after retries, or exhausted call budget.
++
++## Example usage
++
++The generic runbook lives at:
++
++```text
++docs/ZYAL/examples/34-super-reasoning-port-swarm.zyal
++```
++
++It is intentionally parameterized by target/replacement and should be copied or
++templated for specific projects instead of baking target-specific phases into
++the ZYAL example itself.
+diff --git a/docs/ZYAL/examples/34-super-reasoning-port-swarm.zyal b/docs/ZYAL/examples/34-super-reasoning-port-swarm.zyal
+new file mode 100644
+index 000000000..1c4f0aa6b
+--- /dev/null
++++ b/docs/ZYAL/examples/34-super-reasoning-port-swarm.zyal
+@@ -0,0 +1,324 @@
++# Generic super-reasoning port swarm. This is intentionally not Redis-specific:
++# the target contract, stages, parity cases, and perf gaps are runtime-derived
++# from evidence, graph state, and reducer receipts.
++<<<ZYAL v1:daemon id=super-reasoning-port-swarm>>>
++version: v1
++intent: daemon
++confirm: RUN_FOREVER
++
++job:
++  name: "Super reasoning port swarm"
++  objective: |
++    Build a replacement implementation with reference-target parity by using a
++    host-owned 12-stage macro plan, graph-fed workers, verified memory
++    compounding, phase signoff, target-switched parity, and performance gap
++    closure. Keep the workflow target-agnostic; derive behavior and phases from
++    evidence rather than hard-coded target-specific assumptions.
++  risk:
++    - "Ambitious multi-day work can sprawl without graph-scoped phases."
++    - "Weaker agents can compound wrong beliefs unless memory writes are verifier-gated."
++    - "Parity and performance claims are false unless reference/candidate tests are switched and recorded."
++
++arming:
++  preview_hash_required: true
++  host_nonce_required: true
++  reject_inside_code_fence: true
++  reject_from: [assistant_output, tool_output, web_content, mcp_resource]
++  accepted_origins: [trusted_user_message, signed_cli_input, host_ui_button]
++  arm_token_single_use: true
++
++port:
++  target: "ReferenceSystem"
++  replacement: "ReplacementSystem"
++  target_repo: "./references/target"
++  replacement_repo: "."
++  worker_cap: 10
++  resume_store: sqlite
++  require_clean_start: true
++  stage_strategy: runtime_generated_from_evidence
++  macro_plan:
++    strategy: blind_brainstorm_critique_reduce
++    required_stage_count: 12
++    allow_parallel_phases_when: graph_dependency_free
++    require_phase_signoff: true
++    forbid_target_specific_baked_stages: true
++  stop_on:
++    - dirty_primary_worktree
++    - destructive_target_repo_operation
++    - budget_expired
++    - graph_index_stale
++    - jankurai_hard_regression
++    - repeated_worker_quarantine
++    - parity_gate_failed_after_budget
++
++advanced_reasoning:
++  enabled: true
++  worker_cap: 10
++  confidence_cap_without_executable_evidence: 0.35
++  store_raw_reasoning: false
++  blind_lanes: true
++  strategy_diversity_required: true
++  roles:
++    - framer
++    - retriever
++    - planner
++    - critic
++    - verifier
++    - reducer
++    - memory_curator
++    - parity_generator
++    - perf_auditor
++  reducer:
++    model: jnoccio/power-winner
++    may_only_combine_verified_artifacts: true
++    reject_unresolved_contradictions: true
++  artifacts:
++    require_schema: true
++    require_content_hash: sha256
++    evidence_levels:
++      unsupported: E0
++      internal_consistency: E1
++      independent_agreement: E2
++      external_grounding: E3
++      executable: E4
++      adversarial_survival: E5
++      historical_durability: E6
++  memory:
++    write_positive_after: verifier_approval
++    write_negative_after: falsifying_evidence
++    permanent_write_requires:
++      - verified_or_rejected_status
++      - verifier_or_reducer_approval
++      - nonempty_source_artifact
++      - no_raw_reasoning
++    poison_guard: true
++
++repo_graph:
++  enabled: true
++  store: sqlite
++  export: "target/zyal/reasoning/${run.id}/reasoning-graph.json"
++  nodes:
++    - files
++    - modules
++    - packages
++    - functions
++    - structs
++    - enums
++    - traits
++    - impls
++    - methods
++    - tests
++    - benchmarks
++    - docs
++    - commands
++    - protocol_messages
++    - phases
++    - tasks
++    - parity_cases
++    - perf_cases
++    - memory_capsules
++  edges:
++    - contains
++    - imports
++    - calls
++    - tests
++    - implements
++    - derives_from
++    - parity_covers
++    - benchmark_covers
++    - phase_owns
++    - task_depends_on
++    - reads
++    - writes
++    - changed_by
++    - supports
++    - contradicts
++    - reduces
++    - verifies
++  queries_required:
++    - affected_tests
++    - parallel_safe
++    - blast_radius
++    - parity_coverage
++    - gap_to_task
++    - memory_recall
++  update_on: [run_start, read, edit, checkpoint, parity_result, phase_signoff]
++  feed_workers: true
++
++memory:
++  stores:
++    target_contract_memory:
++      scope: run
++      retention: until_archive
++      write_policy: append_only
++      read_policy: search
++      searchable: true
++      path: target/zyal/reasoning/${run.id}/target-contract.md
++    phase_decision_memory:
++      scope: run
++      retention: until_archive
++      write_policy: append_only
++      read_policy: search
++      searchable: true
++      path: target/zyal/reasoning/${run.id}/phase-decisions.jsonl
++    negative_memory:
++      scope: repo
++      retention: permanent
++      write_policy: append_only
++      read_policy: search
++      searchable: true
++      path: target/zyal/reasoning/${run.id}/negative-memory.jsonl
++    contradiction_log:
++      scope: run
++      retention: until_archive
++      write_policy: append_only
++      read_policy: search
++      searchable: true
++      path: target/zyal/reasoning/${run.id}/contradictions.jsonl
++    parity_gap_memory:
++      scope: repo
++      retention: permanent
++      write_policy: upsert
++      read_policy: search
++      searchable: true
++      path: target/zyal/parity/${run.id}/gap-memory.jsonl
++    perf_gap_memory:
++      scope: repo
++      retention: permanent
++      write_policy: upsert
++      read_policy: search
++      searchable: true
++      path: target/zyal/parity/${run.id}/perf-gap-memory.jsonl
++  provenance:
++    track_source: true
++    hash_chain: true
++  redaction:
++    patterns: [secret, token, password, API_KEY, PRIVATE_KEY]
++    action: hash
++
++sandbox:
++  workers:
++    isolation: git_worktree
++    root: ".zyal/worktrees/${run.id}"
++    max_workers: 10
++    disjoint_write_scopes_required: true
++    persistent_until_final_archive: true
++  target_repos:
++    default: read_only
++    destructive_operations: deny
++  parity:
++    prefer_in_memory: true
++    prefer_ramdisk: true
++    ramdisk_root: "${TMPDIR}/zyal-parity-${run.id}"
++  resources:
++    max_total_disk: 20GB
++    max_memory: 8GB
++    max_processes: 64
++
++fleet:
++  max_workers: 10
++  isolation: git_worktree
++  heartbeat_interval: 20s
++  jnoccio:
++    enabled: true
++    register_workers: true
++    max_instances: 10
++
++model_policy:
++  routine: jnoccio/routine
++  power: jnoccio/power-winner
++  use_routine_for: [frame, retrieve_context, phase_brainstorm, verifier, memory_curate, parity_generate]
++  use_power_for: [stage_reduce, critic, hard_escalation, perf_gap_analysis, final_review]
++  record_reliability: true
++  confidence_cap: 0.35
++
++workflow:
++  states:
++    - target_contract
++    - evidence_atlas
++    - behavior_inventory
++    - macro_plan_tournament
++    - phase_dag
++    - scaffold
++    - vertical_slices
++    - integration_fusion
++    - parity_expansion
++    - correctness_gap_closure
++    - performance_gap_closure
++    - release_readiness
++  persist: sqlite
++  receipts: "target/zyal/runs/${run.id}/events.jsonl"
++  phase_signoff:
++    required: true
++    evidence_required:
++      - graph_current
++      - proof_lane_passed
++      - no_unresolved_critical_objections
++      - memory_capsules_curated
++  parallelism:
++    allow_parallel_states: [evidence_atlas, behavior_inventory, vertical_slices, parity_expansion, correctness_gap_closure, performance_gap_closure]
++    require_graph_dependency_free: true
++    require_disjoint_write_scopes: true
++
++parity_lab:
++  enabled: true
++  style: redlinedb
++  artifact_dir: "target/zyal/parity/${run.id}"
++  cases_dir: "tests/parity/${run.id}"
++  approved_cases_only: true
++  raw_results: raw.jsonl
++  summary: summary.json
++  gaps: gaps.json
++  adapters:
++    reference:
++      target_kind: reference
++      repo: "./references/target"
++      command: "./target-reference --in-memory"
++      read_only: true
++    candidate:
++      target_kind: replacement
++      repo: "."
++      command: "cargo run --bin replacement -- --in-memory"
++  required_tags: [required, approved]
++  perf_budget:
++    default_p95_ms_max_ratio: 1.25
++    default_throughput_min_ratio: 0.80
++  fail_on:
++    - zero_cases
++    - missing_required_case
++    - skipped_required_case
++    - failed_case
++    - missing_perf_data
++    - perf_ratio_over_budget
++
++jankurai_gate:
++  command: "rtk jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md"
++  max_new_hard_findings: 0
++  max_score_drop: 0
++  block_cap_regression: true
++
++approvals:
++  gates:
++    macro_plan_review:
++      required_role: architect
++      timeout: 1d
++      decisions: [approve, reject, edit]
++      require_evidence: [reasoning_graph, macro_plan, critique_receipts]
++    phase_signoff:
++      required_role: reviewer
++      timeout: 12h
++      decisions: [approve, reject, edit]
++      require_evidence: [phase_receipt, proof_report, graph_delta]
++    final_acceptance:
++      required_role: owner
++      timeout: 2d
++      decisions: [approve, reject]
++      require_evidence: [parity_summary, perf_report, rollback_plan, jankurai_report]
++
++quality:
++  anti_vibe:
++    enabled: true
++    fail_closed: true
++    block_test_deletion: true
++    block_assertion_weakening: true
++    block_silent_catch: true
++    block_fake_data_substitutes: true
++    require_failing_test_first_for_bugfix: true
++    require_root_cause_for_bugfix: true
++  diff_budget:
++    max_files_changed: 50
++    max_added_lines: 5000
++    max_deleted_lines: 1500
++    on_violation: require_approval
++
++observability:
++  daemon_status:
++    include:
++      - run_id
++      - current_stage
++      - active_workers
++      - active_lanes
++      - open_parity_gap_count
++      - open_perf_gap_count
++      - memory_capsule_count
++      - graph_node_count
++      - graph_edge_count
++      - model_reliability_winners
++      - last_jankurai_score
++  artifacts:
++    events: "target/zyal/runs/${run.id}/events.jsonl"
++    reasoning_graph: "target/zyal/reasoning/${run.id}/reasoning-graph.json"
++    macro_plan: "target/zyal/reasoning/${run.id}/macro-plan.json"
++    phase_dag: "target/zyal/reasoning/${run.id}/phase-dag.json"
++    parity_summary: "target/zyal/parity/${run.id}/summary.json"
++    parity_gaps: "target/zyal/parity/${run.id}/gaps.json"
++
++budgets:
++  run:
++    wall_clock: 72h
++    cost_usd: 250.00
++    on_exhaust: renew_with_approval
++  task:
++    iterations: 20
++    cost_usd: 8.00
++    on_exhaust: park
++  iteration:
++    tool_calls: 50
++    diff_lines: 1500
++    on_exhaust: pause
++
++rollback:
++  required_when:
++    risk_score_gte: 0.2
++  plan_required: true
++  verify_command: "git apply --reverse --check < target/zyal/runs/${run.id}/rollback.patch"
++  on_failure_after_merge: revert_commit
++
++checkpoint:
++  when: after_verified_change
++  noop_if_clean: true
++  verify:
++    - command: "rtk just zyal-port-fast"
++      timeout: 30m
++      assert:
++        exit_code: 0
++    - command: "rtk git diff --check"
++      timeout: 2m
++      assert:
++        exit_code: 0
++  git:
++    add: ["declared_worker_paths_only"]
++    commit_message: "zyal(super-port): ${task.id}"
++    push: ask
++
++done:
++  require:
++    - target_request_captured
++    - evidence_atlas_written
++    - macro_plan_reduced_from_blind_lanes
++    - all_phases_signed_off
++    - graph_current_after_final_checkpoint
++    - parity_summary_passed
++    - parity_gaps_empty
++    - perf_budgets_checked
++    - jankurai_gate_passed
++    - rollback_plan_recorded
++    - memory_capsules_verified_or_rejected
++    - final_worktree_clean
++  forbid:
++    - baked_target_specific_stage_list
++    - model_only_claim
++    - raw_chain_of_thought_storage
++    - unresolved_critical_objection
++    - missing_required_parity_case
++    - skipped_required_parity_case
++    - unchecked_perf_budget
++    - destructive_target_repo_operation
++
++permissions:
++  shell: allow
++  edit: allow
++  git_commit: allow
++  git_push: ask
++  workers: allow
++  research: allow
++  websearch: allow
++  webfetch: allow
++  mcp: allow
++
++ui:
++  theme: jekko-gold
++  banner: super-reasoning-port
++<<<END_ZYAL id=super-reasoning-port-swarm>>>
++ZYAL_ARM RUN_FOREVER id=super-reasoning-port-swarm
+diff --git a/docs/ZYAL/examples/README.md b/docs/ZYAL/examples/README.md
+index d4e4cb4d9..26f16c784 100644
+--- a/docs/ZYAL/examples/README.md
++++ b/docs/ZYAL/examples/README.md
+@@ -1,6 +1,6 @@
+ # ZYAL Powerful Examples
+ 
+-Forty-two flagship runbooks that show what ZYAL v2.6 makes possible. Each is a complete `<<<ZYAL v1:daemon>>>` block — paste any of them into a trusted Jekko prompt to preview the runtime plan, then explicitly arm to execute.
++Forty-three flagship runbooks that show what ZYAL v2.6 makes possible. Each is a complete `<<<ZYAL v1:daemon>>>` block — paste any of them into a trusted Jekko prompt to preview the runtime plan, then explicitly arm to execute.
+@@ -40,6 +40,7 @@ Forty-two flagship runbooks that show what ZYAL v2.6 makes possible. Each is a c
+ | [`31-advanced-reasoning-foundry.zyal`](31-advanced-reasoning-foundry.zyal) | Generic host-controlled reasoning foundry with blind lanes, critics, reducers, verifier-gated memory, confidence caps, and no raw chain-of-thought storage | `advanced_reasoning`, `repo_graph`, `parity_lab`, `model_policy`, `workflow`, `memory`, `jankurai_gate` |
+ | [`32-redis-jedis-port-foundry.zyal`](32-redis-jedis-port-foundry.zyal) | Ambitious Redis-to-Jedis port request with runtime-generated stages, ten workers, read-only reference target, RedlineDB-style parity artifacts, and perf gap closure | `port`, `advanced_reasoning`, `repo_graph`, `parity_lab`, `sandbox`, `fleet`, `model_policy`, `observability` |
+ | [`33-redis-jedis-live-proof.zyal`](33-redis-jedis-live-proof.zyal) | Bounded live proof for Redis/Jedis Stage-0 planning plus a deterministic baseline-vs-tournament reasoning benchmark | `port`, `advanced_reasoning`, `evidence_inputs`, `live_call_budget`, `proofs`, `parity_lab`, `model_policy`, `observability` |
++| [`34-super-reasoning-port-swarm.zyal`](34-super-reasoning-port-swarm.zyal) | Target-agnostic super-reasoning swarm for ambitious replacement builds: 12-stage macro plan, graph-fed workers, verified positive/negative memory, phase signoff, parity expansion, correctness/perf gap closure, and persistent worktrees | `port`, `advanced_reasoning`, `repo_graph`, `memory`, `sandbox`, `fleet`, `workflow`, `parity_lab`, `approvals`, `quality`, `jankurai_gate` |
+ | [`memory-benchmark/prompt-scoring.zyal`](memory-benchmark/prompt-scoring.zyal) | Judge-population prompt scoring for the tracked memory benchmark corpus | `fan_out`, `memory`, `evidence`, `security`, `observability` |
+ | [`memory-benchmark/autoresearch-basic.zyal`](memory-benchmark/autoresearch-basic.zyal) | Basic sandboxed AutoResearch memory benchmark with four workers and best-verified-patch reduction | `fan_out`, `experiments`, `memory`, `sandbox`, `observability` |
+ | [`memory-benchmark/executable-benchmark.zyal`](memory-benchmark/executable-benchmark.zyal) | Deterministic Rust harness scoring for baseline, candidate, and reference memory systems | `fan_out`, `experiments`, `evidence`, `sandbox`, `observability` |

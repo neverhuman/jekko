@@ -20,7 +20,7 @@ pub mod embedder;
 pub mod retrieval;
 
 pub use embedder::{Embedder, FakeEmbedder, OpenAICompatibleEmbedder};
-pub use retrieval::{RetrievalConfig, format_lessons_prompt_block, retrieve_for_run};
+pub use retrieval::{format_lessons_prompt_block, retrieve_for_run, RetrievalConfig};
 
 #[cfg(test)]
 mod tests;

@@ -169,7 +169,13 @@ fn format_lessons_prompt_block_truncates_at_token_budget() {
     // ~4 chars per token => 20 tokens ≈ 80 chars budget. The first line
     // ("- [score=0.90] short claim a\n" = 30 chars) fits; the second
     // long line would push past, so it must be dropped.
-    let cap_a = capsule("cap-a", "run-a", "project_only", "short claim a", Some(vec![1.0]));
+    let cap_a = capsule(
+        "cap-a",
+        "run-a",
+        "project_only",
+        "short claim a",
+        Some(vec![1.0]),
+    );
     let cap_b = capsule(
         "cap-b",
         "run-b",

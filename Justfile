@@ -48,11 +48,30 @@ validate:
 	just fast
 
 # Workspace-wide fast lane composed from narrow proof targets.
+# `fmt-check-fast` runs first so a stray formatting violation fails fast
+# before the heavier typecheck/build/test lanes burn time. The `parity`
+# GitHub workflow runs `cargo fmt --all --check` and rejects PRs that
+# drift; mirroring it here closes the local-CI parity gap.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
 workspace-fast:
+	just fmt-check-fast
 	just workspace-typecheck-fast
 	just workspace-build-fast
 	just workspace-test-fast
+
+# Narrow lane: rustfmt --check across the workspace AND the standalone
+# jnoccio-fusion package. Mirrors what the GitHub `parity` workflow runs
+# so PRs don't fail remote on a fmt diff that local CI would have caught.
+# jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
+fmt-check-fast:
+	cargo fmt --all -- --check
+	cd jnoccio-fusion && cargo fmt --all -- --check
+
+# Apply rustfmt across both build trees. Use before committing if
+# fmt-check-fast fails.
+fmt:
+	cargo fmt --all
+	cd jnoccio-fusion && cargo fmt --all
 
 # Narrow lane for workspace typecheck-only feedback.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true

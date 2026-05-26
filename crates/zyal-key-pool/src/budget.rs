@@ -99,8 +99,7 @@ pub fn ensure_schema(path: &Path) -> Result<()> {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("mkdir -p {}", parent.display()))?;
     }
-    let conn = Connection::open(path)
-        .with_context(|| format!("open {}", path.display()))?;
+    let conn = Connection::open(path).with_context(|| format!("open {}", path.display()))?;
     conn.execute_batch(SCHEMA)
         .with_context(|| format!("init budget schema in {}", path.display()))?;
     Ok(())
@@ -139,7 +138,10 @@ mod tests {
             .unwrap()
             .map(Result::unwrap)
             .collect();
-        assert_eq!(names, vec!["user_budget".to_string(), "user_usage_day".to_string()]);
+        assert_eq!(
+            names,
+            vec!["user_budget".to_string(), "user_usage_day".to_string()]
+        );
     }
 
     #[test]

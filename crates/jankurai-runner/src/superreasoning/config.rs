@@ -138,12 +138,14 @@ impl Default for ParallelPhasePolicy {
 impl ParallelPhasePolicy {
     /// Effective parallel-phase count, clamped to the workspace worker cap.
     pub fn effective_max_parallel_phases(&self) -> usize {
-        self.max_parallel_phases.clamp(1, MAX_SUPERREASONING_WORKERS)
+        self.max_parallel_phases
+            .clamp(1, MAX_SUPERREASONING_WORKERS)
     }
 
     /// Effective per-phase worker cap, clamped to the workspace worker cap.
     pub fn effective_per_phase_worker_cap(&self) -> usize {
-        self.per_phase_worker_cap.clamp(1, MAX_SUPERREASONING_WORKERS)
+        self.per_phase_worker_cap
+            .clamp(1, MAX_SUPERREASONING_WORKERS)
     }
 }
 
@@ -533,10 +535,7 @@ pub fn draft_super_master_plan_with_config(
             bounded_write_scope: true,
             dependencies: Vec::new(),
             proof_lane: "just zyal-port-fast".to_string(),
-            done_evidence: vec![
-                "tests_passed".to_string(),
-                "replay_receipt".to_string(),
-            ],
+            done_evidence: vec!["tests_passed".to_string(), "replay_receipt".to_string()],
             memory_scope: "run".to_string(),
             generated_zone_boundary_checks: true,
             status: MasterTaskStatus::Queued,

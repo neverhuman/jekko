@@ -55,8 +55,8 @@ impl RoundRobinCursor {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("mkdir -p {}", parent.display()))?;
         }
-        let conn = Connection::open(&db_path)
-            .with_context(|| format!("open {}", db_path.display()))?;
+        let conn =
+            Connection::open(&db_path).with_context(|| format!("open {}", db_path.display()))?;
         conn.execute_batch(SCHEMA)
             .with_context(|| format!("init schema in {}", db_path.display()))?;
         Ok(Self { conn, db_path })
@@ -70,12 +70,7 @@ impl RoundRobinCursor {
     /// Return the next candidate index for `(provider, model)`, advancing
     /// the cursor by one. Returns 0 when `candidates_len == 0` (caller should
     /// treat as "no eligible slot").
-    pub fn next_index(
-        &self,
-        provider: &str,
-        model: &str,
-        candidates_len: usize,
-    ) -> Result<usize> {
+    pub fn next_index(&self, provider: &str, model: &str, candidates_len: usize) -> Result<usize> {
         if candidates_len == 0 {
             return Ok(0);
         }

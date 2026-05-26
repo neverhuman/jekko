@@ -4,8 +4,8 @@
 //! entries, base URLs, and provider adapters live in one place.
 
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::env;
+use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -85,8 +85,7 @@ pub(super) async fn ensure_jnoccio_ready(start: &Path) -> RuntimeResult<()> {
         ));
     }
 
-    let Some(fusion_root) = jekko_jnoccio_boot::unlock::find_jnoccio_fusion_root_from(start)
-    else {
+    let Some(fusion_root) = jekko_jnoccio_boot::unlock::find_jnoccio_fusion_root_from(start) else {
         return Err(RuntimeError::other(
             "jnoccio-fusion checkout not found for runtime auto-boot",
         ));

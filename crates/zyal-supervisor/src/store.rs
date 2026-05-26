@@ -382,9 +382,7 @@ impl SupervisorStore {
                 run_id, phase_id, task_id, scope, kind, body, tags_json, source_ref, created_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             "#,
-            params![
-                run_id, phase_id, task_id, scope, kind, body, tags_json, source_ref, now,
-            ],
+            params![run_id, phase_id, task_id, scope, kind, body, tags_json, source_ref, now,],
         )?;
         Ok(self.conn.last_insert_rowid())
     }

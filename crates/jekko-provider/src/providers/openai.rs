@@ -302,9 +302,6 @@ mod tests {
         };
         let events = map_openai_frame_stateful(&frame, &mut OpenAiStreamState::new()).unwrap();
         assert_eq!(events.len(), 1);
-        assert!(matches!(
-            events[0].kind,
-            ProviderEventKind::Metadata { .. }
-        ));
+        assert!(matches!(events[0].kind, ProviderEventKind::Metadata { .. }));
     }
 }

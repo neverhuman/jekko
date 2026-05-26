@@ -95,8 +95,7 @@ pub fn fold_events(events: &[Event]) -> WatcherSnapshot {
                 if let Some(closed) = event.data.get("gaps_closed").and_then(|v| v.as_i64()) {
                     snap.parity_gaps_closed =
                         snap.parity_gaps_closed.saturating_add(closed.max(0) as u64);
-                    snap.parity_gaps_open =
-                        snap.parity_gaps_open.saturating_sub(closed.max(0));
+                    snap.parity_gaps_open = snap.parity_gaps_open.saturating_sub(closed.max(0));
                 }
             }
             EventKind::ModelAttempt => {
@@ -107,10 +106,9 @@ pub fn fold_events(events: &[Event]) -> WatcherSnapshot {
                 let success = matches!(state, Some("parsed"));
                 if !success {
                     snap.model_failures = snap.model_failures.saturating_add(1);
-                    if let Some(provider) =
-                        event.data.get("provider").and_then(|v| v.as_str())
-                    {
-                        *snap.errors_by_provider
+                    if let Some(provider) = event.data.get("provider").and_then(|v| v.as_str()) {
+                        *snap
+                            .errors_by_provider
                             .entry(provider.to_string())
                             .or_insert(0) += 1;
                     }
@@ -144,7 +142,12 @@ mod tests {
     use serde_json::json;
 
     fn ev(kind: EventKind, ts: u64, data: serde_json::Value) -> Event {
-        Event { ts, kind, run_id: "r1".into(), data }
+        Event {
+            ts,
+            kind,
+            run_id: "r1".into(),
+            data,
+        }
     }
 
     #[test]
@@ -156,9 +159,21 @@ mod tests {
     #[test]
     fn counts_lanes_started_and_finished() {
         let events = vec![
-            ev(EventKind::ReasoningLane, 1, json!({"id": "lane-1", "status": "started"})),
-            ev(EventKind::ReasoningLane, 2, json!({"id": "lane-1", "status": "complete"})),
-            ev(EventKind::ReasoningLane, 3, json!({"id": "lane-2", "status": "complete"})),
+            ev(
+                EventKind::ReasoningLane,
+                1,
+                json!({"id": "lane-1", "status": "started"}),
+            ),
+            ev(
+                EventKind::ReasoningLane,
+                2,
+                json!({"id": "lane-1", "status": "complete"}),
+            ),
+            ev(
+                EventKind::ReasoningLane,
+                3,
+                json!({"id": "lane-2", "status": "complete"}),
+            ),
         ];
         let snap = fold_events(&events);
         assert_eq!(snap.lanes_started, 1);
@@ -168,13 +183,21 @@ mod tests {
     #[test]
     fn tracks_model_attempts_failures_and_spend() {
         let events = vec![
-            ev(EventKind::ModelAttempt, 1, json!({"kind": "frame", "attempt": 1})),
+            ev(
+                EventKind::ModelAttempt,
+                1,
+                json!({"kind": "frame", "attempt": 1}),
+            ),
             ev(
                 EventKind::ModelAttemptOutcome,
                 2,
                 json!({"state": "retryable_failure", "provider": "openrouter", "cost_usd": 0.0}),
             ),
-            ev(EventKind::ModelAttempt, 3, json!({"kind": "frame", "attempt": 2})),
+            ev(
+                EventKind::ModelAttempt,
+                3,
+                json!({"kind": "frame", "attempt": 2}),
+            ),
             ev(
                 EventKind::ModelOutcome,
                 4,

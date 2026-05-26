@@ -102,8 +102,10 @@ pub fn list_promoted_capsules(
     }
     sql.push_str(" ORDER BY time_updated DESC, id ASC");
     let mut stmt = conn.prepare(&sql)?;
-    let param_refs: Vec<&dyn rusqlite::ToSql> =
-        params_vec.iter().map(|v| v as &dyn rusqlite::ToSql).collect();
+    let param_refs: Vec<&dyn rusqlite::ToSql> = params_vec
+        .iter()
+        .map(|v| v as &dyn rusqlite::ToSql)
+        .collect();
     let rows = stmt.query_map(param_refs.as_slice(), memory_capsule_from_row)?;
     collect_rows(rows)
 }

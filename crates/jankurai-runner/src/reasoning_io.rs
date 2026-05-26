@@ -261,7 +261,6 @@ pub(crate) async fn complete_structured(
     }
 }
 
-
 fn push_model_attempt_outcome(
     queued: &mut Vec<(EventKind, serde_json::Value)>,
     receipt: &ModelCallReceipt,

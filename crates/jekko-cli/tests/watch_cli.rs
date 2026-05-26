@@ -75,14 +75,7 @@ fn watch_once_emits_json_snapshot_for_fixture_stream() {
 
     let mut cmd = Command::cargo_bin("jekko").expect("jekko binary");
     let output = cmd
-        .args([
-            "watch",
-            run_id,
-            "--once",
-            "--format",
-            "json",
-            "--repo-root",
-        ])
+        .args(["watch", run_id, "--once", "--format", "json", "--repo-root"])
         .arg(tmp.path())
         .output()
         .expect("watch invocation");

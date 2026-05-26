@@ -76,7 +76,10 @@ pub fn detect_and_remediate(
                 summary: format!("no progress for {elapsed}s (threshold {stall_threshold_secs}s)"),
                 detail: BTreeMap::from([
                     ("elapsed_secs".to_string(), elapsed.to_string()),
-                    ("threshold_secs".to_string(), stall_threshold_secs.to_string()),
+                    (
+                        "threshold_secs".to_string(),
+                        stall_threshold_secs.to_string(),
+                    ),
                 ]),
             });
         }
@@ -91,13 +94,19 @@ pub fn detect_and_remediate(
             .map(|(provider, count)| (provider.clone(), *count));
         let detail = match &worst {
             Some((provider, count)) => BTreeMap::from([
-                ("error_rate".to_string(), format!("{:.2}", snap.error_rate())),
+                (
+                    "error_rate".to_string(),
+                    format!("{:.2}", snap.error_rate()),
+                ),
                 ("attempts".to_string(), snap.model_attempts.to_string()),
                 ("worst_provider".to_string(), provider.clone()),
                 ("worst_provider_errors".to_string(), count.to_string()),
             ]),
             None => BTreeMap::from([
-                ("error_rate".to_string(), format!("{:.2}", snap.error_rate())),
+                (
+                    "error_rate".to_string(),
+                    format!("{:.2}", snap.error_rate()),
+                ),
                 ("attempts".to_string(), snap.model_attempts.to_string()),
             ]),
         };
@@ -132,16 +141,17 @@ pub fn detect_and_remediate(
                 ),
                 detail: BTreeMap::from([
                     ("prior_open".to_string(), prior.to_string()),
-                    ("current_open".to_string(), snap.parity_gaps_open.to_string()),
+                    (
+                        "current_open".to_string(),
+                        snap.parity_gaps_open.to_string(),
+                    ),
                 ]),
             });
         }
     }
 
     // JankuraiRegression — current > prior implies new hard findings.
-    if let (Some(prior), Some(current)) =
-        (prior_hard_findings, snap.last_jankurai_hard_findings)
-    {
+    if let (Some(prior), Some(current)) = (prior_hard_findings, snap.last_jankurai_hard_findings) {
         if current > prior {
             out.push(RemediationAction {
                 rule: RemediationRule::JankuraiRegression,
@@ -182,7 +192,9 @@ mod tests {
         snap.last_progress_ts = Some(100);
         snap.finished = true;
         let actions = detect_and_remediate(&snap, 9999, 300, 0.5, None, None);
-        assert!(actions.iter().all(|a| a.rule != RemediationRule::StallDetected));
+        assert!(actions
+            .iter()
+            .all(|a| a.rule != RemediationRule::StallDetected));
     }
 
     #[test]

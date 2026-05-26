@@ -145,20 +145,26 @@ mod memory_helpers_tests {
     #[test]
     fn promote_walks_the_lifecycle_in_order() {
         let mut c = capsule("verified", EvidenceLevel::ExternalGrounding, "a1");
-        c.promote(MemoryPromotionStatus::RunOnly, "verifier").unwrap();
+        c.promote(MemoryPromotionStatus::RunOnly, "verifier")
+            .unwrap();
         assert_eq!(c.promotion_status, MemoryPromotionStatus::RunOnly);
         assert_eq!(c.approved_by_role.as_deref(), Some("verifier"));
-        c.promote(MemoryPromotionStatus::ProjectOnly, "reducer").unwrap();
+        c.promote(MemoryPromotionStatus::ProjectOnly, "reducer")
+            .unwrap();
         assert_eq!(c.promotion_status, MemoryPromotionStatus::ProjectOnly);
-        c.promote(MemoryPromotionStatus::Global, "verifier").unwrap();
+        c.promote(MemoryPromotionStatus::Global, "verifier")
+            .unwrap();
         assert_eq!(c.promotion_status, MemoryPromotionStatus::Global);
     }
 
     #[test]
     fn promote_rejects_regression() {
         let mut c = capsule("verified", EvidenceLevel::ExternalGrounding, "a1");
-        c.promote(MemoryPromotionStatus::RunOnly, "verifier").unwrap();
-        let err = c.promote(MemoryPromotionStatus::Scratch, "verifier").unwrap_err();
+        c.promote(MemoryPromotionStatus::RunOnly, "verifier")
+            .unwrap();
+        let err = c
+            .promote(MemoryPromotionStatus::Scratch, "verifier")
+            .unwrap_err();
         assert!(err.to_string().contains("illegal transition"));
     }
 
@@ -175,7 +181,9 @@ mod memory_helpers_tests {
     fn promote_scratch_to_runonly_requires_write_gate() {
         // Status candidate => can_write_permanent false => Scratch can't advance.
         let mut c = capsule("candidate", EvidenceLevel::ExternalGrounding, "a1");
-        let err = c.promote(MemoryPromotionStatus::RunOnly, "verifier").unwrap_err();
+        let err = c
+            .promote(MemoryPromotionStatus::RunOnly, "verifier")
+            .unwrap_err();
         assert!(err.to_string().contains("verifier signoff"));
     }
 

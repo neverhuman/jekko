@@ -49,8 +49,9 @@ fn dry_run_emits_wave_plan_for_canonical_12_stage() {
     );
 
     let stdout = String::from_utf8(output.stdout).expect("stdout utf8");
-    let value: Value = serde_json::from_str(&stdout)
-        .unwrap_or_else(|err| panic!("dry-run output must be JSON: {err}\n--- stdout ---\n{stdout}"));
+    let value: Value = serde_json::from_str(&stdout).unwrap_or_else(|err| {
+        panic!("dry-run output must be JSON: {err}\n--- stdout ---\n{stdout}")
+    });
 
     let waves = value
         .get("waves")
@@ -123,18 +124,20 @@ fn mark_complete_walks_all_phases() {
     // exactly one run row in this tempdir DB.
     let conn = rusqlite::Connection::open(&db_path).expect("open supervisor db");
     let run_id: String = conn
-        .query_row(
-            "SELECT run_id FROM zyal_super_runs LIMIT 1",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT run_id FROM zyal_super_runs LIMIT 1", [], |row| {
+            row.get(0)
+        })
         .expect("query run id");
 
     let mut stmt = conn
-        .prepare("SELECT phase_id, status FROM zyal_super_phases WHERE run_id = ?1 ORDER BY phase_id")
+        .prepare(
+            "SELECT phase_id, status FROM zyal_super_phases WHERE run_id = ?1 ORDER BY phase_id",
+        )
         .expect("prepare phase query");
     let rows: Vec<(String, String)> = stmt
-        .query_map([&run_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .query_map([&run_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
         .expect("query phases")
         .map(|r| r.expect("row"))
         .collect();
@@ -169,11 +172,9 @@ fn status_subcommand_prints_phase_rows() {
     // on stdout parsing.
     let conn = rusqlite::Connection::open(&db_path).expect("open db");
     let run_id: String = conn
-        .query_row(
-            "SELECT run_id FROM zyal_super_runs LIMIT 1",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT run_id FROM zyal_super_runs LIMIT 1", [], |row| {
+            row.get(0)
+        })
         .expect("query run id");
     drop(conn);
 
@@ -380,11 +381,9 @@ fn max_stages_blocks_remaining_phases() {
 
     let conn = rusqlite::Connection::open(&db_path).expect("open supervisor db");
     let run_id: String = conn
-        .query_row(
-            "SELECT run_id FROM zyal_super_runs LIMIT 1",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT run_id FROM zyal_super_runs LIMIT 1", [], |row| {
+            row.get(0)
+        })
         .expect("query run id");
 
     let mut stmt = conn

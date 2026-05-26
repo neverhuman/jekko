@@ -43,10 +43,7 @@ pub(super) fn emit_superworkflow(raw: &str) -> Result<String> {
     let body = strip_pragmas(raw);
     let parsed: serde_yaml::Value =
         serde_yaml::from_str(&body).context("parse superworkflow YAML body")?;
-    super::validation::validate_superworkflow_value(
-        std::path::Path::new("<memory>"),
-        &parsed,
-    )?;
+    super::validation::validate_superworkflow_value(std::path::Path::new("<memory>"), &parsed)?;
     // Convert YAML → JSON Value so we can prepend the generated-header
     // object (jankurai's HLT-002-GENERATED-MUTATION rule expects every
     // generated zone file to declare its source + regeneration command;
@@ -54,8 +51,7 @@ pub(super) fn emit_superworkflow(raw: &str) -> Result<String> {
     // top-level `_generated` object instead).
     let json_value = serde_json::to_value(&parsed).context("YAML → JSON for SuperWorkflow")?;
     let stamped = stamp_generated_header(json_value);
-    let rendered =
-        serde_json::to_string_pretty(&stamped).context("render SuperWorkflow JSON")?;
+    let rendered = serde_json::to_string_pretty(&stamped).context("render SuperWorkflow JSON")?;
     Ok(format!("{rendered}\n"))
 }
 

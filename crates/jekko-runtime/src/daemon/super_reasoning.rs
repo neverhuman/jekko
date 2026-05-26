@@ -360,8 +360,7 @@ impl SuperReasoningPlan {
                 )));
             }
         }
-        let mut indegree: BTreeMap<String, usize> =
-            ids.iter().map(|id| (id.clone(), 0)).collect();
+        let mut indegree: BTreeMap<String, usize> = ids.iter().map(|id| (id.clone(), 0)).collect();
         let mut children: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for phase in &self.phases {
             // Dedupe deps per phase — a duplicate entry (e.g. `depends_on:

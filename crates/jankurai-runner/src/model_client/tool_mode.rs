@@ -64,8 +64,8 @@ pub fn requires_tools(kind: ModelTaskKind) -> ToolMode {
     use ModelTaskKind::*;
     match kind {
         // Pure synthesis / framing / reducer roles — no tool access.
-        Frame | StageCritique | StageReduce | PhaseFinalize | Critic | MetaJudge
-        | JudgePatch | Review | KnowledgeCurate => ToolMode::Off,
+        Frame | StageCritique | StageReduce | PhaseFinalize | Critic | MetaJudge | JudgePatch
+        | Review | KnowledgeCurate => ToolMode::Off,
 
         // Exploration / verification / curation roles — read-only surface.
         StageBrainstorm | PhaseBrainstorm | Hypothesis | Verifier | ParityGenerate
@@ -112,9 +112,15 @@ mod tests {
         assert_eq!(requires_tools(ModelTaskKind::Frame), ToolMode::Off);
         assert_eq!(requires_tools(ModelTaskKind::StageCritique), ToolMode::Off);
         assert_eq!(requires_tools(ModelTaskKind::StageReduce), ToolMode::Off);
-        assert_eq!(requires_tools(ModelTaskKind::StageBrainstorm), ToolMode::ReadOnly);
+        assert_eq!(
+            requires_tools(ModelTaskKind::StageBrainstorm),
+            ToolMode::ReadOnly
+        );
         assert_eq!(requires_tools(ModelTaskKind::Verifier), ToolMode::ReadOnly);
-        assert_eq!(requires_tools(ModelTaskKind::ParityGenerate), ToolMode::ReadOnly);
+        assert_eq!(
+            requires_tools(ModelTaskKind::ParityGenerate),
+            ToolMode::ReadOnly
+        );
         assert_eq!(requires_tools(ModelTaskKind::Implement), ToolMode::Full);
         assert_eq!(requires_tools(ModelTaskKind::Healing), ToolMode::Full);
         assert_eq!(requires_tools(ModelTaskKind::StuckDebug), ToolMode::Full);

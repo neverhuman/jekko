@@ -97,10 +97,7 @@ pub async fn retrieve_for_run(
 /// Render the top-k capsules as a `<prior_lessons>` XML-ish block ready to
 /// concatenate into a system prompt. Truncates so the final block fits the
 /// `max_tokens` budget (estimated 4 chars per token).
-pub fn format_lessons_prompt_block(
-    top_k: &[(MemoryCapsuleRow, f32)],
-    max_tokens: usize,
-) -> String {
+pub fn format_lessons_prompt_block(top_k: &[(MemoryCapsuleRow, f32)], max_tokens: usize) -> String {
     let max_chars = max_tokens.saturating_mul(4);
     let mut body = String::new();
     for (capsule, score) in top_k {

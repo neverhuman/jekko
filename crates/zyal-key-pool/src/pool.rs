@@ -131,9 +131,18 @@ mod tests {
     fn parse_env_lines_handles_comments_quotes_and_export() {
         let env = "# leading comment\nOPENAI_API_KEY=sk-plain\nexport GROQ_API_KEY=\"gsk_quoted\"\n  # indented comment\nGEMINI_API_KEY='single-quoted'\n";
         let parsed = parse_env_lines(env);
-        assert_eq!(parsed.get("OPENAI_API_KEY").map(String::as_str), Some("sk-plain"));
-        assert_eq!(parsed.get("GROQ_API_KEY").map(String::as_str), Some("gsk_quoted"));
-        assert_eq!(parsed.get("GEMINI_API_KEY").map(String::as_str), Some("single-quoted"));
+        assert_eq!(
+            parsed.get("OPENAI_API_KEY").map(String::as_str),
+            Some("sk-plain")
+        );
+        assert_eq!(
+            parsed.get("GROQ_API_KEY").map(String::as_str),
+            Some("gsk_quoted")
+        );
+        assert_eq!(
+            parsed.get("GEMINI_API_KEY").map(String::as_str),
+            Some("single-quoted")
+        );
         assert_eq!(parsed.len(), 3);
     }
 

@@ -228,12 +228,11 @@ fn follow(
         offset = new_offset;
         emit_tick(&new_events, state, args, format, /* initial */ false)?;
 
-        if state.all_events.iter().any(|ev| {
-            matches!(
-                ev.kind,
-                jankurai_runner::events::EventKind::RunFinished
-            )
-        }) {
+        if state
+            .all_events
+            .iter()
+            .any(|ev| matches!(ev.kind, jankurai_runner::events::EventKind::RunFinished))
+        {
             break;
         }
     }
@@ -712,19 +711,21 @@ fn leave_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<(
 /// `dash` — callable from both the real terminal and `TestBackend`.
 fn draw_dashboard(f: &mut Frame<'_>, dash: &DashboardState) {
     let area = f.area();
-    let outer_block = Block::default().borders(Borders::ALL).title(Line::from(vec![
-        Span::raw(" ZYAL Watcher: "),
-        Span::styled(
-            dash.run_id.clone(),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw("   elapsed "),
-        Span::styled(
-            dash.elapsed_label(),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" "),
-    ]));
+    let outer_block = Block::default()
+        .borders(Borders::ALL)
+        .title(Line::from(vec![
+            Span::raw(" ZYAL Watcher: "),
+            Span::styled(
+                dash.run_id.clone(),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("   elapsed "),
+            Span::styled(
+                dash.elapsed_label(),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" "),
+        ]));
     let inner = outer_block.inner(area);
     f.render_widget(outer_block, area);
 
@@ -807,8 +808,11 @@ fn draw_rules(f: &mut Frame<'_>, area: Rect, dash: &DashboardState) {
             })
             .collect()
     };
-    let list =
-        List::new(items).block(Block::default().borders(Borders::ALL).title(" Active rules "));
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Active rules "),
+    );
     f.render_widget(list, area);
 }
 

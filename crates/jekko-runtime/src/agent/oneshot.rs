@@ -13,8 +13,8 @@ use crate::tool::{ToolContext, ToolOutput};
 use crate::Runtime;
 use jekko_core::project::ProjectId;
 
-use super::types::{AgentTurnRequest, AgentTurnResult, RunRequest, RunResult};
 use super::provider::select_credential;
+use super::types::{AgentTurnRequest, AgentTurnResult, RunRequest, RunResult};
 
 /// Canonical agent name used when a request omits an explicit agent.
 ///
