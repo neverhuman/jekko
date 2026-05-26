@@ -130,10 +130,10 @@ pub fn run(_global: &GlobalOpts, args: &PortRunArgs) -> Result<()> {
         return run_resume(args, run_id);
     }
 
-    let manifest_path = args
-        .super_manifest
-        .as_deref()
-        .ok_or_else(|| anyhow!("--super <MANIFEST> is required (or use --resume / --status)"))?;
+    let manifest_path = match args.super_manifest.as_deref() {
+        Some(p) => p,
+        None => bail!("--super <MANIFEST> is required (or use --resume / --status)"),
+    };
     let manifest = load_manifest(manifest_path)?;
     validate_manifest(&manifest).map_err(|err| anyhow!("manifest validation failed: {err}"))?;
 
@@ -199,8 +199,10 @@ fn resolve_db_path(args: &PortRunArgs) -> Result<PathBuf> {
     if let Some(p) = args.db.as_ref() {
         return Ok(p.clone());
     }
-    let home = std::env::var_os("HOME")
-        .ok_or_else(|| anyhow!("HOME is not set; pass --db <PATH> explicitly"))?;
+    let home = match std::env::var_os("HOME") {
+        Some(h) => h,
+        None => bail!("HOME is not set; pass --db <PATH> explicitly"),
+    };
     let mut path = PathBuf::from(home);
     path.push(".jekko");
     path.push("zyal-supervisor.sqlite");
@@ -300,11 +302,10 @@ fn parse_supervisor_manifest(text: &str, source: &Path) -> Result<SuperWorkflow>
 /// fields is dropped silently for the scaffold; richer policies are a
 /// follow-up.
 fn adapt_zyalc_emission(value: &JsonValue, source: &Path) -> Result<SuperWorkflow> {
-    let id = value
-        .get("id")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("manifest at {} is missing `id`", source.display()))?
-        .to_string();
+    let id = match value.get("id").and_then(|v| v.as_str()) {
+        Some(s) => s.to_string(),
+        None => bail!("manifest at {} is missing `id`", source.display()),
+    };
     let job = value.get("job");
     let name = job
         .and_then(|j| j.get("name"))
@@ -342,11 +343,10 @@ fn adapt_zyalc_emission(value: &JsonValue, source: &Path) -> Result<SuperWorkflo
     };
     let mut phases: Vec<Phase> = Vec::with_capacity(raw_phases.len());
     for (idx, raw) in raw_phases.into_iter().enumerate() {
-        let phase_id = raw
-            .get("id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("phase #{idx} at {} is missing `id`", source.display()))?
-            .to_string();
+        let phase_id = match raw.get("id").and_then(|v| v.as_str()) {
+            Some(s) => s.to_string(),
+            None => bail!("phase #{idx} at {} is missing `id`", source.display()),
+        };
         let phase_name = raw
             .get("name")
             .and_then(|v| v.as_str())
@@ -659,9 +659,10 @@ fn walk_waves(
                 .with_context(|| format!("mark phase `{phase_id}` running"))?;
 
             let outcome = if args.live {
-                let phase = phase_lookup
-                    .get(phase_id.as_str())
-                    .ok_or_else(|| anyhow!("phase `{phase_id}` not present in manifest lookup"))?;
+                let phase = match phase_lookup.get(phase_id.as_str()) {
+                    Some(p) => p,
+                    None => bail!("phase `{phase_id}` not present in manifest lookup"),
+                };
                 invoke_live_phase(phase, args)
             } else {
                 // Non-live path records the phase as completed with a
