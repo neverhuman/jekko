@@ -336,6 +336,18 @@ fn validate_scenario(scenario: &DummyScenario) -> Result<(), String> {
             scenario.id
         ));
     }
+    if scenario.model.trim().is_empty() {
+        return Err(format!(
+            "dummy_agent_llm scenario `{}` must have a model",
+            scenario.id
+        ));
+    }
+    if scenario.tags.iter().any(|tag| tag.trim().is_empty()) {
+        return Err(format!(
+            "dummy_agent_llm scenario `{}` has a blank tag",
+            scenario.id
+        ));
+    }
     if scenario.stages.is_empty() {
         return Err(format!(
             "dummy_agent_llm scenario `{}` must have at least one stage",
