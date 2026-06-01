@@ -1,17 +1,14 @@
 {
   "id": "basic",
   "title": "Deterministic text response",
-  "tags": ["text", "deterministic", "no-network"],
+  "tags": ["text", "deterministic", "local"],
   "provider": "dummy_agent_llm",
   "model": "basic",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        {
-          "type": "stream-start",
-          "model": "dummy_agent_llm/basic"
-        },
+        { "type": "stream-start" },
         {
           "type": "text-delta",
           "text": "dummy_agent_llm/basic: {{last_user_text}}"
@@ -23,18 +20,7 @@
           "cache_read_tokens": 0,
           "cache_write_tokens": 0
         },
-        {
-          "type": "metadata",
-          "metadata": {
-            "scenario_id": "basic",
-            "provider": "dummy_agent_llm",
-            "network": false
-          }
-        },
-        {
-          "type": "stream-end",
-          "stop_reason": "stop"
-        }
+        { "type": "stream-end", "stop_reason": "stop" }
       ]
     }
   ]
