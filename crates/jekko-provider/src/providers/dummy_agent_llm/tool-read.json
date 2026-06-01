@@ -1,7 +1,7 @@
 {
   "id": "tool-read",
-  "title": "Read tool-call loop",
-  "tags": ["tool-call", "read", "deterministic", "offline"],
+  "title": "Read tool round trip",
+  "tags": ["tool-call", "read", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
@@ -9,17 +9,6 @@
       "when": "initial",
       "frames": [
         { "type": "stream-start" },
-        {
-          "type": "metadata",
-          "metadata": {
-            "scenario_id": "tool-read",
-            "provider": "dummy_agent_llm",
-            "stage": "initial",
-            "deterministic": true,
-            "network": false,
-            "token_cost": 0
-          }
-        },
         {
           "type": "tool-call",
           "id": "dummy-read-1",
@@ -30,42 +19,16 @@
             "limit": 2000
           }
         },
-        {
-          "type": "usage",
-          "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
-        },
-        { "type": "stream-end", "stop_reason": "tool-calls" }
+        { "type": "usage", "input_tokens": 0, "output_tokens": 0 },
+        { "type": "stream-end", "stop_reason": "tool-call" }
       ]
     },
     {
       "when": "after-tool-result",
       "frames": [
         { "type": "stream-start" },
-        {
-          "type": "metadata",
-          "metadata": {
-            "scenario_id": "tool-read",
-            "provider": "dummy_agent_llm",
-            "stage": "after-tool-result",
-            "deterministic": true,
-            "network": false,
-            "token_cost": 0
-          }
-        },
-        {
-          "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: tool result received."
-        },
-        {
-          "type": "usage",
-          "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
-        },
+        { "type": "text-delta", "text": "dummy_agent_llm/tool-read: tool result received." },
+        { "type": "usage", "input_tokens": 0, "output_tokens": 0 },
         { "type": "stream-end", "stop_reason": "stop" }
       ]
     }
