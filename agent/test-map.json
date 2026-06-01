@@ -368,9 +368,17 @@
       "command": "just zyal-superreasoning-fast",
       "purpose": "verify provider auto-selection and users-only credential routing for live ZYAL runs"
     },
+    "crates/jekko-runtime/src/daemon/events.rs": {
+      "command": "cargo test -p jekko-runtime --locked daemon::events && cargo test -p jekko-runtime --locked daemon::tests",
+      "purpose": "verify structured idempotency-keyed daemon run/task/artifact events publish deterministically onto the bus"
+    },
     "crates/jekko-server/src/routes/daemon.rs": {
       "command": "cargo check -p jekko-server --locked && cargo test -p jekko-store --locked --test daemon_port_roundtrip -- --test-threads=1",
       "purpose": "verify daemon server status JSON remains compiled against durable daemon rows"
+    },
+    "crates/jekko-server/tests/daemon_feed_routes.rs": {
+      "command": "cargo test -p jekko-server --locked --test daemon_feed_routes",
+      "purpose": "verify read-only daemon event-feed pagination and lean task-list endpoints read durable daemon_event/daemon_task rows"
     },
     "crates/jekko-store/src/daemon/": {
       "command": "cargo test -p jekko-store --locked --test daemon_port_roundtrip -- --test-threads=1",

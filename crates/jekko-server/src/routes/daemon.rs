@@ -8,14 +8,19 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::error::{ServerError, ServerResult};
 use crate::state::AppState;
+
+/// Default page size for the daemon event feed.
+const DEFAULT_EVENT_LIMIT: usize = 100;
+/// Maximum page size for the daemon event feed.
+const MAX_EVENT_LIMIT: usize = 1000;
 
 /// Request body for `POST /api/v1/daemon/preview`.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -24,12 +29,90 @@ pub struct PreviewBody {
     pub text: String,
 }
 
+/// Query parameters for `GET /api/v1/daemon/{run_id}/events`.
+#[derive(Debug, Clone, Default, Deserialize, IntoParams)]
+pub struct EventsQuery {
+    /// Exclusive lower bound on `timestamp_ms` (ms since epoch). Defaults to 0.
+    pub since: Option<i64>,
+    /// Maximum number of events to return (1..=1000). Defaults to 100.
+    pub limit: Option<usize>,
+}
+
+/// One event in the replayable daemon feed.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct DaemonEventView {
+    /// Event id (durable row id).
+    pub id: String,
+    /// Event kind tag.
+    pub kind: String,
+    /// Event timestamp (ms since epoch).
+    pub timestamp_ms: i64,
+    /// Full event payload (JSON).
+    pub properties: serde_json::Value,
+    /// Idempotency key projected out of the payload, when present.
+    pub idempotency_key: Option<String>,
+}
+
+/// Paginated response for `GET /api/v1/daemon/{run_id}/events`.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct DaemonEventsResponse {
+    /// Events in this page, oldest first.
+    pub events: Vec<DaemonEventView>,
+    /// Cursor to resume after, or `null` at the tail of the stream.
+    pub next_cursor: Option<i64>,
+}
+
+/// Query parameters for `GET /api/v1/daemon/{run_id}/tasks`.
+#[derive(Debug, Clone, Default, Deserialize, IntoParams)]
+pub struct TasksQuery {
+    /// Filter by task status tag.
+    pub status: Option<String>,
+    /// Filter by task lane tag.
+    pub lane: Option<String>,
+}
+
+/// Lean task projection returned by `GET /api/v1/daemon/{run_id}/tasks`.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct DaemonTaskView {
+    /// Task id.
+    pub id: String,
+    /// Owning run id.
+    pub run_id: String,
+    /// Human-friendly title.
+    pub title: String,
+    /// Status tag.
+    pub status: String,
+    /// Lane tag.
+    pub lane: String,
+    /// Phase tag.
+    pub phase: String,
+    /// Priority weight.
+    pub priority: i64,
+    /// Attempt counter.
+    pub attempt_count: i64,
+    /// Creation timestamp (ms since epoch).
+    pub time_created: i64,
+    /// Last-update timestamp (ms since epoch).
+    pub time_updated: i64,
+}
+
+/// Response for `GET /api/v1/daemon/{run_id}/tasks`.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct DaemonTasksResponse {
+    /// Run id the tasks belong to.
+    pub run_id: String,
+    /// Lean task list.
+    pub tasks: Vec<DaemonTaskView>,
+}
+
 /// Build the daemon router.
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(list))
         .route("/preview", post(preview))
         .route("/:run_id", get(get_run))
+        .route("/:run_id/events", get(events))
+        .route("/:run_id/tasks", get(tasks))
         .route("/:run_id/pause", post(pause))
         .route("/:run_id/resume", post(resume))
         .route("/:run_id/abort", post(abort))
@@ -104,6 +187,112 @@ pub async fn get_run(
             Ok(Json(durable_run_value(&db, run)?))
         }
     }
+}
+
+/// `GET /api/v1/daemon/{run_id}/events` — paginate the durable event feed.
+///
+/// Reads the existing `daemon_event` table oldest-first, returning a stable,
+/// replayable page plus a `next_cursor` (a `timestamp_ms`) to resume after.
+/// The `idempotency_key` is projected out of each event payload when present.
+#[utoipa::path(
+    get,
+    path = "/api/v1/daemon/{run_id}/events",
+    params(
+        ("run_id" = String, Path, description = "Daemon run id"),
+        EventsQuery,
+    ),
+    responses(
+        (status = 200, description = "Replayable event page", body = DaemonEventsResponse),
+        (status = 404, description = "Run not found"),
+    )
+)]
+pub async fn events(
+    State(_state): State<Arc<AppState>>,
+    Path(run_id): Path<String>,
+    Query(query): Query<EventsQuery>,
+) -> ServerResult<Json<DaemonEventsResponse>> {
+    let Some(db) = open_default_db()? else {
+        return Err(ServerError::not_found(format!("daemon: {run_id}")));
+    };
+    let since = query.since.unwrap_or(0);
+    let limit = query
+        .limit
+        .unwrap_or(DEFAULT_EVENT_LIMIT)
+        .clamp(1, MAX_EVENT_LIMIT);
+    let page = jekko_store::daemon::list_events_for_run_since(db.connection(), &run_id, since, limit)
+        .map_err(|err| ServerError::internal(err.to_string()))?;
+    let events = page
+        .events
+        .into_iter()
+        .map(|row| {
+            let idempotency_key = row
+                .payload_json
+                .get(jekko_runtime::daemon::IDEMPOTENCY_KEY_FIELD)
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string);
+            DaemonEventView {
+                id: row.id,
+                kind: row.event_type,
+                timestamp_ms: row.time_created,
+                properties: row.payload_json,
+                idempotency_key,
+            }
+        })
+        .collect();
+    Ok(Json(DaemonEventsResponse {
+        events,
+        next_cursor: page.next_cursor,
+    }))
+}
+
+/// `GET /api/v1/daemon/{run_id}/tasks` — lean task list for a run.
+///
+/// Reads the existing `daemon_task` table and returns a slim projection
+/// (no embedded run / assessment / evidence blobs), optionally filtered by
+/// `status` and/or `lane`.
+#[utoipa::path(
+    get,
+    path = "/api/v1/daemon/{run_id}/tasks",
+    params(
+        ("run_id" = String, Path, description = "Daemon run id"),
+        TasksQuery,
+    ),
+    responses(
+        (status = 200, description = "Lean task list", body = DaemonTasksResponse),
+        (status = 404, description = "Run not found"),
+    )
+)]
+pub async fn tasks(
+    State(_state): State<Arc<AppState>>,
+    Path(run_id): Path<String>,
+    Query(query): Query<TasksQuery>,
+) -> ServerResult<Json<DaemonTasksResponse>> {
+    let Some(db) = open_default_db()? else {
+        return Err(ServerError::not_found(format!("daemon: {run_id}")));
+    };
+    let rows = jekko_store::daemon::list_task_summaries_for_run(
+        db.connection(),
+        &run_id,
+        query.status.as_deref(),
+        query.lane.as_deref(),
+    )
+    .map_err(|err| ServerError::internal(err.to_string()))?;
+    let tasks = rows
+        .into_iter()
+        .map(|row| DaemonTaskView {
+            id: row.id,
+            run_id: row.run_id,
+            title: row.title,
+            status: row.status,
+            lane: row.lane,
+            phase: row.phase,
+            priority: row.priority,
+            attempt_count: row.attempt_count,
+            time_created: row.time_created,
+            time_updated: row.time_updated,
+        })
+        .collect();
+    Ok(Json(DaemonTasksResponse { run_id, tasks }))
 }
 
 fn durable_run_value(

@@ -34,6 +34,8 @@ use crate::state::AppState;
     crate::routes::daemon::list,
     crate::routes::daemon::preview,
     crate::routes::daemon::get_run,
+    crate::routes::daemon::events,
+    crate::routes::daemon::tasks,
     crate::routes::daemon::pause,
     crate::routes::daemon::resume,
     crate::routes::daemon::abort,

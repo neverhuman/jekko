@@ -72,6 +72,7 @@
     "crates/jankurai-runner/": "tools",
     "crates/jankurai/tests/fixtures/coverage/": "agent",
     "crates/jekko-cli/src/cmd/daemon.rs": "tools",
+    "crates/jekko-runtime/src/daemon/events.rs": "tools",
     "crates/jekko-store/src/daemon/": "tools",
     "crates/memory-benchmark/": "tools",
     "crates/memory-benchmark/data/real-paper-bank/": "tools",

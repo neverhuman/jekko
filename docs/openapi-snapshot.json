@@ -147,6 +147,68 @@
         }
       }
     },
+    "/api/v1/daemon/{run_id}/events": {
+      "get": {
+        "tags": [
+          "crate::routes::daemon"
+        ],
+        "summary": "`GET /api/v1/daemon/{run_id}/events` — paginate the durable event feed.",
+        "description": "Reads the existing `daemon_event` table oldest-first, returning a stable,\nreplayable page plus a `next_cursor` (a `timestamp_ms`) to resume after.\nThe `idempotency_key` is projected out of each event payload when present.",
+        "operationId": "events",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "description": "Daemon run id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Exclusive lower bound on `timestamp_ms` (ms since epoch). Defaults to 0.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of events to return (1..=1000). Defaults to 100.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Replayable event page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonEventsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found"
+          }
+        }
+      }
+    },
     "/api/v1/daemon/{run_id}/pause": {
       "post": {
         "tags": [
@@ -191,6 +253,66 @@
         "responses": {
           "200": {
             "description": "Resumed"
+          }
+        }
+      }
+    },
+    "/api/v1/daemon/{run_id}/tasks": {
+      "get": {
+        "tags": [
+          "crate::routes::daemon"
+        ],
+        "summary": "`GET /api/v1/daemon/{run_id}/tasks` — lean task list for a run.",
+        "description": "Reads the existing `daemon_task` table and returns a slim projection\n(no embedded run / assessment / evidence blobs), optionally filtered by\n`status` and/or `lane`.",
+        "operationId": "tasks",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "description": "Daemon run id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by task status tag.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "lane",
+            "in": "query",
+            "description": "Filter by task lane tag.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lean task list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonTasksResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found"
           }
         }
       }
@@ -1378,6 +1500,148 @@
               "null"
             ],
             "description": "Workspace id."
+          }
+        }
+      },
+      "DaemonEventView": {
+        "type": "object",
+        "description": "One event in the replayable daemon feed.",
+        "required": [
+          "id",
+          "kind",
+          "timestamp_ms",
+          "properties"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Event id (durable row id)."
+          },
+          "idempotency_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Idempotency key projected out of the payload, when present."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Event kind tag."
+          },
+          "properties": {
+            "description": "Full event payload (JSON)."
+          },
+          "timestamp_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Event timestamp (ms since epoch)."
+          }
+        }
+      },
+      "DaemonEventsResponse": {
+        "type": "object",
+        "description": "Paginated response for `GET /api/v1/daemon/{run_id}/events`.",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DaemonEventView"
+            },
+            "description": "Events in this page, oldest first."
+          },
+          "next_cursor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Cursor to resume after, or `null` at the tail of the stream."
+          }
+        }
+      },
+      "DaemonTaskView": {
+        "type": "object",
+        "description": "Lean task projection returned by `GET /api/v1/daemon/{run_id}/tasks`.",
+        "required": [
+          "id",
+          "run_id",
+          "title",
+          "status",
+          "lane",
+          "phase",
+          "priority",
+          "attempt_count",
+          "time_created",
+          "time_updated"
+        ],
+        "properties": {
+          "attempt_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Attempt counter."
+          },
+          "id": {
+            "type": "string",
+            "description": "Task id."
+          },
+          "lane": {
+            "type": "string",
+            "description": "Lane tag."
+          },
+          "phase": {
+            "type": "string",
+            "description": "Phase tag."
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Priority weight."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "Owning run id."
+          },
+          "status": {
+            "type": "string",
+            "description": "Status tag."
+          },
+          "time_created": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Creation timestamp (ms since epoch)."
+          },
+          "time_updated": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Last-update timestamp (ms since epoch)."
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-friendly title."
+          }
+        }
+      },
+      "DaemonTasksResponse": {
+        "type": "object",
+        "description": "Response for `GET /api/v1/daemon/{run_id}/tasks`.",
+        "required": [
+          "run_id",
+          "tasks"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "Run id the tasks belong to."
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DaemonTaskView"
+            },
+            "description": "Lean task list."
           }
         }
       },

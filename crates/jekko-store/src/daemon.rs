@@ -23,7 +23,9 @@ pub mod task_pass;
 pub mod worker;
 
 pub use artifact::{upsert_artifact, DaemonArtifactRow};
-pub use event::{insert_event, list_events_for_run, DaemonEventRow};
+pub use event::{
+    insert_event, list_events_for_run, list_events_for_run_since, DaemonEventPage, DaemonEventRow,
+};
 pub use forever::{
     get_concept, get_finding, list_active_concepts_for_run, list_concept_links_for_run,
     list_finding_batches_for_run, list_finding_edges_for_run, list_findings_for_run,
@@ -52,7 +54,10 @@ pub use reasoning::{
     ReasoningEdgeRow, ReasoningLaneRow,
 };
 pub use run::{delete_run, get_run, list_runs, upsert_run, DaemonRunRow};
-pub use task::{delete_task, get_task, upsert_task, DaemonTaskRow};
+pub use task::{
+    delete_task, get_task, list_task_summaries_for_run, upsert_task, DaemonTaskRow,
+    DaemonTaskSummaryRow,
+};
 pub use task_memory::{upsert_task_memory, DaemonTaskMemoryRow};
 pub use task_pass::{get_task_pass, upsert_task_pass, DaemonTaskPassRow};
 pub use worker::{upsert_worker, DaemonWorkerRow};

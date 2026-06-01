@@ -18,8 +18,13 @@ use uuid::Uuid;
 use crate::bus::Bus;
 use crate::error::{RuntimeError, RuntimeResult};
 
+pub mod events;
 pub mod super_reasoning;
 
+pub use events::{
+    DaemonEvent, DaemonEventPublisher, ARTIFACT_STORED, IDEMPOTENCY_KEY_FIELD, RUN_CREATED,
+    RUN_STATUS_CHANGED, RUN_STOPPED, TASK_CREATED, TASK_STATUS_CHANGED,
+};
 pub use super_reasoning::{SuperReasoningPlan, SUPER_REASONING_METADATA_KEY};
 
 /// Lifecycle status of a daemon.
@@ -100,6 +105,7 @@ impl DaemonRegistry {
             .await
             .insert(record.id.clone(), record.clone());
         self.publish_status(&record).await;
+        self.publish_run_created(&record).await;
         record
     }
 
@@ -204,6 +210,7 @@ impl DaemonRegistry {
         rec.status = status;
         rec.time_updated = Utc::now().timestamp_millis();
         self.publish_status(rec).await;
+        self.publish_run_status_changed(rec).await;
         Ok(())
     }
 
@@ -230,6 +237,38 @@ impl DaemonRegistry {
                     "daemon.status",
                     serde_json::to_value(record).unwrap_or_else(|_| serde_json::json!({})),
                 )
+                .await;
+        }
+    }
+
+    /// Emit the structured `daemon.run.created` event for a freshly
+    /// registered record. Additive to the legacy `daemon.status` feed.
+    async fn publish_run_created(&self, record: &DaemonRecord) {
+        if let Some(bus) = &self.bus {
+            let publisher = events::DaemonEventPublisher::new(bus.clone());
+            publisher
+                .run_created(&record.id, record.time_created)
+                .await;
+        }
+    }
+
+    /// Emit the structured run-status event for a record. A terminal status
+    /// additionally emits `daemon.run.stopped`.
+    async fn publish_run_status_changed(&self, record: &DaemonRecord) {
+        let Some(bus) = &self.bus else {
+            return;
+        };
+        let publisher = events::DaemonEventPublisher::new(bus.clone());
+        let status_tag = serde_json::to_value(record.status)
+            .ok()
+            .and_then(|value| value.as_str().map(str::to_string))
+            .unwrap_or_else(|| "unknown".to_string());
+        publisher
+            .run_status_changed(&record.id, &status_tag, record.time_updated)
+            .await;
+        if matches!(record.status, DaemonStatus::Done | DaemonStatus::Failed) {
+            publisher
+                .run_stopped(&record.id, Some(&status_tag), record.time_updated)
                 .await;
         }
     }
@@ -276,6 +315,31 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(sub.recv().await.unwrap().kind, "daemon.status");
+    }
+
+    #[tokio::test]
+    async fn structured_run_events_publish_alongside_status() {
+        let bus = Arc::new(Bus::new());
+        let reg = DaemonRegistry::with_bus(bus.clone());
+        let mut sub = bus.subscribe_all();
+
+        let rec = reg.register("session_1", "checker").await;
+        reg.set_status(&rec.id, DaemonStatus::Running)
+            .await
+            .unwrap();
+        reg.set_status(&rec.id, DaemonStatus::Done).await.unwrap();
+
+        let mut seen_kinds = Vec::new();
+        // register: daemon.status + daemon.run.created.
+        // running: daemon.status + daemon.run.status_changed.
+        // done: daemon.status + daemon.run.status_changed + daemon.run.stopped.
+        for _ in 0..7 {
+            seen_kinds.push(sub.recv().await.unwrap().kind);
+        }
+        assert!(seen_kinds.contains(&events::RUN_CREATED.to_string()));
+        assert!(seen_kinds.contains(&events::RUN_STATUS_CHANGED.to_string()));
+        assert!(seen_kinds.contains(&events::RUN_STOPPED.to_string()));
+        assert!(seen_kinds.iter().filter(|k| k.as_str() == "daemon.status").count() == 3);
     }
 
     #[tokio::test]

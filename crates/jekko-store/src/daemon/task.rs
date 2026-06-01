@@ -163,6 +163,83 @@ pub fn upsert_task(conn: &Connection, row: &DaemonTaskRow) -> StoreResult<()> {
     Ok(())
 }
 
+/// Lean projection of a [`DaemonTaskRow`] for list endpoints. Deliberately
+/// omits the large JSON columns so callers can enumerate a run's tasks
+/// without loading every assessment/evidence blob.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DaemonTaskSummaryRow {
+    /// Task id.
+    pub id: String,
+    /// Owning run id.
+    pub run_id: String,
+    /// Human-friendly title.
+    pub title: String,
+    /// Status tag.
+    pub status: String,
+    /// Lane tag.
+    pub lane: String,
+    /// Phase tag.
+    pub phase: String,
+    /// Priority weight.
+    pub priority: i64,
+    /// Attempt counter.
+    pub attempt_count: i64,
+    /// Creation timestamp (ms since epoch).
+    pub time_created: i64,
+    /// Last-update timestamp (ms since epoch).
+    pub time_updated: i64,
+}
+
+/// List lean task summaries for a run, optionally filtered by `status` and/or
+/// `lane`. Ordered by priority (desc) then creation time (asc) — matching the
+/// `daemon_task_run_status_idx` ordering used by the scheduler.
+pub fn list_task_summaries_for_run(
+    conn: &Connection,
+    run_id: &str,
+    status: Option<&str>,
+    lane: Option<&str>,
+) -> StoreResult<Vec<DaemonTaskSummaryRow>> {
+    let mut sql = String::from(
+        "SELECT id, run_id, title, status, lane, phase, priority, attempt_count,
+                time_created, time_updated
+         FROM daemon_task WHERE run_id = ?1",
+    );
+    // Hold owned bind values so their borrows outlive the prepared statement.
+    let mut binds: Vec<&dyn rusqlite::ToSql> = vec![&run_id];
+    if let Some(status) = status.as_ref() {
+        let idx = binds.len() + 1;
+        sql.push_str(&format!(" AND status = ?{idx}"));
+        binds.push(status);
+    }
+    if let Some(lane) = lane.as_ref() {
+        let idx = binds.len() + 1;
+        sql.push_str(&format!(" AND lane = ?{idx}"));
+        binds.push(lane);
+    }
+    sql.push_str(" ORDER BY priority DESC, time_created ASC, id ASC");
+
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(binds.as_slice(), |row| {
+        Ok(DaemonTaskSummaryRow {
+            id: row.get(0)?,
+            run_id: row.get(1)?,
+            title: row.get(2)?,
+            status: row.get(3)?,
+            lane: row.get(4)?,
+            phase: row.get(5)?,
+            priority: row.get(6)?,
+            attempt_count: row.get(7)?,
+            time_created: row.get(8)?,
+            time_updated: row.get(9)?,
+        })
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row?);
+    }
+    Ok(out)
+}
+
 /// Read a daemon_task row.
 pub fn get_task(conn: &Connection, id: &str) -> StoreResult<Option<DaemonTaskRow>> {
     conn.query_row(

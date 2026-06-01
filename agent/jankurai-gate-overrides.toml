@@ -93,7 +93,7 @@ expires = "2027-05-30"
 
 [[allow]]
 rule = "HLT-001-DEAD-MARKER"
-evidence = "daemon.rs:231 serde_json::to_value(record).unwrap_or_else"
+evidence = "daemon.rs:238 serde_json::to_value(record).unwrap_or_else"
 reason = "Rust idiom, same class as the already-waived `.ok_or_else(|| anyhow!` and `.unwrap_or_default()` entries above. `serde_json::to_value(record).unwrap_or_else(|_| serde_json::json!({}))` defaults a record→Value serialization (which cannot realistically fail for an owned record) to an empty object for a telemetry payload. It is an explicit, bounded default — not fallback soup. The HLT-001 detector matches the `.unwrap_or_else` token without inspecting the closure. Other daemon.rs HLT-001 evidence still fails the gate."
 expires = "2027-05-30"
 

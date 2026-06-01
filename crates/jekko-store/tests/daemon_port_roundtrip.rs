@@ -620,3 +620,103 @@ fn port_workflow_tables_round_trip() {
     );
     assert_eq!(daemon::list_model_reliability(conn, None).unwrap().len(), 1);
 }
+
+fn seed_task(db: &Db, id: &str, status: &str, lane: &str, priority: i64, created: i64) {
+    daemon::upsert_task(
+        db.connection(),
+        &daemon::DaemonTaskRow {
+            id: id.into(),
+            run_id: "run-1".into(),
+            external_id: None,
+            title: format!("task {id}"),
+            body_json: json!({"summary": id}),
+            status: status.into(),
+            lane: lane.into(),
+            phase: "queued".into(),
+            difficulty_score: 0.0,
+            risk_score: 0.0,
+            readiness_score: 0.0,
+            implementation_confidence: 0.0,
+            verification_confidence: 0.0,
+            attempt_count: 0,
+            no_progress_count: 0,
+            incubator_round: 0,
+            incubator_status: "none".into(),
+            accepted_artifact_id: None,
+            last_assessment_json: None,
+            promotion_result_json: None,
+            blocked_reason: None,
+            priority,
+            lease_worker_id: None,
+            lease_expires_at: None,
+            locked_paths_json: None,
+            evidence_json: None,
+            time_created: created,
+            time_updated: created,
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn event_pagination_and_task_summaries_round_trip() {
+    let db = Db::open_in_memory().unwrap();
+    seed_run(&db);
+    let conn = db.connection();
+
+    for i in 0..5 {
+        daemon::insert_event(
+            conn,
+            &daemon::DaemonEventRow {
+                id: format!("evt-{i}"),
+                run_id: "run-1".into(),
+                iteration: 1,
+                event_type: "daemon.task.created".into(),
+                payload_json: json!({
+                    "run_id": "run-1",
+                    "idempotency_key": format!("idk_{i}"),
+                }),
+                time_created: 100 + i as i64,
+                time_updated: 100 + i as i64,
+            },
+        )
+        .unwrap();
+    }
+
+    // First page: limit 2 from the beginning yields a resume cursor.
+    let page1 = daemon::list_events_for_run_since(conn, "run-1", 0, 2).unwrap();
+    assert_eq!(page1.events.len(), 2);
+    assert_eq!(page1.events[0].id, "evt-0");
+    assert_eq!(page1.next_cursor, Some(101));
+
+    // Resume after the cursor.
+    let page2 = daemon::list_events_for_run_since(conn, "run-1", 101, 2).unwrap();
+    assert_eq!(page2.events.len(), 2);
+    assert_eq!(page2.events[0].id, "evt-2");
+
+    // Tail page returns no cursor.
+    let tail = daemon::list_events_for_run_since(conn, "run-1", 103, 10).unwrap();
+    assert_eq!(tail.events.len(), 1);
+    assert_eq!(tail.next_cursor, None);
+    assert_eq!(
+        tail.events[0].payload_json["idempotency_key"],
+        json!("idk_4")
+    );
+
+    seed_task(&db, "task-a", "ready", "normal", 10, 1);
+    seed_task(&db, "task-b", "done", "parallel", 5, 2);
+    seed_task(&db, "task-c", "ready", "parallel", 20, 3);
+
+    let all = daemon::list_task_summaries_for_run(conn, "run-1", None, None).unwrap();
+    assert_eq!(all.len(), 3);
+    // Ordered by priority desc.
+    assert_eq!(all[0].id, "task-c");
+
+    let ready = daemon::list_task_summaries_for_run(conn, "run-1", Some("ready"), None).unwrap();
+    assert_eq!(ready.len(), 2);
+
+    let parallel_ready =
+        daemon::list_task_summaries_for_run(conn, "run-1", Some("ready"), Some("parallel")).unwrap();
+    assert_eq!(parallel_ready.len(), 1);
+    assert_eq!(parallel_ready[0].id, "task-c");
+}
