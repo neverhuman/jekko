@@ -1,7 +1,7 @@
 {
   "id": "failure",
   "title": "Scripted provider failure",
-  "tags": ["failure", "error", "deterministic", "local"],
+  "tags": ["error", "failure", "deterministic", "offline"],
   "provider": "dummy_agent_llm",
   "model": "failure",
   "stages": [
@@ -9,8 +9,20 @@
       "when": "initial",
       "frames": [
         { "type": "stream-start" },
-        { "type": "text-delta", "text": "dummy_agent_llm/failure: before error." },
-        { "type": "error", "message": "dummy_agent_llm scripted failure for {{last_user_text}}" }
+        {
+          "type": "metadata",
+          "metadata": {
+            "scenario_id": "failure",
+            "provider": "dummy_agent_llm",
+            "deterministic": true,
+            "network": false,
+            "token_cost": 0
+          }
+        },
+        {
+          "type": "error",
+          "message": "scripted failure from dummy_agent_llm/failure for {{last_user_text}}"
+        }
       ]
     }
   ]

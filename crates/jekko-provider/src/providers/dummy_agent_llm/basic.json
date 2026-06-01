@@ -1,7 +1,7 @@
 {
   "id": "basic",
   "title": "Deterministic text response",
-  "tags": ["text", "deterministic", "local"],
+  "tags": ["text", "deterministic", "offline"],
   "provider": "dummy_agent_llm",
   "model": "basic",
   "stages": [
@@ -9,8 +9,20 @@
       "when": "initial",
       "frames": [
         { "type": "stream-start" },
-        { "type": "text-delta", "text": "dummy_agent_llm/basic: " },
-        { "type": "text-delta", "text": "{{last_user_text}}" },
+        {
+          "type": "metadata",
+          "metadata": {
+            "scenario_id": "basic",
+            "provider": "dummy_agent_llm",
+            "deterministic": true,
+            "network": false,
+            "token_cost": 0
+          }
+        },
+        {
+          "type": "text-delta",
+          "text": "dummy_agent_llm/basic: deterministic response for {{last_user_text}}"
+        },
         {
           "type": "usage",
           "input_tokens": 0,
