@@ -10,18 +10,8 @@
       "frames": [
         { "type": "stream-start" },
         {
-          "type": "metadata",
-          "metadata": {
-            "provider": "dummy_agent_llm",
-            "scenario_id": "failure",
-            "deterministic": true,
-            "network": false,
-            "cost_usd": 0
-          }
-        },
-        {
           "type": "error",
-          "message": "dummy_agent_llm/failure: scripted failure for `{{last_user_text}}`."
+          "message": "dummy_agent_llm/failure: scripted failure for {{last_user_text}}"
         }
       ]
     }
