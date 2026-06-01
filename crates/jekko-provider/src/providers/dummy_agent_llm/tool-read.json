@@ -1,14 +1,24 @@
 {
   "id": "tool-read",
-  "title": "Read-tool workflow with deterministic follow-up",
-  "tags": ["tool-call", "read", "streaming", "deterministic"],
+  "title": "Read tool call loop",
+  "tags": ["tool-call", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start" },
+        { "type": "stream-start", "model": "dummy_agent_llm/tool-read" },
+        {
+          "type": "metadata",
+          "metadata": {
+            "provider": "dummy_agent_llm",
+            "scenario_id": "tool-read",
+            "stage": "initial",
+            "network": false,
+            "api_key_required": false
+          }
+        },
         {
           "type": "tool-call",
           "id": "dummy-read-1",
@@ -16,7 +26,7 @@
           "input": {
             "filePath": "{{first_path}}",
             "offset": 1,
-            "limit": 2000
+            "limit": 20
           }
         },
         {
@@ -32,19 +42,18 @@
     {
       "when": "after-tool-result",
       "frames": [
-        { "type": "stream-start" },
-        { "type": "text-delta", "text": "dummy_agent_llm/tool-read: tool result received." },
+        { "type": "stream-start", "model": "dummy_agent_llm/tool-read" },
         {
           "type": "metadata",
           "metadata": {
             "provider": "dummy_agent_llm",
             "scenario_id": "tool-read",
-            "tool": "read",
-            "path": "{{first_path}}",
-            "deterministic": true,
-            "network": false
+            "stage": "after-tool-result",
+            "network": false,
+            "api_key_required": false
           }
         },
+        { "type": "text-delta", "text": "dummy_agent_llm/tool-read: tool result received." },
         {
           "type": "usage",
           "input_tokens": 0,
