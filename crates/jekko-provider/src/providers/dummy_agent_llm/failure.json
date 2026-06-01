@@ -1,6 +1,6 @@
 {
   "id": "failure",
-  "title": "Scripted deterministic provider failure",
+  "title": "Scripted provider failure",
   "tags": ["failure", "error", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "failure",
@@ -8,7 +8,10 @@
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start" },
+        {
+          "type": "stream-start",
+          "model": "dummy_agent_llm/failure"
+        },
         {
           "type": "error",
           "message": "dummy_agent_llm/failure: scripted failure for {{last_user_text}}"
