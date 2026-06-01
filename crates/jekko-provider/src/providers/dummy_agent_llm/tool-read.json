@@ -1,7 +1,7 @@
 {
   "id": "tool-read",
-  "title": "Read tool loop with deterministic follow-up",
-  "tags": ["tool-call", "read", "deterministic", "no-network"],
+  "title": "Read-tool loop with deterministic follow-up",
+  "tags": ["tool-call", "read", "streaming", "deterministic"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
@@ -12,13 +12,15 @@
           "type": "stream-start"
         },
         {
+          "type": "text-delta",
+          "text": "dummy_agent_llm/tool-read: requesting read of {{first_path}}."
+        },
+        {
           "type": "tool-call",
           "id": "dummy-read-1",
           "name": "read",
           "input": {
-            "filePath": "{{first_path}}",
-            "offset": 1,
-            "limit": 2000
+            "filePath": "{{first_path}}"
           }
         },
         {
@@ -46,6 +48,15 @@
           "type": "usage",
           "input_tokens": 0,
           "output_tokens": 0
+        },
+        {
+          "type": "metadata",
+          "metadata": {
+            "provider": "dummy_agent_llm",
+            "scenario_id": "tool-read",
+            "tool_result_seen": true,
+            "cost_usd": 0
+          }
         },
         {
           "type": "stream-end",
