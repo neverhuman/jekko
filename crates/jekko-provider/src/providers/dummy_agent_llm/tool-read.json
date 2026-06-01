@@ -15,12 +15,12 @@
         },
         {
           "type": "tool-call",
-          "id": "call_read_1",
+          "id": "dummy-read-1",
           "name": "read",
           "input": {
             "filePath": "{{first_path}}",
             "offset": 1,
-            "limit": 2000
+            "limit": 20
           }
         },
         {
@@ -46,8 +46,8 @@
           "metadata": {
             "provider": "dummy_agent_llm",
             "scenario_id": "tool-read",
-            "network": false,
-            "api_key_required": false
+            "deterministic": true,
+            "network": false
           }
         },
         {

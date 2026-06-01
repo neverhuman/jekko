@@ -11,15 +11,15 @@
         { "type": "stream-start", "model": "dummy_agent_llm/basic" },
         {
           "type": "text-delta",
-          "text": "dummy_agent_llm/basic: deterministic response to `{{last_user_text}}`."
+          "text": "dummy_agent_llm/basic: deterministic response for {{last_user_text}}"
         },
         {
           "type": "metadata",
           "metadata": {
             "provider": "dummy_agent_llm",
             "scenario_id": "basic",
-            "network": false,
-            "api_key_required": false
+            "deterministic": true,
+            "network": false
           }
         },
         {
