@@ -1,7 +1,7 @@
 {
   "id": "tool-read",
-  "title": "Deterministic read tool call",
-  "tags": ["tool-call", "read", "deterministic", "local"],
+  "title": "Read tool loop",
+  "tags": ["tool-call", "read", "deterministic"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
@@ -16,16 +16,10 @@
           "input": {
             "filePath": "{{first_path}}",
             "offset": 1,
-            "limit": 20
+            "limit": 2000
           }
         },
-        {
-          "type": "usage",
-          "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
-        },
+        { "type": "usage", "input_tokens": 0, "output_tokens": 0 },
         { "type": "stream-end", "stop_reason": "tool-calls" }
       ]
     },
@@ -33,17 +27,8 @@
       "when": "after-tool-result",
       "frames": [
         { "type": "stream-start" },
-        {
-          "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: tool result received."
-        },
-        {
-          "type": "usage",
-          "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
-        },
+        { "type": "text-delta", "text": "dummy_agent_llm/tool-read: tool result received." },
+        { "type": "usage", "input_tokens": 0, "output_tokens": 0 },
         { "type": "stream-end", "stop_reason": "stop" }
       ]
     }
