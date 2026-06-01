@@ -1,23 +1,19 @@
 {
   "id": "tool-read",
-  "title": "Read tool loop",
-  "tags": ["tool-call", "streaming", "zero-cost"],
+  "title": "Read tool call loop",
+  "tags": ["tool-call", "read", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start" },
         {
-          "type": "metadata",
-          "metadata": {
-            "provider": "dummy_agent_llm",
-            "scenario_id": "tool-read",
-            "stage": "initial",
-            "network": false,
-            "requires_api_key": false
-          }
+          "type": "stream-start"
+        },
+        {
+          "type": "text-delta",
+          "text": "dummy_agent_llm/tool-read: requesting read tool."
         },
         {
           "type": "tool-call",
@@ -26,43 +22,39 @@
           "input": {
             "filePath": "{{first_path}}",
             "offset": 1,
-            "limit": 2000
+            "limit": 20
           }
         },
         {
           "type": "usage",
           "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
+          "output_tokens": 0
         },
-        { "type": "stream-end", "stop_reason": "tool-calls" }
+        {
+          "type": "stream-end",
+          "stop_reason": "tool-calls"
+        }
       ]
     },
     {
       "when": "after-tool-result",
       "frames": [
-        { "type": "stream-start" },
         {
-          "type": "metadata",
-          "metadata": {
-            "provider": "dummy_agent_llm",
-            "scenario_id": "tool-read",
-            "stage": "after-tool-result",
-            "network": false,
-            "requires_api_key": false
-          }
+          "type": "stream-start"
         },
-        { "type": "text-delta", "text": "dummy_agent_llm/tool-read: " },
-        { "type": "text-delta", "text": "tool result received." },
+        {
+          "type": "text-delta",
+          "text": "dummy_agent_llm/tool-read: tool result received."
+        },
         {
           "type": "usage",
           "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
+          "output_tokens": 0
         },
-        { "type": "stream-end", "stop_reason": "stop" }
+        {
+          "type": "stream-end",
+          "stop_reason": "stop"
+        }
       ]
     }
   ]
