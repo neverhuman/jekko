@@ -1,6 +1,6 @@
 {
   "id": "basic",
-  "title": "Deterministic text-only response",
+  "title": "Deterministic text-only assistant response",
   "tags": ["deterministic", "text", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "basic",
@@ -8,22 +8,31 @@
     {
       "when": "initial",
       "frames": [
+        { "type": "stream-start" },
         {
-          "type": "stream-start"
+          "type": "text-delta",
+          "text": "dummy_agent_llm/basic: received "
         },
         {
           "type": "text-delta",
-          "text": "dummy_agent_llm/basic: deterministic response for `{{last_user_text}}`."
+          "text": "{{last_user_text}}"
+        },
+        {
+          "type": "metadata",
+          "metadata": {
+            "provider": "dummy_agent_llm",
+            "scenario_id": "basic",
+            "deterministic": true
+          }
         },
         {
           "type": "usage",
           "input_tokens": 0,
-          "output_tokens": 0
+          "output_tokens": 0,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0
         },
-        {
-          "type": "stream-end",
-          "stop_reason": "stop"
-        }
+        { "type": "stream-end", "stop_reason": "stop" }
       ]
     }
   ]
