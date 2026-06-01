@@ -1,17 +1,15 @@
 {
   "id": "tool-read",
-  "title": "Read tool round trip",
-  "tags": ["tool-call", "read", "deterministic", "local"],
+  "title": "Read tool loop",
+  "tags": ["tool-call", "read", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start" },
         {
-          "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: requesting read."
+          "type": "stream-start"
         },
         {
           "type": "tool-call",
@@ -20,24 +18,13 @@
           "input": {
             "filePath": "{{first_path}}",
             "offset": 1,
-            "limit": 50
+            "limit": 2000
           }
         },
         {
           "type": "usage",
           "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
-        },
-        {
-          "type": "metadata",
-          "metadata": {
-            "provider": "dummy_agent_llm",
-            "scenario_id": "tool-read",
-            "stage": "initial",
-            "cost_usd": 0
-          }
+          "output_tokens": 0
         },
         {
           "type": "stream-end",
@@ -48,7 +35,9 @@
     {
       "when": "after-tool-result",
       "frames": [
-        { "type": "stream-start" },
+        {
+          "type": "stream-start"
+        },
         {
           "type": "text-delta",
           "text": "dummy_agent_llm/tool-read: tool result received."
@@ -56,18 +45,7 @@
         {
           "type": "usage",
           "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
-        },
-        {
-          "type": "metadata",
-          "metadata": {
-            "provider": "dummy_agent_llm",
-            "scenario_id": "tool-read",
-            "stage": "after-tool-result",
-            "cost_usd": 0
-          }
+          "output_tokens": 0
         },
         {
           "type": "stream-end",
