@@ -1,7 +1,7 @@
 {
   "id": "tool-read",
-  "title": "Read-tool agent loop",
-  "tags": ["tool-call", "agent-loop", "deterministic"],
+  "title": "Read-tool loop",
+  "tags": ["tool-call", "read", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
@@ -10,20 +10,29 @@
       "frames": [
         { "type": "stream-start" },
         {
-          "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: requesting read for {{first_path}}."
+          "type": "metadata",
+          "metadata": {
+            "provider": "dummy_agent_llm",
+            "scenario_id": "tool-read",
+            "stage": "initial"
+          }
         },
         {
           "type": "tool-call",
-          "id": "dummy-tool-read-1",
+          "id": "dummy-read-1",
           "name": "read",
           "input": {
             "filePath": "{{first_path}}",
-            "offset": 1,
-            "limit": 2000
+            "limit": 200
           }
         },
-        { "type": "usage", "input_tokens": 0, "output_tokens": 0 },
+        {
+          "type": "usage",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0
+        },
         { "type": "stream-end", "stop_reason": "tool-calls" }
       ]
     },
@@ -32,10 +41,21 @@
       "frames": [
         { "type": "stream-start" },
         {
-          "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: tool result received."
+          "type": "metadata",
+          "metadata": {
+            "provider": "dummy_agent_llm",
+            "scenario_id": "tool-read",
+            "stage": "after-tool-result"
+          }
         },
-        { "type": "usage", "input_tokens": 0, "output_tokens": 0 },
+        { "type": "text-delta", "text": "dummy_agent_llm/tool-read: tool result received." },
+        {
+          "type": "usage",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0
+        },
         { "type": "stream-end", "stop_reason": "stop" }
       ]
     }
