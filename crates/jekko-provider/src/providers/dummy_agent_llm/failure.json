@@ -8,7 +8,18 @@
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start" },
+        {
+          "type": "stream-start",
+          "model": "dummy_agent_llm/failure"
+        },
+        {
+          "type": "metadata",
+          "metadata": {
+            "provider": "dummy_agent_llm",
+            "scenario_id": "failure",
+            "model": "failure"
+          }
+        },
         {
           "type": "error",
           "message": "dummy_agent_llm/failure: scripted failure for {{last_user_text}}"
