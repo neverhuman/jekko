@@ -110,7 +110,7 @@ pub const CATALOG: &[CatalogEntry] = &[
         provider_id: "dummy_agent_llm",
         env_names: &[],
         signup_url: None,
-        recommended_model_id: Some("default"),
+        recommended_model_id: Some("basic"),
         priority: 0,
         companion_env_names: None,
     },
@@ -444,7 +444,8 @@ mod tests {
         assert!(CATALOG.iter().any(|e| e.provider_id == "openai"));
         assert!(CATALOG.iter().any(|e| e.provider_id == "anthropic"));
         assert!(CATALOG.iter().any(|e| e.provider_id == "jnoccio"));
-        assert!(CATALOG.iter().any(|e| e.provider_id == "dummy_agent_llm"));
+        let dummy = catalog_entry("dummy_agent_llm").unwrap();
+        assert_eq!(dummy.recommended_model_id, Some("basic"));
         let cf = catalog_entry("cloudflare").unwrap();
         assert_eq!(cf.companion_env_names.unwrap().len(), 2);
     }
