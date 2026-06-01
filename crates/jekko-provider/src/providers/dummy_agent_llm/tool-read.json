@@ -1,14 +1,16 @@
 {
   "id": "tool-read",
-  "title": "Read-tool loop",
-  "tags": ["tool-call", "read", "deterministic", "no-network"],
+  "title": "Read-tool workflow loop",
+  "tags": ["deterministic", "tool-call", "read", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start" },
+        {
+          "type": "stream-start"
+        },
         {
           "type": "tool-call",
           "id": "dummy-read-1",
@@ -20,20 +22,20 @@
         {
           "type": "usage",
           "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
+          "output_tokens": 0
         },
         {
           "type": "stream-end",
-          "stop_reason": "tool-call"
+          "stop_reason": "tool-calls"
         }
       ]
     },
     {
       "when": "after-tool-result",
       "frames": [
-        { "type": "stream-start" },
+        {
+          "type": "stream-start"
+        },
         {
           "type": "text-delta",
           "text": "dummy_agent_llm/tool-read: tool result received."
@@ -41,9 +43,7 @@
         {
           "type": "usage",
           "input_tokens": 0,
-          "output_tokens": 0,
-          "cache_read_tokens": 0,
-          "cache_write_tokens": 0
+          "output_tokens": 0
         },
         {
           "type": "stream-end",
