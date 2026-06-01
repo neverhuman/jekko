@@ -1,16 +1,14 @@
 {
   "id": "tool-read",
-  "title": "Read tool call loop",
-  "tags": ["tool-call", "read", "deterministic", "no-network"],
+  "title": "Read tool loop",
+  "tags": ["tool-call", "streaming", "zero-cost"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        {
-          "type": "stream-start"
-        },
+        { "type": "stream-start" },
         {
           "type": "text-delta",
           "text": "dummy_agent_llm/tool-read: requesting read tool."
@@ -22,7 +20,7 @@
           "input": {
             "filePath": "{{first_path}}",
             "offset": 1,
-            "limit": 20
+            "limit": 40
           }
         },
         {
@@ -32,19 +30,24 @@
         },
         {
           "type": "stream-end",
-          "stop_reason": "tool-calls"
+          "stop_reason": "tool-call"
         }
       ]
     },
     {
       "when": "after-tool-result",
       "frames": [
-        {
-          "type": "stream-start"
-        },
+        { "type": "stream-start" },
         {
           "type": "text-delta",
           "text": "dummy_agent_llm/tool-read: tool result received."
+        },
+        {
+          "type": "metadata",
+          "metadata": {
+            "scenario_id": "tool-read",
+            "tool_result_seen": true
+          }
         },
         {
           "type": "usage",
