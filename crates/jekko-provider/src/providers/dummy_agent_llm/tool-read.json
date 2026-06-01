@@ -1,7 +1,7 @@
 {
   "id": "tool-read",
-  "title": "Read-tool loop scenario",
-  "tags": ["tool-call", "streaming", "zero-cost"],
+  "title": "Read-tool loop simulation",
+  "tags": ["tool-call", "read", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
@@ -10,17 +10,8 @@
       "frames": [
         { "type": "stream-start" },
         {
-          "type": "metadata",
-          "metadata": {
-            "provider": "dummy_agent_llm",
-            "scenario_id": "tool-read",
-            "model": "tool-read",
-            "usage_cost_usd": 0
-          }
-        },
-        {
           "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: requesting a deterministic read."
+          "text": "dummy_agent_llm/tool-read: requesting read for {{first_path}}."
         },
         {
           "type": "tool-call",
@@ -32,7 +23,24 @@
             "limit": 2000
           }
         },
-        { "type": "usage", "input_tokens": 0, "output_tokens": 0 },
+        {
+          "type": "usage",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        {
+          "type": "metadata",
+          "metadata": {
+            "provider": "dummy_agent_llm",
+            "scenario_id": "tool-read",
+            "stage": "initial",
+            "deterministic": true,
+            "network": false,
+            "cost_usd": 0
+          }
+        },
         { "type": "stream-end", "stop_reason": "tool-calls" }
       ]
     },
@@ -41,20 +49,27 @@
       "frames": [
         { "type": "stream-start" },
         {
+          "type": "text-delta",
+          "text": "dummy_agent_llm/tool-read: tool result received."
+        },
+        {
+          "type": "usage",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        {
           "type": "metadata",
           "metadata": {
             "provider": "dummy_agent_llm",
             "scenario_id": "tool-read",
-            "model": "tool-read",
             "stage": "after-tool-result",
-            "usage_cost_usd": 0
+            "deterministic": true,
+            "network": false,
+            "cost_usd": 0
           }
         },
-        {
-          "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: tool result received."
-        },
-        { "type": "usage", "input_tokens": 0, "output_tokens": 0 },
         { "type": "stream-end", "stop_reason": "stop" }
       ]
     }

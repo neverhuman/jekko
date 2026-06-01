@@ -1,7 +1,7 @@
 {
   "id": "failure",
   "title": "Scripted provider failure",
-  "tags": ["error", "failure", "zero-cost"],
+  "tags": ["failure", "error", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "failure",
   "stages": [
@@ -14,13 +14,14 @@
           "metadata": {
             "provider": "dummy_agent_llm",
             "scenario_id": "failure",
-            "model": "failure",
-            "usage_cost_usd": 0
+            "deterministic": true,
+            "network": false,
+            "cost_usd": 0
           }
         },
         {
           "type": "error",
-          "message": "dummy_agent_llm/failure: scripted failure for {{last_user_text}}"
+          "message": "dummy_agent_llm/failure: scripted failure for `{{last_user_text}}`."
         }
       ]
     }
