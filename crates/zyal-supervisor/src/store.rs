@@ -139,6 +139,7 @@ mod tests {
                     kind: GateKind::TestsGreen,
                     required: true,
                 }],
+                exec: None,
             })
             .collect();
         SuperWorkflow {

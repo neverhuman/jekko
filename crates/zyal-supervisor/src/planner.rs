@@ -201,6 +201,7 @@ mod tests {
                 kind: GateKind::TestsGreen,
                 required: true,
             }],
+            exec: None,
         }
     }
 

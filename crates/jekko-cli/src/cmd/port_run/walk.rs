@@ -8,7 +8,9 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
-use zyal_supervisor::{execution_layers, Phase, PhaseStatus, SuperWorkflow, SupervisorStore};
+use zyal_supervisor::{
+    execution_layers, Phase, PhaseExec, PhaseStatus, SshExec, SuperWorkflow, SupervisorStore,
+};
 
 use super::PortRunArgs;
 
@@ -94,7 +96,7 @@ pub(super) fn walk_waves(
                     Some(p) => p,
                     None => bail!("phase `{phase_id}` not present in manifest lookup"),
                 };
-                invoke_live_phase(phase, args)
+                invoke_phase(phase, args)
             } else {
                 // Non-live path records the phase as completed with a
                 // descriptive summary so --status can distinguish scaffolded
@@ -212,11 +214,119 @@ fn block_remaining_from(
     Ok(())
 }
 
-/// Spawn `jekko run --ephemeral --json --agent plan --cwd <repo> <prompt>`
+/// Dispatch a single `--live` phase to its executor.
+///
+/// Routing is driven by [`Phase::exec`]:
+/// * `None` — historical default; delegate to `jekko run --agent plan`.
+/// * `Some(Agent { name })` — delegate to `jekko run --agent <name>`.
+/// * `Some(Ssh(..))` — run an allowlisted remote command over SSH.
+fn invoke_phase(phase: &Phase, args: &PortRunArgs) -> Result<String> {
+    match phase.exec.as_ref() {
+        None => invoke_agent_phase(phase, "plan", args),
+        Some(PhaseExec::Agent { name }) => invoke_agent_phase(phase, name, args),
+        Some(PhaseExec::Ssh(ssh)) => invoke_ssh_phase(phase, ssh, args),
+    }
+}
+
+/// Decide whether `host` is permitted by the optional `allowlist` (the value
+/// of `JEKKO_SSH_ALLOWED_HOSTS`). A `None` or empty/whitespace allowlist
+/// applies no gate (full extensibility — the gate is opt-in by configuring
+/// the var). Otherwise `host` must match one comma-separated entry exactly.
+fn host_allowed(host: &str, allowlist: Option<&str>) -> bool {
+    match allowlist {
+        None => true,
+        Some(raw) => {
+            let raw = raw.trim();
+            raw.is_empty()
+                || raw
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|h| !h.is_empty())
+                    .any(|h| h == host)
+        }
+    }
+}
+
+/// Enforce the [`host_allowed`] gate against `JEKKO_SSH_ALLOWED_HOSTS`,
+/// rejecting the phase before any process is spawned when the host is denied.
+fn ensure_ssh_host_allowed(host: &str) -> Result<()> {
+    let allowlist = std::env::var("JEKKO_SSH_ALLOWED_HOSTS").ok();
+    if host_allowed(host, allowlist.as_deref()) {
+        Ok(())
+    } else {
+        bail!("ssh host `{host}` is not in the JEKKO_SSH_ALLOWED_HOSTS allowlist");
+    }
+}
+
+/// Run an allowlisted remote command for an [`PhaseExec::Ssh`] phase and
+/// return its captured stdout as the phase summary. The ssh binary is
+/// `JEKKO_SSH_BIN` (default `ssh` on PATH). A non-zero remote exit fails the
+/// phase unless [`SshExec::allow_nonzero_exit`] is set. Aborts after
+/// `args.per_phase_timeout_secs` seconds.
+fn invoke_ssh_phase(phase: &Phase, ssh: &SshExec, args: &PortRunArgs) -> Result<String> {
+    ensure_ssh_host_allowed(&ssh.host)?;
+    let bin = match std::env::var("JEKKO_SSH_BIN") {
+        Ok(v) => v,
+        Err(_) => "ssh".to_string(),
+    };
+    let timeout = Duration::from_secs(args.per_phase_timeout_secs);
+    let phase_id = phase.id.clone();
+    let host = ssh.host.clone();
+    let command = ssh.command.clone();
+    let allow_nonzero_exit = ssh.allow_nonzero_exit;
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("build tokio runtime for ssh phase invocation")?;
+
+    rt.block_on(async move {
+        let mut cmd = tokio::process::Command::new(&bin);
+        cmd.arg(&host)
+            .arg(&command)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .kill_on_drop(true);
+
+        let child = cmd
+            .spawn()
+            .with_context(|| format!("spawn `{bin} {host} <command>`"))?;
+
+        let wait = child.wait_with_output();
+        let output = match tokio::time::timeout(timeout, wait).await {
+            Ok(res) => res.context("await ssh phase subprocess")?,
+            Err(_) => {
+                bail!(
+                    "ssh phase `{}` exceeded per-phase timeout of {}s",
+                    phase_id,
+                    args.per_phase_timeout_secs
+                );
+            }
+        };
+        if !output.status.success() && !allow_nonzero_exit {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            bail!(
+                "ssh phase `{}` exited with status {:?}: {}",
+                phase_id,
+                output.status.code(),
+                if stderr.is_empty() {
+                    "<no stderr>".to_string()
+                } else {
+                    stderr
+                }
+            );
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Ok(stdout)
+    })
+}
+
+/// Spawn `jekko run --ephemeral --json --agent <agent> --cwd <repo> <prompt>`
 /// as a child process and return its captured stdout. Honors `JEKKO_BIN`
 /// (default `jekko` on PATH) and `JEKKO_KEY_SOURCE_POLICY` (default
 /// `users-only`). Aborts after `args.per_phase_timeout_secs` seconds.
-fn invoke_live_phase(phase: &Phase, args: &PortRunArgs) -> Result<String> {
+fn invoke_agent_phase(phase: &Phase, agent: &str, args: &PortRunArgs) -> Result<String> {
     // Env-var defaults expressed as explicit typed-state matches rather
     // than `.unwrap_or_else` to avoid tripping the fallback-soup detector
     // — the default IS the configured behavior, not a silent recovery.
@@ -243,7 +353,7 @@ fn invoke_live_phase(phase: &Phase, args: &PortRunArgs) -> Result<String> {
             .arg("--ephemeral")
             .arg("--json")
             .arg("--agent")
-            .arg("plan")
+            .arg(agent)
             .arg("--cwd")
             .arg(&cwd)
             .arg(&prompt)
@@ -255,7 +365,7 @@ fn invoke_live_phase(phase: &Phase, args: &PortRunArgs) -> Result<String> {
 
         let child = cmd
             .spawn()
-            .with_context(|| format!("spawn `{bin} run --ephemeral --json --agent plan`"))?;
+            .with_context(|| format!("spawn `{bin} run --ephemeral --json --agent {agent}`"))?;
 
         let wait = child.wait_with_output();
         let output = match tokio::time::timeout(timeout, wait).await {
@@ -284,4 +394,33 @@ fn invoke_live_phase(phase: &Phase, args: &PortRunArgs) -> Result<String> {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         Ok(stdout)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::host_allowed;
+
+    #[test]
+    fn host_allowed_with_no_allowlist_permits_any_host() {
+        // Gate is opt-in: an unset allowlist means full extensibility.
+        assert!(host_allowed("deploy@xbabe", None));
+    }
+
+    #[test]
+    fn host_allowed_with_empty_allowlist_permits_any_host() {
+        assert!(host_allowed("deploy@xbabe", Some("")));
+        assert!(host_allowed("deploy@xbabe", Some("   ")));
+    }
+
+    #[test]
+    fn host_allowed_enforces_exact_membership_when_set() {
+        let allow = Some("xbabe, deploy@xbabe ,build-01");
+        assert!(host_allowed("xbabe", allow));
+        assert!(host_allowed("deploy@xbabe", allow), "whitespace is trimmed");
+        assert!(host_allowed("build-01", allow));
+        assert!(!host_allowed("evil-host", allow));
+        // Substring / prefix matches must NOT pass — membership is exact.
+        assert!(!host_allowed("xbabe.internal", allow));
+        assert!(!host_allowed("deploy@xbabe2", allow));
+    }
 }

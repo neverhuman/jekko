@@ -61,6 +61,49 @@ pub struct Phase {
     /// Exit gates this phase must satisfy.
     #[serde(default)]
     pub gates: Vec<Gate>,
+    /// How this phase's per-phase work is executed in `--live` mode.
+    ///
+    /// Absent (the default) preserves the historical behavior of delegating
+    /// the phase to `jekko run --agent plan`. A present value lets a workflow
+    /// route the phase to a named agent or a host-defined executor (e.g. an
+    /// allowlisted SSH command) without changing the phase DAG shape.
+    #[serde(default)]
+    pub exec: Option<PhaseExec>,
+}
+
+/// Per-phase executor selection for `--live` walks.
+///
+/// This is an additive, backward-compatible extension to [`Phase`]: manifests
+/// that omit `exec` deserialize to `None` and keep the default agent path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PhaseExec {
+    /// Delegate the phase to a named jekko agent (`jekko run --agent <name>`).
+    /// `name = "plan"` is equivalent to the historical default.
+    Agent {
+        /// Agent name passed to `jekko run --agent`.
+        name: String,
+    },
+    /// Run an allowlisted command on a remote host over SSH and capture its
+    /// stdout as the phase summary. Hosts are gated by the host runtime's
+    /// allowlist (see the `--live` walker); this variant only carries intent.
+    Ssh(SshExec),
+}
+
+/// Parameters for an [`PhaseExec::Ssh`] phase executor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SshExec {
+    /// SSH destination — an `ssh` argument such as `user@host` or a
+    /// `~/.ssh/config` host alias.
+    pub host: String,
+    /// Command to execute on the remote host.
+    pub command: String,
+    /// When true, a non-zero remote exit code still completes the phase
+    /// (stdout is captured as the summary). Defaults to false, where a
+    /// non-zero exit fails the phase.
+    #[serde(default)]
+    pub allow_nonzero_exit: bool,
 }
 
 /// Persisted phase status.
@@ -343,4 +386,79 @@ pub struct ParityPolicy {
     /// Optional ramdisk mount root for parity runs.
     #[serde(default)]
     pub ramdisk_root: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn phase_without_exec_defaults_to_none() {
+        // Manifests authored before `exec` existed must still parse, and must
+        // keep the historical default-agent path (exec == None).
+        let phase: Phase = serde_json::from_value(serde_json::json!({
+            "id": "p1",
+            "name": "Frame",
+            "objective": "establish the contract",
+        }))
+        .expect("legacy phase without exec parses");
+        assert_eq!(phase.exec, None);
+        assert!(phase.depends_on.is_empty());
+    }
+
+    #[test]
+    fn phase_exec_agent_round_trips() {
+        let phase: Phase = serde_json::from_value(serde_json::json!({
+            "id": "p2",
+            "name": "Review",
+            "objective": "critique the candidate",
+            "exec": { "kind": "agent", "name": "code-reviewer" },
+        }))
+        .expect("agent exec parses");
+        assert_eq!(
+            phase.exec,
+            Some(PhaseExec::Agent {
+                name: "code-reviewer".to_string()
+            })
+        );
+        // Round-trip through JSON preserves the tagged shape.
+        let json = serde_json::to_value(&phase).expect("serialize phase");
+        let back: Phase = serde_json::from_value(json).expect("re-parse phase");
+        assert_eq!(back.exec, phase.exec);
+    }
+
+    #[test]
+    fn phase_exec_ssh_parses_with_defaulted_nonzero() {
+        let phase: Phase = serde_json::from_value(serde_json::json!({
+            "id": "p3",
+            "name": "Remote deploy",
+            "objective": "push to the box",
+            "exec": {
+                "kind": "ssh",
+                "host": "deploy@xbabe",
+                "command": "bash ci-fast-push.sh",
+            },
+        }))
+        .expect("ssh exec parses");
+        match phase.exec {
+            Some(PhaseExec::Ssh(ssh)) => {
+                assert_eq!(ssh.host, "deploy@xbabe");
+                assert_eq!(ssh.command, "bash ci-fast-push.sh");
+                assert!(!ssh.allow_nonzero_exit, "defaults to failing on non-zero");
+            }
+            other => panic!("expected ssh exec, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn phase_exec_ssh_honors_allow_nonzero_exit() {
+        let ssh = SshExec {
+            host: "h".into(),
+            command: "true".into(),
+            allow_nonzero_exit: true,
+        };
+        let json = serde_json::to_value(PhaseExec::Ssh(ssh)).expect("serialize");
+        assert_eq!(json["kind"], "ssh");
+        assert_eq!(json["allow_nonzero_exit"], true);
+    }
 }
