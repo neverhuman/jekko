@@ -1,7 +1,7 @@
 {
   "id": "basic",
   "title": "Deterministic text response",
-  "tags": ["text", "deterministic", "no-network"],
+  "tags": ["default", "text", "streaming"],
   "provider": "dummy_agent_llm",
   "model": "basic",
   "stages": [
@@ -11,10 +11,9 @@
         { "type": "stream-start" },
         {
           "type": "text-delta",
-          "text": "dummy_agent_llm/basic: deterministic response for `"
+          "text": "dummy_agent_llm/basic: deterministic response for "
         },
         { "type": "text-delta", "text": "{{last_user_text}}" },
-        { "type": "text-delta", "text": "`." },
         {
           "type": "usage",
           "input_tokens": 0,
