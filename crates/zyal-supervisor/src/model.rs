@@ -141,6 +141,12 @@ pub struct JailgunExec {
     /// Defaults to an empty object.
     #[serde(default)]
     pub request_overrides: serde_json::Value,
+    /// Optional Jailgun-server base URL (e.g. `http://127.0.0.1:8787`). When set,
+    /// the phase calls jailgun over HTTP (`POST /api/runs` + poll
+    /// `GET /api/runs/{id}/agent-summary`) instead of the `jailgun run-agent`
+    /// CLI. Absent (the default) keeps the CLI transport.
+    #[serde(default)]
+    pub endpoint: Option<String>,
 }
 
 /// Persisted phase status.

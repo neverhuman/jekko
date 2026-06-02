@@ -294,20 +294,153 @@ fn summarize_jailgun_file(path: &Path) -> Option<String> {
     Some(summarize_jailgun_value(&value))
 }
 
-/// Run a Jailgun agent run for a [`PhaseExec::Jailgun`] phase. Resolves the
-/// binary from `JAILGUN_BIN` (default `jailgun`) and the timeout from
-/// `args.per_phase_timeout_secs`, then delegates to [`run_jailgun_agent`].
+/// Run a Jailgun agent run for a [`PhaseExec::Jailgun`] phase. Dispatches by
+/// transport: when `jx.endpoint` is set the run goes over HTTP to a
+/// jailgun-server ([`run_jailgun_http`]); otherwise it shells out to the
+/// `jailgun run-agent` CLI (`JAILGUN_BIN`, default `jailgun`) via
+/// [`run_jailgun_agent`]. Both honor `args.per_phase_timeout_secs`.
 fn invoke_jailgun_phase(phase: &Phase, jx: &JailgunExec, args: &PortRunArgs) -> Result<String> {
-    let bin = match std::env::var("JAILGUN_BIN") {
-        Ok(v) => v,
-        Err(_) => "jailgun".to_string(),
-    };
-    run_jailgun_agent(
-        &bin,
-        jx,
-        Duration::from_secs(args.per_phase_timeout_secs),
-        &phase.id,
+    let timeout = Duration::from_secs(args.per_phase_timeout_secs);
+    match jx.endpoint.as_deref() {
+        Some(base) => {
+            let curl = match std::env::var("CURL_BIN") {
+                Ok(v) => v,
+                Err(_) => "curl".to_string(),
+            };
+            run_jailgun_http(&curl, base, jx, timeout, &phase.id)
+        }
+        None => {
+            let bin = match std::env::var("JAILGUN_BIN") {
+                Ok(v) => v,
+                Err(_) => "jailgun".to_string(),
+            };
+            run_jailgun_agent(&bin, jx, timeout, &phase.id)
+        }
+    }
+}
+
+/// HTTP transport for a [`PhaseExec::Jailgun`] phase: POST the run request to a
+/// jailgun-server (`POST {base}/api/runs`) and poll its agent-summary
+/// (`GET {base}/api/runs/{id}/agent-summary`) until a summary with a status
+/// appears. `CURL_BIN` (default `curl`) is the transport — jekko-cli needs no
+/// HTTP-client dep and the path is stub-testable. Mirrors the CLI path's
+/// prompt-free summary and fail-closed semantics: a non-`succeeded` run fails
+/// the phase. Note: the request's `prompt_file` is a path the jailgun-server
+/// must be able to read, so this assumes a same-host server.
+fn run_jailgun_http(
+    curl: &str,
+    base_url: &str,
+    jx: &JailgunExec,
+    timeout: Duration,
+    phase_id: &str,
+) -> Result<String> {
+    let base = base_url.trim_end_matches('/').to_string();
+    let dir = tempfile::tempdir().context("create temp dir for jailgun http phase")?;
+    let prompt_file = dir.path().join("prompt.txt");
+    let request_file = dir.path().join("request.json");
+    let summary_file = dir.path().join("summary.json");
+    std::fs::write(&prompt_file, &jx.prompt)
+        .with_context(|| format!("write jailgun prompt file for phase `{phase_id}`"))?;
+    let request = request_json_for(jx, &prompt_file);
+    std::fs::write(
+        &request_file,
+        serde_json::to_vec_pretty(&request).context("serialize jailgun run request")?,
     )
+    .with_context(|| format!("write jailgun request file for phase `{phase_id}`"))?;
+
+    let phase_id = phase_id.to_string();
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("build tokio runtime for jailgun http phase")?;
+
+    rt.block_on(async move {
+        // Submit: POST the request body; expect a 202 JSON carrying `run_id`.
+        let runs_url = format!("{base}/api/runs");
+        let mut post = tokio::process::Command::new(curl);
+        post.arg("-sS")
+            .arg("-X")
+            .arg("POST")
+            .arg("-H")
+            .arg("content-type: application/json")
+            .arg("--data-binary")
+            .arg(format!("@{}", request_file.display()))
+            .arg(&runs_url)
+            .stdin(std::process::Stdio::null())
+            .kill_on_drop(true);
+        let out = post
+            .output()
+            .await
+            .with_context(|| format!("spawn `{curl} POST {runs_url}`"))?;
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            bail!(
+                "jailgun http submit failed for phase `{}` (curl {:?}): {}",
+                phase_id,
+                out.status.code(),
+                if stderr.is_empty() {
+                    "<no stderr>".to_owned()
+                } else {
+                    stderr
+                }
+            );
+        }
+        let body = String::from_utf8_lossy(&out.stdout);
+        let accepted: serde_json::Value = serde_json::from_str(body.trim())
+            .with_context(|| format!("parse jailgun POST /api/runs response: {}", body.trim()))?;
+        let run_id = accepted
+            .get("run_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("jailgun POST /api/runs response missing run_id: {}", body.trim()))?
+            .to_string();
+
+        // Poll the agent-summary until a summary carrying a `status` appears.
+        let summary_url = format!("{base}/api/runs/{run_id}/agent-summary");
+        let start = Instant::now();
+        loop {
+            let mut get = tokio::process::Command::new(curl);
+            get.arg("-sS")
+                .arg("-o")
+                .arg(&summary_file)
+                .arg("-w")
+                .arg("%{http_code}")
+                .arg(&summary_url)
+                .stdin(std::process::Stdio::null())
+                .kill_on_drop(true);
+            let resp = get
+                .output()
+                .await
+                .with_context(|| format!("spawn `{curl} GET {summary_url}`"))?;
+            let code = String::from_utf8_lossy(&resp.stdout).trim().to_string();
+            if code == "200" {
+                if let Ok(bytes) = std::fs::read(&summary_file) {
+                    if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                        let status = value
+                            .get("status")
+                            .and_then(|s| s.as_str())
+                            .unwrap_or_default();
+                        // A summary with a non-empty status is terminal.
+                        if !status.is_empty() {
+                            let summary = summarize_jailgun_value(&value);
+                            if status == "succeeded" {
+                                return Ok(summary);
+                            }
+                            bail!("jailgun http phase `{}` failed: {}", phase_id, summary);
+                        }
+                    }
+                }
+            }
+            if start.elapsed() >= timeout {
+                bail!(
+                    "jailgun http phase `{}` produced no summary within {}s (last http {})",
+                    phase_id,
+                    timeout.as_secs(),
+                    if code.is_empty() { "<none>" } else { &code }
+                );
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    })
 }
 
 /// Core of [`invoke_jailgun_phase`], parameterized over the binary and timeout
@@ -604,6 +737,7 @@ mod tests {
                 "tabs": 99,                    // must NOT win over the core field
                 "prompt_file": "/etc/passwd",  // must NOT hijack the prompt file
             }),
+            endpoint: None,
         };
         let req = request_json_for(&jx, std::path::Path::new("/tmp/p.txt"));
         assert_eq!(req["version"], 1);
@@ -630,6 +764,7 @@ mod tests {
             tabs: None,
             max_runtime_seconds: None,
             request_overrides: serde_json::Value::Null,
+            endpoint: None,
         };
         let req = request_json_for(&jx, std::path::Path::new("/tmp/p.txt"));
         assert!(req.get("tabs").is_none());
@@ -672,6 +807,7 @@ mod tests {
             tabs: None,
             max_runtime_seconds: None,
             request_overrides: serde_json::Value::Null,
+            endpoint: None,
         }
     }
 
@@ -779,6 +915,7 @@ exit 0
             tabs: Some(7),
             max_runtime_seconds: Some(120),
             request_overrides: serde_json::Value::Null,
+            endpoint: None,
         };
         super::run_jailgun_agent(
             stub.to_str().unwrap(),
@@ -802,5 +939,80 @@ exit 0
         )
         .expect_err("hang must time out");
         assert!(format!("{err:#}").contains("timeout"), "err: {err:#}");
+    }
+
+    // ---- HTTP-transport tests (stub `curl` via the curl-bin parameter) ----
+    // The stub distinguishes POST (no `-o`) from the GET agent-summary poll
+    // (`-o <file>`), mirroring jailgun-server: POST -> 202 {run_id}; GET ->
+    // 200 + the summary JSON written to the `-o` file.
+
+    #[cfg(unix)]
+    const STUB_CURL_OK: &str = r#"#!/bin/sh
+OUT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) shift; OUT="$1" ;;
+  esac
+  shift
+done
+if [ -n "$OUT" ]; then
+  printf '%s' '{"run_id":"http-run","status":"succeeded","deploy_status":"done","ci_status":"passed","changed_files":["x.rs"],"failures":[]}' > "$OUT"
+  printf '200'
+else
+  printf '%s' '{"run_id":"http-run","status":"accepted","summary_url":"/api/runs/http-run/agent-summary"}'
+fi
+exit 0
+"#;
+
+    #[cfg(unix)]
+    const STUB_CURL_FAIL: &str = r#"#!/bin/sh
+OUT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) shift; OUT="$1" ;;
+  esac
+  shift
+done
+if [ -n "$OUT" ]; then
+  printf '%s' '{"run_id":"http-run","status":"failed","changed_files":[],"failures":[{"code":"x","message":"boom"}]}' > "$OUT"
+  printf '200'
+else
+  printf '%s' '{"run_id":"http-run","status":"accepted"}'
+fi
+exit 0
+"#;
+
+    #[cfg(unix)]
+    #[test]
+    fn run_jailgun_http_submits_polls_and_summarizes() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let stub = write_stub(dir.path(), "curl_ok.sh", STUB_CURL_OK);
+        let summary = super::run_jailgun_http(
+            stub.to_str().unwrap(),
+            "http://127.0.0.1:9",
+            &jx_simple(),
+            std::time::Duration::from_secs(30),
+            "produce",
+        )
+        .expect("http jailgun succeeds");
+        assert!(summary.contains("http-run"), "summary: {summary}");
+        assert!(summary.contains("status=succeeded"), "summary: {summary}");
+        assert!(summary.contains("changed_files=1"), "summary: {summary}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_jailgun_http_fails_phase_on_failed_status() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let stub = write_stub(dir.path(), "curl_fail.sh", STUB_CURL_FAIL);
+        let err = super::run_jailgun_http(
+            stub.to_str().unwrap(),
+            "http://127.0.0.1:9",
+            &jx_simple(),
+            std::time::Duration::from_secs(30),
+            "produce",
+        )
+        .expect_err("failed status must fail the phase");
+        assert!(format!("{err:#}").contains("status=failed"), "err: {err:#}");
     }
 }
