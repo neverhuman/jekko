@@ -1,0 +1,91 @@
+{
+  "_comment": "Example ZYAL SuperWorkflow that runs a governed Jailgun coding job end to end: research the task, produce N candidate solutions with Jailgun (same prompt across tabs), reduce to the best, review it for real-vs-fake work, gate, deploy over SSH, verify, and distill durable lessons. Authored in the flat supervisor shape so `jekko port-run --super` decodes it directly (no zyalc step needed for the per-phase `exec` field). Hosts/prompts are placeholders; override per run.",
+  "id": "jailgun-run",
+  "name": "Jailgun governed coding run",
+  "objective": "Drive a single coding objective through research, N-way Jailgun production, reduction, engineering review, gate, SSH deploy, verification, and durable memory without scope sprawl or vibe-coding shortcuts.",
+  "memory": {
+    "negative_memory": true,
+    "compounding_enabled": true,
+    "inject_at_phase_start": ["negative"]
+  },
+  "phases": [
+    {
+      "id": "frame",
+      "name": "Frame the objective",
+      "objective": "Restate the coding objective, success criteria, and the artifact contract; surface any project-scoped Negative lessons to avoid.",
+      "depends_on": []
+    },
+    {
+      "id": "research",
+      "name": "Research first",
+      "objective": "Search the internet and the repo for prior art, APIs, and pitfalls relevant to the objective; produce a context brief.",
+      "depends_on": ["frame"],
+      "exec": { "kind": "agent", "name": "plan" }
+    },
+    {
+      "id": "produce",
+      "name": "Produce candidates with Jailgun",
+      "objective": "Run the same prompt across N Jailgun tabs to produce candidate solutions (tar.gz -> deploy/CI), each an independent attempt.",
+      "depends_on": ["research"],
+      "exec": {
+        "kind": "jailgun",
+        "prompt_ref": "jmcp://workflow/jailgun-run/produce",
+        "prompt": "Implement the framed objective end to end with real tests. Follow the research brief; avoid the listed Negative lessons.",
+        "tabs": 6
+      }
+    },
+    {
+      "id": "reduce",
+      "name": "Reduce to the best candidate",
+      "objective": "Compare the N Jailgun candidate receipts and select or merge the strongest one; record why the others were rejected.",
+      "depends_on": ["produce"],
+      "exec": { "kind": "agent", "name": "plan" }
+    },
+    {
+      "id": "review",
+      "name": "Engineering review",
+      "objective": "Review the reduced diff: real work vs fake tests vs over-engineering, with concrete references to files/lines. Emit a verdict.",
+      "depends_on": ["reduce"],
+      "exec": { "kind": "agent", "name": "code-reviewer" }
+    },
+    {
+      "id": "gate",
+      "name": "Verdict gate",
+      "objective": "Block the run when the review verdict rejects the work (fake tests / over-engineering / needs-rework); otherwise pass.",
+      "depends_on": ["review"],
+      "signoff": "single",
+      "gates": [
+        { "name": "review_pass", "kind": "custom", "required": true }
+      ]
+    },
+    {
+      "id": "ssh_deploy",
+      "name": "Deploy over SSH",
+      "objective": "Push the approved candidate to the target host and run the fast-push/deploy command.",
+      "depends_on": ["gate"],
+      "exec": {
+        "kind": "ssh",
+        "host": "deploy@target-host",
+        "command": "bash ci-fast-push.sh"
+      }
+    },
+    {
+      "id": "verify",
+      "name": "Verify deploy + CI",
+      "objective": "Confirm the deploy landed and CI is green on the target host.",
+      "depends_on": ["ssh_deploy"],
+      "exec": {
+        "kind": "ssh",
+        "host": "deploy@target-host",
+        "command": "bash ci-verify.sh"
+      }
+    },
+    {
+      "id": "signoff",
+      "name": "Sign off + distill memory",
+      "objective": "Summarize the outcome and write durable Negative-memory capsules (project scope) for any approach that failed, so future runs avoid it.",
+      "depends_on": ["verify"],
+      "signoff": "single"
+    }
+  ]
+}

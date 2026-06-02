@@ -22,4 +22,4 @@ pub use model::{
     SandboxPolicy, SshExec, SuperWorkflow, Task, TaskStatus, WriteScope,
 };
 pub use planner::{execution_layers, ready_phases, validate_manifest, ValidationError};
-pub use store::{SupervisorStore, SCHEMA};
+pub use store::{MemoryCapsule, SupervisorStore, SCHEMA};
