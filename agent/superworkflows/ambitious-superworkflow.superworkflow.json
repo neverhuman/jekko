@@ -6,6 +6,34 @@
     "schema": "zyal/superworkflow@1"
   },
   "confirm": "RUN_FOREVER",
+  "exec": {
+    "args": [
+      "port-run",
+      "--super",
+      "agent/superworkflows/ambitious-superworkflow.superworkflow.json"
+    ],
+    "dry_run_args": [
+      "port-run",
+      "--super",
+      "agent/superworkflows/ambitious-superworkflow.superworkflow.json",
+      "--dry-run"
+    ],
+    "manifest_path": "agent/superworkflows/ambitious-superworkflow.superworkflow.json",
+    "mode": "super",
+    "runner": "jekko",
+    "source_args": [
+      "port-run",
+      "--super",
+      "agent/zyal/ambitious-superworkflow.zyal"
+    ],
+    "source_path": "agent/zyal/ambitious-superworkflow.zyal",
+    "status_args": [
+      "port-run",
+      "--status",
+      "<run_id>"
+    ],
+    "subcommand": "port-run"
+  },
   "id": "ambitious-superworkflow-template",
   "intent": "daemon",
   "job": {

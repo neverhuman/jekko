@@ -207,3 +207,48 @@ fn adapt_zyalc_emission(value: &JsonValue, source: &Path) -> Result<SuperWorkflo
         parity: Default::default(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zyalc_exec_metadata_is_ignored_by_supervisor_adapter() {
+        let phases = (0..9)
+            .map(|idx| {
+                serde_json::json!({
+                    "id": format!("p{idx}"),
+                    "name": format!("Phase {idx}"),
+                    "objective": format!("Phase {idx} objective"),
+                    "depends_on": []
+                })
+            })
+            .collect::<Vec<_>>();
+        let manifest = serde_json::json!({
+            "_generated": {
+                "by": "zyalc"
+            },
+            "exec": {
+                "runner": "jekko",
+                "subcommand": "port-run",
+                "args": ["port-run", "--super", "agent/superworkflows/example.superworkflow.json"]
+            },
+            "id": "exec-fixture",
+            "job": {
+                "name": "Exec fixture",
+                "objective": "Ensure exec metadata stays additive"
+            },
+            "superworkflow": {
+                "phases": phases
+            }
+        });
+
+        let parsed =
+            parse_supervisor_manifest(&manifest.to_string(), Path::new("exec-fixture.json"))
+                .expect("parse zyalc manifest with exec");
+
+        assert_eq!(parsed.id, "exec-fixture");
+        assert_eq!(parsed.name, "Exec fixture");
+        assert_eq!(parsed.phases.len(), 9);
+    }
+}

@@ -172,6 +172,9 @@ the canonical 12-stage plan
 contracts_and_slices -> parallel_subsystems -> integration_fusion ->
 parity_lab -> parity_gap_closure -> performance_closure ->
 hardening_security -> docs_release_ops -> final_signoff`) to
-`agent/superworkflows/ambitious-superworkflow.superworkflow.json`. See
+`agent/superworkflows/ambitious-superworkflow.superworkflow.json`. The
+compiled JSON includes a top-level `exec` object with the recommended
+`jekko port-run --super <manifest>` command metadata; `zyal-supervisor`
+does not require or parse that field. See
 `docs/ZYAL/SUPER_REASONING_WORKFLOWS.md` for the live driver subsection
 and per-stage contract.

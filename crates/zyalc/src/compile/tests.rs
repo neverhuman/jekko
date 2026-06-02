@@ -92,9 +92,34 @@ fn superworkflow_emit_requires_nine_to_twelve_phases() {
     let out = emit_superworkflow(&raw).expect("9-phase superworkflow json");
     assert!(out.contains("\"superworkflow\""));
     assert!(out.contains("\"phases\""));
+    assert!(out.contains("\"exec\""));
+    assert!(out.contains("\"port-run\""));
 
     let raw = superworkflow_with_phases(12);
     emit_superworkflow(&raw).expect("12-phase superworkflow json");
+}
+
+#[test]
+fn superworkflow_compile_emits_exec_metadata_with_paths() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("smoke.zyal");
+    let target = dir.path().join("smoke.superworkflow.json");
+    fs::write(&source, superworkflow_with_phases(9)).unwrap();
+
+    let outcome = compile_one(&source, Some(&target), false).unwrap();
+    assert!(matches!(outcome, Outcome::Wrote(path) if path == target));
+
+    let json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&target).unwrap()).unwrap();
+    let exec = json.get("exec").expect("top-level exec object");
+    assert_eq!(exec["runner"], "jekko");
+    assert_eq!(exec["subcommand"], "port-run");
+    assert_eq!(exec["manifest_path"], target.display().to_string());
+    assert_eq!(exec["source_path"], source.display().to_string());
+    assert_eq!(exec["args"][0], "port-run");
+    assert_eq!(exec["args"][1], "--super");
+    assert_eq!(exec["args"][2], target.display().to_string());
+    assert_eq!(exec["dry_run_args"][3], "--dry-run");
 }
 
 #[test]
