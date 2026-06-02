@@ -1,16 +1,14 @@
 {
   "id": "failure",
-  "title": "Scripted provider failure",
-  "tags": ["deterministic", "failure", "no-network"],
+  "title": "Deterministic provider failure",
+  "tags": ["error", "retry", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "failure",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        {
-          "type": "stream-start"
-        },
+        { "type": "stream-start" },
         {
           "type": "metadata",
           "metadata": {
@@ -20,10 +18,7 @@
             "cost_usd": 0
           }
         },
-        {
-          "type": "error",
-          "message": "dummy_agent_llm/failure: scripted failure for {{last_user_text}}"
-        }
+        { "type": "error", "message": "dummy_agent_llm/failure: scripted failure for `{{last_user_text}}`." }
       ]
     }
   ]
