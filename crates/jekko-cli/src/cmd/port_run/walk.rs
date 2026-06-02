@@ -5,11 +5,13 @@
 //! `port_run` module — public surface is `pub(super)` only.
 
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
 use zyal_supervisor::{
-    execution_layers, Phase, PhaseExec, PhaseStatus, SshExec, SuperWorkflow, SupervisorStore,
+    execution_layers, JailgunExec, Phase, PhaseExec, PhaseStatus, SshExec, SuperWorkflow,
+    SupervisorStore,
 };
 
 use super::PortRunArgs;
@@ -225,7 +227,172 @@ fn invoke_phase(phase: &Phase, args: &PortRunArgs) -> Result<String> {
         None => invoke_agent_phase(phase, "plan", args),
         Some(PhaseExec::Agent { name }) => invoke_agent_phase(phase, name, args),
         Some(PhaseExec::Ssh(ssh)) => invoke_ssh_phase(phase, ssh, args),
+        Some(PhaseExec::Jailgun(jx)) => invoke_jailgun_phase(phase, jx, args),
     }
+}
+
+/// Build the `JailgunAgentRunRequest` JSON for a [`PhaseExec::Jailgun`] phase.
+///
+/// jekko cannot depend on `jailgun-core`, so the request is mirrored
+/// structurally (field names must match `JailgunAgentRunRequest`); the
+/// integration test against a stub `jailgun` binary guards against drift.
+/// `request_overrides` (when an object) supplies extra fields like
+/// `repo`/`deploy`/`ci`/`github`. The authoritative core fields
+/// (`version`/`prompt_ref`/`prompt_file`/`tabs`/`max_runtime_seconds`) are
+/// stamped on top so an override can never hijack the prompt file/reference or
+/// the interface version.
+fn request_json_for(jx: &JailgunExec, prompt_file: &Path) -> serde_json::Value {
+    let mut req = match jx.request_overrides {
+        serde_json::Value::Object(ref map) => serde_json::Value::Object(map.clone()),
+        _ => serde_json::Value::Object(serde_json::Map::new()),
+    };
+    let obj = req
+        .as_object_mut()
+        .expect("constructed as a JSON object above");
+    obj.insert("version".into(), serde_json::json!(1));
+    obj.insert("prompt_ref".into(), serde_json::json!(jx.prompt_ref));
+    obj.insert(
+        "prompt_file".into(),
+        serde_json::json!(prompt_file.to_string_lossy()),
+    );
+    if let Some(tabs) = jx.tabs {
+        obj.insert("tabs".into(), serde_json::json!(tabs));
+    }
+    if let Some(secs) = jx.max_runtime_seconds {
+        obj.insert("max_runtime_seconds".into(), serde_json::json!(secs));
+    }
+    req
+}
+
+/// Render a concise, prompt-text-free phase summary from a
+/// `JailgunAgentRunSummary` JSON value. Only structured status fields are
+/// surfaced — never prompt text.
+fn summarize_jailgun_value(v: &serde_json::Value) -> String {
+    let field = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("-").to_string();
+    let arr_len = |k: &str| {
+        v.get(k)
+            .and_then(|x| x.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0)
+    };
+    format!(
+        "jailgun run {}: status={} deploy={} ci={} changed_files={} failures={}",
+        v.get("run_id").and_then(|x| x.as_str()).unwrap_or("?"),
+        field("status"),
+        field("deploy_status"),
+        field("ci_status"),
+        arr_len("changed_files"),
+        arr_len("failures"),
+    )
+}
+
+/// Read and summarize the Jailgun summary file written by `run-agent`. Returns
+/// `None` when the file is missing or unparseable.
+fn summarize_jailgun_file(path: &Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    Some(summarize_jailgun_value(&value))
+}
+
+/// Run a Jailgun agent run for a [`PhaseExec::Jailgun`] phase. Resolves the
+/// binary from `JAILGUN_BIN` (default `jailgun`) and the timeout from
+/// `args.per_phase_timeout_secs`, then delegates to [`run_jailgun_agent`].
+fn invoke_jailgun_phase(phase: &Phase, jx: &JailgunExec, args: &PortRunArgs) -> Result<String> {
+    let bin = match std::env::var("JAILGUN_BIN") {
+        Ok(v) => v,
+        Err(_) => "jailgun".to_string(),
+    };
+    run_jailgun_agent(
+        &bin,
+        jx,
+        Duration::from_secs(args.per_phase_timeout_secs),
+        &phase.id,
+    )
+}
+
+/// Core of [`invoke_jailgun_phase`], parameterized over the binary and timeout
+/// so it is unit-testable with a stub `jailgun` (no env coupling, no `--live`
+/// gate). Writes the prompt to a temp file referenced by the request's
+/// `prompt_file` and invokes `<bin> run-agent --request <f> --events-jsonl <t>
+/// --summary-json <t>`. The CLI bails non-zero on a non-`succeeded` run (after
+/// writing the summary), so a non-zero exit fails the phase while still
+/// surfacing the structured status; never echoes prompt text.
+fn run_jailgun_agent(
+    bin: &str,
+    jx: &JailgunExec,
+    timeout: Duration,
+    phase_id: &str,
+) -> Result<String> {
+    let dir = tempfile::tempdir().context("create temp dir for jailgun phase")?;
+    let prompt_file = dir.path().join("prompt.txt");
+    let request_file = dir.path().join("request.json");
+    let events_file = dir.path().join("events.jsonl");
+    let summary_file = dir.path().join("summary.json");
+
+    std::fs::write(&prompt_file, &jx.prompt)
+        .with_context(|| format!("write jailgun prompt file for phase `{phase_id}`"))?;
+    let request = request_json_for(jx, &prompt_file);
+    let request_bytes =
+        serde_json::to_vec_pretty(&request).context("serialize jailgun run request")?;
+    std::fs::write(&request_file, request_bytes)
+        .with_context(|| format!("write jailgun request file for phase `{phase_id}`"))?;
+
+    let summary_path = summary_file.clone();
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("build tokio runtime for jailgun phase invocation")?;
+
+    rt.block_on(async move {
+        let mut cmd = tokio::process::Command::new(bin);
+        cmd.arg("run-agent")
+            .arg("--request")
+            .arg(&request_file)
+            .arg("--events-jsonl")
+            .arg(&events_file)
+            .arg("--summary-json")
+            .arg(&summary_file)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .kill_on_drop(true);
+
+        let child = cmd
+            .spawn()
+            .with_context(|| format!("spawn `{bin} run-agent`"))?;
+
+        let wait = child.wait_with_output();
+        let output = match tokio::time::timeout(timeout, wait).await {
+            Ok(res) => res.context("await jailgun phase subprocess")?,
+            Err(_) => {
+                bail!(
+                    "jailgun phase `{}` exceeded per-phase timeout of {}s",
+                    phase_id,
+                    timeout.as_secs()
+                );
+            }
+        };
+        if !output.status.success() {
+            // `run-agent` writes the summary then bails non-zero on a
+            // non-succeeded run; prefer the structured status, fall back to stderr.
+            let detail = summarize_jailgun_file(&summary_path).unwrap_or_else(|| {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                if stderr.is_empty() {
+                    "<no stderr>".to_string()
+                } else {
+                    stderr
+                }
+            });
+            bail!("jailgun phase `{phase_id}` failed: {detail}");
+        }
+        summarize_jailgun_file(&summary_path).ok_or_else(|| {
+            anyhow!(
+                "jailgun phase `{}` produced no readable summary at {}",
+                phase_id,
+                summary_path.display()
+            )
+        })
+    })
 }
 
 /// Decide whether `host` is permitted by the optional `allowlist` (the value
@@ -398,7 +565,8 @@ fn invoke_agent_phase(phase: &Phase, agent: &str, args: &PortRunArgs) -> Result<
 
 #[cfg(test)]
 mod tests {
-    use super::host_allowed;
+    use super::{host_allowed, request_json_for, summarize_jailgun_value};
+    use zyal_supervisor::JailgunExec;
 
     #[test]
     fn host_allowed_with_no_allowlist_permits_any_host() {
@@ -422,5 +590,217 @@ mod tests {
         // Substring / prefix matches must NOT pass — membership is exact.
         assert!(!host_allowed("xbabe.internal", allow));
         assert!(!host_allowed("deploy@xbabe2", allow));
+    }
+
+    #[test]
+    fn request_json_for_stamps_authoritative_core_fields() {
+        let jx = JailgunExec {
+            prompt_ref: "jmcp://wo/7/prompt".into(),
+            prompt: "do the secret thing".into(),
+            tabs: Some(6),
+            max_runtime_seconds: Some(900),
+            request_overrides: serde_json::json!({
+                "ci": { "enabled": true, "branch": "main" },
+                "tabs": 99,                    // must NOT win over the core field
+                "prompt_file": "/etc/passwd",  // must NOT hijack the prompt file
+            }),
+        };
+        let req = request_json_for(&jx, std::path::Path::new("/tmp/p.txt"));
+        assert_eq!(req["version"], 1);
+        assert_eq!(req["prompt_ref"], "jmcp://wo/7/prompt");
+        assert_eq!(
+            req["prompt_file"], "/tmp/p.txt",
+            "core prompt_file wins over override"
+        );
+        assert_eq!(req["tabs"], 6, "core tabs wins over override");
+        assert_eq!(req["max_runtime_seconds"], 900);
+        assert_eq!(
+            req["ci"]["branch"], "main",
+            "non-core overrides are preserved"
+        );
+        // Prompt text is never embedded in the request envelope (only the path).
+        assert!(!req.to_string().contains("secret thing"));
+    }
+
+    #[test]
+    fn request_json_for_omits_absent_optionals() {
+        let jx = JailgunExec {
+            prompt_ref: "r".into(),
+            prompt: "p".into(),
+            tabs: None,
+            max_runtime_seconds: None,
+            request_overrides: serde_json::Value::Null,
+        };
+        let req = request_json_for(&jx, std::path::Path::new("/tmp/p.txt"));
+        assert!(req.get("tabs").is_none());
+        assert!(req.get("max_runtime_seconds").is_none());
+        assert_eq!(req["version"], 1);
+    }
+
+    #[test]
+    fn summarize_jailgun_value_is_concise_and_prompt_free() {
+        let v = serde_json::json!({
+            "run_id": "run-9",
+            "status": "succeeded",
+            "deploy_status": "done",
+            "ci_status": "passed",
+            "changed_files": ["a.rs", "b.rs"],
+            "failures": [],
+        });
+        let s = summarize_jailgun_value(&v);
+        assert!(s.contains("run-9") && s.contains("status=succeeded"));
+        assert!(s.contains("changed_files=2") && s.contains("failures=0"));
+    }
+
+    #[test]
+    fn summarize_jailgun_value_tolerates_missing_fields() {
+        let s = summarize_jailgun_value(&serde_json::json!({}));
+        assert!(s.contains("status=-"));
+        assert!(s.contains("changed_files=0"));
+    }
+
+    // ---- Stub-binary tests for the jailgun phase executor ----
+    // These drive `run_jailgun_agent` against a throwaway shell stub via an
+    // explicit binary path (no `JAILGUN_BIN` env, no `--live` gate), so they run
+    // deterministically in CI and in parallel.
+
+    #[cfg(unix)]
+    fn jx_simple() -> JailgunExec {
+        JailgunExec {
+            prompt_ref: "jmcp://wo/1/prompt".into(),
+            prompt: "build it".into(),
+            tabs: None,
+            max_runtime_seconds: None,
+            request_overrides: serde_json::Value::Null,
+        }
+    }
+
+    #[cfg(unix)]
+    fn write_stub(dir: &std::path::Path, name: &str, body: &str) -> std::path::PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let path = dir.join(name);
+        std::fs::write(&path, body).expect("write stub");
+        let mut perms = std::fs::metadata(&path).expect("stat stub").permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&path, perms).expect("chmod stub");
+        path
+    }
+
+    #[cfg(unix)]
+    const STUB_OK: &str = r#"#!/bin/sh
+SUMMARY=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --summary-json) shift; SUMMARY="$1" ;;
+  esac
+  shift
+done
+printf '%s' '{"run_id":"run-stub","status":"succeeded","deploy_status":"done","ci_status":"passed","changed_files":["a.rs"],"failures":[]}' > "$SUMMARY"
+exit 0
+"#;
+
+    #[cfg(unix)]
+    const STUB_FAIL: &str = r#"#!/bin/sh
+SUMMARY=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --summary-json) shift; SUMMARY="$1" ;;
+  esac
+  shift
+done
+printf '%s' '{"run_id":"run-stub","status":"failed","changed_files":[],"failures":[{"code":"x","message":"boom"}]}' > "$SUMMARY"
+exit 1
+"#;
+
+    #[cfg(unix)]
+    const STUB_CHECK_REQUEST: &str = r#"#!/bin/sh
+SUMMARY=""
+REQ=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --summary-json) shift; SUMMARY="$1" ;;
+    --request) shift; REQ="$1" ;;
+  esac
+  shift
+done
+grep -q '"prompt_ref"' "$REQ" || exit 2
+grep -q '"prompt_file"' "$REQ" || exit 3
+grep -q '"tabs": 7' "$REQ" || exit 4
+printf '%s' '{"run_id":"r","status":"succeeded","changed_files":[],"failures":[]}' > "$SUMMARY"
+exit 0
+"#;
+
+    #[cfg(unix)]
+    const STUB_HANG: &str = "#!/bin/sh\nsleep 30\nexit 0\n";
+
+    #[cfg(unix)]
+    #[test]
+    fn run_jailgun_agent_succeeds_with_stub() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let stub = write_stub(dir.path(), "jailgun_ok.sh", STUB_OK);
+        let summary = super::run_jailgun_agent(
+            stub.to_str().unwrap(),
+            &jx_simple(),
+            std::time::Duration::from_secs(30),
+            "produce",
+        )
+        .expect("stub jailgun succeeds");
+        assert!(summary.contains("run-stub"), "summary: {summary}");
+        assert!(summary.contains("status=succeeded"), "summary: {summary}");
+        assert!(summary.contains("changed_files=1"), "summary: {summary}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_jailgun_agent_fails_on_nonzero_exit_but_surfaces_status() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let stub = write_stub(dir.path(), "jailgun_fail.sh", STUB_FAIL);
+        let err = super::run_jailgun_agent(
+            stub.to_str().unwrap(),
+            &jx_simple(),
+            std::time::Duration::from_secs(30),
+            "produce",
+        )
+        .expect_err("non-zero exit must fail the phase");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("produce"), "msg: {msg}");
+        assert!(msg.contains("status=failed"), "msg: {msg}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_jailgun_agent_passes_well_formed_request() {
+        // The stub asserts the request JSON carries the core fields + tabs=7.
+        let dir = tempfile::tempdir().expect("tmp");
+        let stub = write_stub(dir.path(), "jailgun_check.sh", STUB_CHECK_REQUEST);
+        let jx = JailgunExec {
+            prompt_ref: "jmcp://wo/2/prompt".into(),
+            prompt: "p".into(),
+            tabs: Some(7),
+            max_runtime_seconds: Some(120),
+            request_overrides: serde_json::Value::Null,
+        };
+        super::run_jailgun_agent(
+            stub.to_str().unwrap(),
+            &jx,
+            std::time::Duration::from_secs(30),
+            "produce",
+        )
+        .expect("request shape validated by stub (else non-zero exit)");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_jailgun_agent_times_out() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let stub = write_stub(dir.path(), "jailgun_hang.sh", STUB_HANG);
+        let err = super::run_jailgun_agent(
+            stub.to_str().unwrap(),
+            &jx_simple(),
+            std::time::Duration::from_secs(1),
+            "produce",
+        )
+        .expect_err("hang must time out");
+        assert!(format!("{err:#}").contains("timeout"), "err: {err:#}");
     }
 }

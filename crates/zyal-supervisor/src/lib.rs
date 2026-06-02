@@ -17,9 +17,9 @@ pub mod planner;
 pub mod store;
 
 pub use model::{
-    ControllerPolicy, Gate, GateKind, GraphStore, MemoryPolicy, NetworkPolicy, ParityPolicy, Phase,
-    PhaseExec, PhaseSignoffMode, PhaseStatus, RepoGraphPolicy, SandboxMode, SandboxPolicy, SshExec,
-    SuperWorkflow, Task, TaskStatus, WriteScope,
+    ControllerPolicy, Gate, GateKind, GraphStore, JailgunExec, MemoryPolicy, NetworkPolicy,
+    ParityPolicy, Phase, PhaseExec, PhaseSignoffMode, PhaseStatus, RepoGraphPolicy, SandboxMode,
+    SandboxPolicy, SshExec, SuperWorkflow, Task, TaskStatus, WriteScope,
 };
 pub use planner::{execution_layers, ready_phases, validate_manifest, ValidationError};
 pub use store::{SupervisorStore, SCHEMA};

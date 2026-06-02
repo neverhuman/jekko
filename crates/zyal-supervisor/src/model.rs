@@ -75,7 +75,10 @@ pub struct Phase {
 ///
 /// This is an additive, backward-compatible extension to [`Phase`]: manifests
 /// that omit `exec` deserialize to `None` and keep the default agent path.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// `Eq` is intentionally omitted: the `Jailgun` variant carries a
+// `serde_json::Value` (not `Eq`). `PartialEq` is retained for tests and
+// `Phase` itself does not derive `Eq`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PhaseExec {
     /// Delegate the phase to a named jekko agent (`jekko run --agent <name>`).
@@ -88,6 +91,11 @@ pub enum PhaseExec {
     /// stdout as the phase summary. Hosts are gated by the host runtime's
     /// allowlist (see the `--live` walker); this variant only carries intent.
     Ssh(SshExec),
+    /// Run a Jailgun agent run (authenticated browser tabs -> tar.gz ->
+    /// deploy/CI) as this phase, capturing the run summary. The host runtime
+    /// invokes the `jailgun run-agent` interface (CLI now, HTTP later) and maps
+    /// the resulting `JailgunAgentRunSummary` into the phase summary.
+    Jailgun(JailgunExec),
 }
 
 /// Parameters for an [`PhaseExec::Ssh`] phase executor.
@@ -104,6 +112,35 @@ pub struct SshExec {
     /// non-zero exit fails the phase.
     #[serde(default)]
     pub allow_nonzero_exit: bool,
+}
+
+/// Parameters for a [`PhaseExec::Jailgun`] phase executor.
+///
+/// Carries the inputs needed to build a Jailgun agent run request. The host
+/// runtime writes `prompt` to a temporary prompt file, builds a
+/// `JailgunAgentRunRequest` (deep-merging `request_overrides`), and invokes the
+/// `jailgun run-agent` interface. `prompt_ref` is the durable, prompt-text-free
+/// reference recorded in summaries.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct JailgunExec {
+    /// Durable, prompt-text-free reference for the run (e.g. a workflow URI).
+    pub prompt_ref: String,
+    /// Prompt text; written to a temporary prompt file for the run, never
+    /// echoed into durable phase summaries.
+    pub prompt: String,
+    /// Number of parallel tabs (candidate solutions). Bounded by Jailgun's own
+    /// `JAILGUN_AGENT_MAX_TABS`; `None` defers to Jailgun's configured default.
+    #[serde(default)]
+    pub tabs: Option<u16>,
+    /// Optional per-run wall-clock cap in seconds (bounded by Jailgun's cap).
+    #[serde(default)]
+    pub max_runtime_seconds: Option<u64>,
+    /// Additional `JailgunAgentRunRequest` fields (repo / source_archive /
+    /// deploy / ci / github / ...) deep-merged into the generated request JSON.
+    /// Defaults to an empty object.
+    #[serde(default)]
+    pub request_overrides: serde_json::Value,
 }
 
 /// Persisted phase status.
@@ -460,5 +497,38 @@ mod tests {
         let json = serde_json::to_value(PhaseExec::Ssh(ssh)).expect("serialize");
         assert_eq!(json["kind"], "ssh");
         assert_eq!(json["allow_nonzero_exit"], true);
+    }
+
+    #[test]
+    fn phase_exec_jailgun_parses_and_round_trips() {
+        let phase: Phase = serde_json::from_value(serde_json::json!({
+            "id": "produce",
+            "name": "Produce candidates",
+            "objective": "same prompt across N tabs",
+            "exec": {
+                "kind": "jailgun",
+                "prompt_ref": "jmcp://wo/42/prompt",
+                "prompt": "implement the feature",
+                "tabs": 5,
+            },
+        }))
+        .expect("jailgun exec parses");
+        match &phase.exec {
+            Some(PhaseExec::Jailgun(jx)) => {
+                assert_eq!(jx.prompt_ref, "jmcp://wo/42/prompt");
+                assert_eq!(jx.prompt, "implement the feature");
+                assert_eq!(jx.tabs, Some(5));
+                assert_eq!(jx.max_runtime_seconds, None);
+                assert!(
+                    jx.request_overrides.is_null(),
+                    "absent overrides default to null"
+                );
+            }
+            other => panic!("expected jailgun exec, got {other:?}"),
+        }
+        let json = serde_json::to_value(&phase).expect("serialize");
+        assert_eq!(json["exec"]["kind"], "jailgun");
+        let back: Phase = serde_json::from_value(json).expect("re-parse");
+        assert_eq!(back.exec, phase.exec);
     }
 }
