@@ -65,6 +65,7 @@
     "agent_chat.md": "agent",
     "apps/": "apps",
     "apps/api/": "apps",
+    "ci-fast-push.sh": "ops",
     "codex-jankurai-loop.sh": "agent",
     "contracts/": "contracts",
     "crates/": "tools",
