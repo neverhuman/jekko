@@ -8,20 +8,13 @@
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start", "model": "dummy_agent_llm/basic" },
+        { "type": "stream-start" },
         {
           "type": "text-delta",
-          "text": "dummy_agent_llm/basic: deterministic response for {{last_user_text}}"
+          "text": "dummy_agent_llm/basic: deterministic response for `"
         },
-        {
-          "type": "metadata",
-          "metadata": {
-            "provider": "dummy_agent_llm",
-            "scenario_id": "basic",
-            "deterministic": true,
-            "network": false
-          }
-        },
+        { "type": "text-delta", "text": "{{last_user_text}}" },
+        { "type": "text-delta", "text": "`." },
         {
           "type": "usage",
           "input_tokens": 0,
