@@ -33,6 +33,10 @@ fi
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
 cd "$repo_root"
 
+base_remote="${JAILGUN_CI_BASE_REMOTE:-${JAILGUN_CI_LOCAL_REMOTE:-jeryu}}"
+push_remote="${JAILGUN_CI_PUSH_REMOTE:-${base_remote}}"
+push_branch="${JAILGUN_CI_BRANCH:-main}"
+
 utc_now() {
   date -u +%Y-%m-%dT%H:%M:%SZ
 }
@@ -41,11 +45,25 @@ run_ci() {
   rtk just jekko-fast
 }
 
-require_origin_main_ancestor() {
-  if ! git merge-base --is-ancestor origin/main HEAD; then
-    log "origin/main is not an ancestor of HEAD; fetch/rebase main before pushing"
+require_remote() {
+  local remote="$1"
+  if git remote get-url "$remote" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  log "missing git remote '$remote'"
+  if [ "$remote" = "jeryu" ]; then
+    log "add it with: git remote add jeryu ssh://git@localhost:2224/root/jekko.git"
+  fi
+  exit 2
+}
+
+require_remote_main_ancestor() {
+  local remote="$1"
+  if ! git merge-base --is-ancestor "${remote}/main" HEAD; then
+    log "${remote}/main is not an ancestor of HEAD; fetch/rebase main before pushing"
     log "HEAD=$(git rev-parse HEAD)"
-    log "origin/main=$(git rev-parse origin/main)"
+    log "${remote}/main=$(git rev-parse "${remote}/main")"
     exit 2
   fi
 }
@@ -61,9 +79,12 @@ commit_staged_if_needed() {
 }
 
 log "starting in $repo_root"
-git fetch origin main
-log "fetched origin/main $(git rev-parse --short origin/main)"
-require_origin_main_ancestor
+require_remote "$base_remote"
+require_remote "$push_remote"
+
+git fetch "$base_remote" main
+log "fetched ${base_remote}/main $(git rev-parse --short "${base_remote}/main")"
+require_remote_main_ancestor "$base_remote"
 
 git add --all -- .
 commit_staged_if_needed "codex: fast push $(utc_now)"
@@ -84,20 +105,24 @@ if ! git diff --cached --quiet --exit-code; then
   commit_staged_if_needed "codex: fast push $(utc_now) ci drift"
 fi
 
-push_branch="${JAILGUN_CI_BRANCH:-codex/live-proof}"
+git fetch "$push_remote" "$push_branch" || true
+git fetch "$base_remote" main
+log "fetched ${base_remote}/main $(git rev-parse --short "${base_remote}/main") before push"
+require_remote_main_ancestor "$base_remote"
 
-git fetch origin main
-log "fetched origin/main $(git rev-parse --short origin/main) before push"
-require_origin_main_ancestor
+if [ "$push_remote" = "origin" ] && [ "$push_branch" = "main" ] && [ "${JAILGUN_CI_PROMOTE_GITHUB_MAIN:-0}" != "1" ]; then
+  log "refusing to push to origin/main without JAILGUN_CI_PROMOTE_GITHUB_MAIN=1"
+  exit 2
+fi
 
-log "pushing HEAD $(git rev-parse --short HEAD) to $push_branch"
-JANKURAI_SKIP_PREPUSH=1 git push origin HEAD:"$push_branch"
-git fetch origin "$push_branch"
+log "pushing HEAD $(git rev-parse --short HEAD) to ${push_remote}/${push_branch}"
+JANKURAI_SKIP_PREPUSH=1 git push "$push_remote" HEAD:"$push_branch"
+git fetch "$push_remote" "$push_branch"
 
 head_sha="$(git rev-parse HEAD)"
-origin_sha="$(git rev-parse "origin/$push_branch")"
-if [ "$head_sha" != "$origin_sha" ]; then
-  log "post-push verification failed: HEAD=$head_sha origin/$push_branch=$origin_sha"
+remote_sha="$(git rev-parse "${push_remote}/${push_branch}")"
+if [ "$head_sha" != "$remote_sha" ]; then
+  log "post-push verification failed: HEAD=$head_sha ${push_remote}/${push_branch}=$remote_sha"
   exit 3
 fi
 
@@ -108,4 +133,4 @@ if [ -n "$status_short" ]; then
   exit 4
 fi
 
-log "pushed HEAD to $push_branch $head_sha"
+log "pushed HEAD to ${push_remote}/${push_branch} $head_sha"
