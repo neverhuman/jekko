@@ -10,7 +10,7 @@ use std::process::Command as ProcCommand;
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value as JsonValue;
 use tempfile::NamedTempFile;
-use zyal_supervisor::{Phase, PhaseExec, SuperWorkflow, SupervisorStore};
+use zyal_supervisor::{Phase, SuperWorkflow, SupervisorStore};
 
 use super::PortRunArgs;
 
@@ -185,15 +185,6 @@ fn adapt_zyalc_emission(value: &JsonValue, source: &Path) -> Result<SuperWorkflo
                 .collect(),
             None => Vec::new(),
         };
-        // Optional per-phase executor (agent name / ssh-exec). Absent keeps the
-        // historical `--agent plan` default; present values are validated here
-        // so a malformed `exec` fails parsing rather than at walk time.
-        let exec: Option<PhaseExec> = match raw.get("exec") {
-            Some(value) => Some(serde_json::from_value(value.clone()).with_context(|| {
-                format!("phase `{phase_id}` at {} has an invalid `exec`", source.display())
-            })?),
-            None => None,
-        };
         phases.push(Phase {
             id: phase_id,
             name: phase_name,
@@ -202,7 +193,6 @@ fn adapt_zyalc_emission(value: &JsonValue, source: &Path) -> Result<SuperWorkflo
             write_scope: Default::default(),
             signoff: Default::default(),
             gates: Vec::new(),
-            exec,
         });
     }
     Ok(SuperWorkflow {

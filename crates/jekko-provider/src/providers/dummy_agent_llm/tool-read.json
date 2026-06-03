@@ -1,25 +1,18 @@
 {
   "id": "tool-read",
-  "title": "Deterministic read-tool loop",
-  "tags": ["tool-call", "read", "streaming", "no-network"],
+  "title": "Read tool loop",
+  "tags": ["tool-call", "read", "deterministic", "no-network"],
   "provider": "dummy_agent_llm",
   "model": "tool-read",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start" },
+        { "type": "stream-start", "model": "dummy_agent_llm/tool-read" },
         {
-          "type": "metadata",
-          "metadata": {
-            "scenario_id": "tool-read",
-            "stage": "initial",
-            "deterministic": true,
-            "network": false,
-            "cost_usd": 0
-          }
+          "type": "text-delta",
+          "text": "dummy_agent_llm/tool-read: requesting read for {{first_path}}."
         },
-        { "type": "text-delta", "text": "dummy_agent_llm/tool-read: requesting read tool." },
         {
           "type": "tool-call",
           "id": "dummy-read-1",
@@ -27,7 +20,7 @@
           "input": {
             "filePath": "{{first_path}}",
             "offset": 1,
-            "limit": 40
+            "limit": 20
           }
         },
         {
@@ -43,18 +36,20 @@
     {
       "when": "after-tool-result",
       "frames": [
-        { "type": "stream-start" },
+        { "type": "stream-start", "model": "dummy_agent_llm/tool-read" },
+        {
+          "type": "text-delta",
+          "text": "dummy_agent_llm/tool-read: tool result received."
+        },
         {
           "type": "metadata",
           "metadata": {
+            "provider": "dummy_agent_llm",
             "scenario_id": "tool-read",
-            "stage": "after-tool-result",
             "deterministic": true,
-            "network": false,
-            "cost_usd": 0
+            "network": false
           }
         },
-        { "type": "text-delta", "text": "dummy_agent_llm/tool-read: tool result received." },
         {
           "type": "usage",
           "input_tokens": 0,
