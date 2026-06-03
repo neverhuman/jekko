@@ -11,13 +11,15 @@ cargo run -p jekko-cli -- --version
 cargo run -p jekko-cli -- --help
 cargo test -p jekko-tui --locked --no-fail-fast
 
-# Best-effort install of the `jankurai` binary so the real-audit render e2e
-# below actually exercises (it skips cleanly when jankurai is absent, so a
-# download failure must not fail the lane).
-if ! command -v jankurai >/dev/null 2>&1; then
-  (
-    set -e
-    ver="1.5.1"
+# Best-effort install of the pinned `jankurai` binary so the real-audit render
+# e2e below exercises the same auditor version as hosted CI. The test skips
+# cleanly when jankurai is absent, so a download failure must not fail the lane.
+(
+  set -e
+  ver="1.5.1"
+  cli_ver="1.6.10"
+  current="$(jankurai --version 2>/dev/null | head -1 || true)"
+  if [[ "$current" != *"jankurai ${cli_ver}"* ]]; then
     target="x86_64-unknown-linux-gnu"
     sha="a12dbb4a3805dee807fc101d4b073ac9386936b33c5579f606a655fe90d0bbac"
     tmp="$(mktemp -d)"
@@ -27,8 +29,8 @@ if ! command -v jankurai >/dev/null 2>&1; then
     tar -xzf "$arc" -C "$tmp"
     mkdir -p "${HOME}/.local/bin"
     install -m 0755 "$tmp/jankurai-${ver}-${target}/jankurai" "${HOME}/.local/bin/jankurai"
-  ) || echo "jankurai install failed; the real-audit render e2e will skip"
-fi
+  fi
+) || echo "jankurai install failed; the real-audit render e2e will skip"
 export PATH="${HOME}/.local/bin:${PATH}"
 
 # Load-bearing guard for the PTY live-render fix: a `\r`/clear-line progress bar

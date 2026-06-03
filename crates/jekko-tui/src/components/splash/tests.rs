@@ -103,8 +103,11 @@ fn render_splash_right_aligns_version_to_logo_edge() {
     render_splash(&mut buf, area, Duration::ZERO, &ctx, None);
 
     let area = *buf.area();
-    let rightmost_nonblank =
-        |y: u16| (0..area.width).filter(|&x| !buf[(x, y)].symbol().trim().is_empty()).max();
+    let rightmost_nonblank = |y: u16| {
+        (0..area.width)
+            .filter(|&x| !buf[(x, y)].symbol().trim().is_empty())
+            .max()
+    };
 
     // Content rows, top to bottom. The version label is the last one; every
     // row above it belongs to the wordmark.

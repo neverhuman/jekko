@@ -40,6 +40,7 @@
     "CONTRIBUTING.md": "workspace",
     "Cargo.lock": "workspace",
     "Cargo.toml": "workspace",
+    "ci-fast-push.sh": "ops",
     "GEMINI.md": "agent",
     "JANKURAI_TASKLIST.md": "agent",
     "Justfile": "workspace",

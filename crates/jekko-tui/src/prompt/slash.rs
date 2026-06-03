@@ -161,7 +161,10 @@ impl SlashPopup {
 pub fn buffer_triggers_slash(buffer: &str) -> bool {
     buffer
         .strip_prefix('/')
-        .map(|rest| !rest.trim_start().is_empty())
+        .map(|rest| {
+            let query = rest.trim_start();
+            !query.contains(char::is_whitespace)
+        })
         .unwrap_or(false)
 }
 
@@ -169,7 +172,8 @@ pub fn buffer_triggers_slash(buffer: &str) -> bool {
 /// already stripped; only the command token before any args is returned).
 pub fn query_from_buffer(buffer: &str) -> &str {
     let rest = buffer.strip_prefix('/').unwrap_or(buffer);
-    rest.trim_start().split_whitespace().next().unwrap_or("")
+    let query = rest.trim_start();
+    query.split_whitespace().next().unwrap_or("")
 }
 
 // ---------------------------------------------------------------------------

@@ -190,7 +190,10 @@ fn adapt_zyalc_emission(value: &JsonValue, source: &Path) -> Result<SuperWorkflo
         // so a malformed `exec` fails parsing rather than at walk time.
         let exec: Option<PhaseExec> = match raw.get("exec") {
             Some(value) => Some(serde_json::from_value(value.clone()).with_context(|| {
-                format!("phase `{phase_id}` at {} has an invalid `exec`", source.display())
+                format!(
+                    "phase `{phase_id}` at {} has an invalid `exec`",
+                    source.display()
+                )
             })?),
             None => None,
         };

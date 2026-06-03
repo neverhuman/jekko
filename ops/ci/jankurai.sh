@@ -6,6 +6,7 @@ cd "$ROOT"
 source ops/ci/lib.sh
 
 JANKURAI_VERSION="1.5.1"
+JANKURAI_CLI_VERSION="1.6.10"
 JANKURAI_SHA256_AARCH64_APPLE_DARWIN="7f47c5dc04ad007c073a8a1ec1108605b271ced47346dda928f5e082a5be4058"
 JANKURAI_SHA256_X86_64_UNKNOWN_LINUX_GNU="a12dbb4a3805dee807fc101d4b073ac9386936b33c5579f606a655fe90d0bbac"
 if [ "$(uname -s)" = "Linux" ]; then
@@ -73,13 +74,18 @@ patch_jankurai_schema_root() {
   fi
 }
 
-if ! command -v jankurai >/dev/null 2>&1; then
+jankurai_version_matches() {
+  command -v jankurai >/dev/null 2>&1 \
+    && jankurai --version 2>/dev/null | grep -q "jankurai ${JANKURAI_CLI_VERSION}"
+}
+
+if ! jankurai_version_matches; then
   if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
     install_jankurai_asset "aarch64-apple-darwin" "$JANKURAI_SHA256_AARCH64_APPLE_DARWIN"
   elif [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
     install_jankurai_asset "x86_64-unknown-linux-gnu" "$JANKURAI_SHA256_X86_64_UNKNOWN_LINUX_GNU"
   else
-    echo "jankurai ${JANKURAI_VERSION} must be preinstalled on this runner" >&2
+    echo "jankurai release ${JANKURAI_VERSION} / CLI ${JANKURAI_CLI_VERSION} must be preinstalled on this runner" >&2
     exit 1
   fi
 fi
@@ -128,8 +134,8 @@ install_zizmor() {
   export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
 }
 
-if ! jankurai --version | grep -q "jankurai ${JANKURAI_VERSION}"; then
-  echo "expected jankurai ${JANKURAI_VERSION}, got: $(jankurai --version)" >&2
+if ! jankurai --version | grep -q "jankurai ${JANKURAI_CLI_VERSION}"; then
+  echo "expected jankurai CLI ${JANKURAI_CLI_VERSION}, got: $(jankurai --version)" >&2
   exit 1
 fi
 
@@ -205,7 +211,7 @@ jankurai proofmark rust . --obligations "${artifact_root}/proofbind/obligations.
 mkdir -p "${artifact_root}"
 # Rendered UX QA is backed by the Rust tuiwright lane now; do not gate on the
 # deleted packages/ux-qa CLI. Always emit the audit artifact.
-jankurai ux audit --config agent/ux-qa.toml --out "${artifact_root}/ux-qa.json"
+bash ops/ci/ux-qa-evidence.sh "${artifact_root}/ux-qa.json"
 cd crates/tuiwright-jekko-unlock && jankurai rust witness build .
 cd "$ROOT"
 cargo run --manifest-path crates/zyalc/Cargo.toml --locked --quiet -- compile --all --check
