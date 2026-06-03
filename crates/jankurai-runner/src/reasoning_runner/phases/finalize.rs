@@ -221,7 +221,8 @@ fn verifier_prompt(master: &ReasoningArtifact) -> String {
                 "summary": &master.summary,
             })
         });
-    let payload = serde_json::to_string(&reduced).unwrap_or_else(|_| "{}".to_string());
+    // serde_json::Value serialization to string is infallible; format! is equivalent here.
+    let payload = format!("{reduced}");
     format!(
         "Verify the reduced master plan payload against the bounded evidence already supplied. \
          Payload: {payload}\n\
