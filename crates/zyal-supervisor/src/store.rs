@@ -111,59 +111,6 @@ impl SupervisorStore {
         }
         Ok(out)
     }
-
-    /// List memory capsules in the store, optionally filtered by `scope`
-    /// and/or `kind`, newest first. A `None` filter matches any value.
-    ///
-    /// The SQLite file is the project boundary, so this query intentionally
-    /// does NOT filter by `run_id`: capsules promoted to a project scope (e.g.
-    /// `Negative` lessons written as `project_only`) are retrievable by later
-    /// runs, which is how the workflow avoids repeating known-bad approaches.
-    pub fn list_memory(
-        &self,
-        scope: Option<&str>,
-        kind: Option<&str>,
-    ) -> rusqlite::Result<Vec<MemoryCapsule>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT run_id, phase_id, scope, kind, body, created_at \
-             FROM zyal_super_memory \
-             WHERE (?1 IS NULL OR scope = ?1) AND (?2 IS NULL OR kind = ?2) \
-             ORDER BY created_at DESC, id DESC",
-        )?;
-        let rows = stmt.query_map(params![scope, kind], |row| {
-            Ok(MemoryCapsule {
-                run_id: row.get(0)?,
-                phase_id: row.get(1)?,
-                scope: row.get(2)?,
-                kind: row.get(3)?,
-                body: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        })?;
-        let mut out = Vec::new();
-        for row in rows {
-            out.push(row?);
-        }
-        Ok(out)
-    }
-}
-
-/// A memory capsule row read from the supervisor store via
-/// [`SupervisorStore::list_memory`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MemoryCapsule {
-    /// Run that wrote the capsule.
-    pub run_id: String,
-    /// Phase that wrote it, if any.
-    pub phase_id: Option<String>,
-    /// Promotion scope label (e.g. `run_only`, `project_only`, `global`).
-    pub scope: String,
-    /// Memory kind label (e.g. `episodic`, `semantic`, `procedural`, `negative`).
-    pub kind: String,
-    /// Capsule body text.
-    pub body: String,
-    /// RFC3339 creation timestamp.
-    pub created_at: String,
 }
 
 #[cfg(test)]
@@ -192,7 +139,6 @@ mod tests {
                     kind: GateKind::TestsGreen,
                     required: true,
                 }],
-                exec: None,
             })
             .collect();
         SuperWorkflow {
@@ -383,76 +329,5 @@ mod tests {
 
         let blocked = store.blocked_phase_ids(&run_id).unwrap();
         assert_eq!(blocked, vec!["p02".to_string()]);
-    }
-
-    #[test]
-    fn list_memory_retrieves_project_scoped_capsules_across_runs() {
-        let store = SupervisorStore::open_in_memory().unwrap();
-        let manifest = sample_manifest();
-        let run1 = store.init_run(&manifest, Some("wf-store-test-1")).unwrap();
-        let run2 = store.init_run(&manifest, Some("wf-store-test-2")).unwrap();
-
-        // Two separate runs each promote a Negative lesson to project scope.
-        store
-            .append_memory(
-                &run1,
-                Some("p00"),
-                None,
-                "project_only",
-                "negative",
-                "approach A loops forever",
-                &[],
-                None,
-            )
-            .unwrap();
-        store
-            .append_memory(
-                &run2,
-                Some("p00"),
-                None,
-                "project_only",
-                "negative",
-                "approach B leaks fds",
-                &[],
-                None,
-            )
-            .unwrap();
-        // A run-only episodic capsule must NOT match the project/negative filter.
-        store
-            .append_memory(
-                &run1,
-                Some("p01"),
-                None,
-                "run_only",
-                "episodic",
-                "ran the tests",
-                &[],
-                None,
-            )
-            .unwrap();
-
-        // Project-scoped Negative capsules are retrievable across BOTH runs.
-        let project_negative = store
-            .list_memory(Some("project_only"), Some("negative"))
-            .unwrap();
-        assert_eq!(
-            project_negative.len(),
-            2,
-            "both runs' negative lessons are retrievable cross-run"
-        );
-        let bodies: Vec<&str> = project_negative.iter().map(|c| c.body.as_str()).collect();
-        assert!(bodies.contains(&"approach A loops forever"));
-        assert!(bodies.contains(&"approach B leaks fds"));
-        let runs: std::collections::BTreeSet<&str> =
-            project_negative.iter().map(|c| c.run_id.as_str()).collect();
-        assert_eq!(runs.len(), 2, "capsules came from two distinct runs");
-
-        // `None` filters match any value; kind filter narrows correctly.
-        assert_eq!(store.list_memory(None, None).unwrap().len(), 3);
-        assert_eq!(store.list_memory(None, Some("episodic")).unwrap().len(), 1);
-        assert!(store
-            .list_memory(Some("project_only"), Some("semantic"))
-            .unwrap()
-            .is_empty());
     }
 }
