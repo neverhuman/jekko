@@ -650,7 +650,7 @@ zyal-super-redis run_id="zyal-super-redis-local":
 	JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" \
 	JEKKO_KEY_SOURCE_POLICY=users-only \
 		rtk cargo run -p jekko-cli --offline -- port-run \
-			--super agent/zyal/ambitious-superworkflow.zyal \
+			--super docs/zyal/ambitious-superworkflow.zyal \
 			--run-id "{{run_id}}"
 
 # Manual-only serious ZYAL live campaign. Never run in CI; requires both

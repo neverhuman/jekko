@@ -3,6 +3,7 @@
 # zyal: declarative target=superworkflow schema=zyal/superworkflow@1
 # zyalc: emits agent/superworkflows/ambitious-superworkflow.superworkflow.json
 # Target framing: target=redis (MiniRedis reference) replacement=candidate.
+<<<ZYAL v1:daemon id=ambitious-superworkflow-template>>>
 version: v1
 intent: daemon
 confirm: RUN_FOREVER
@@ -12,14 +13,18 @@ job:
   objective: Drive a many-hour or many-day MiniRedis-class port from contract
     capture through parity, performance, hardening, release, and durable
     memory archive without scope sprawl.
-  target: redis
-  replacement: candidate
   risk:
     - agent swarm sprawl
     - partial parity mistaken for completion
     - lost context across long runs
     - performance regressions masked by functionality wins
     - unreviewed sandbox artifacts leaking into primary checkout
+
+stop:
+  all:
+    - git_clean:
+        allow_untracked: true
+
 superworkflow:
   stage_count: 12
   strategy: macro_plan_then_parallel_phases_then_fusion_hardening
@@ -382,3 +387,5 @@ superworkflow:
           - supervisor
           - release_captain
           - critic
+<<<END_ZYAL id=ambitious-superworkflow-template>>>
+ZYAL_ARM RUN_FOREVER id=ambitious-superworkflow-template
