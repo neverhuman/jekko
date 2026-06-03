@@ -296,7 +296,11 @@
       "command": "just score",
       "purpose": "verify canonical ZYAL runbooks stay under agent/zyal and only use the .zyal extension"
     },
-    "agent/zyal/sandbox-lanes.zyal": {
+    "docs/zyal/ambitious-superworkflow.zyal": {
+      "command": "just zyalc-compile-check",
+      "purpose": "verify the ambitious superworkflow compiles to canonical SuperWorkflow JSON"
+    },
+    "docs/zyal/sandbox-lanes.zyal": {
       "command": "just zyalc-compile-check",
       "purpose": "verify zyal source compiles cleanly and matches checked-in TOML"
     },
@@ -579,6 +583,10 @@
     "scripts/ci-doctor.sh": {
       "command": "just ci-doctor",
       "purpose": "verify local CI prereq checker stays visible"
+    },
+    "scripts/ci-fast-push-live.sh": {
+      "command": "bash -n scripts/ci-fast-push-live.sh && echo OK",
+      "purpose": "verify the live fast-push helper parses and its pre-push verification lane remains runnable"
     },
     "scripts/ci-local.sh": {
       "command": "just ci-local",
