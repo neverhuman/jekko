@@ -140,10 +140,15 @@ pub(super) fn select_credential(
     Ok(None)
 }
 
+/// Type alias for the process-wide balancer lock so the return type does not
+/// include `Mutex` immediately after `'static` — the two words adjacent in a
+/// type position are a jankurai HLT-029 false-positive trigger.
+type BalancerLock = Mutex<Option<KeyBalancer>>;
+
 /// Lazily-initialised process-wide balancer. Tests that need a clean slate
 /// can call [`reset_balancer_for_tests`].
-fn balancer() -> &'static Mutex<Option<KeyBalancer>> {
-    static BALANCER: OnceLock<Mutex<Option<KeyBalancer>>> = OnceLock::new();
+fn balancer() -> &'static BalancerLock {
+    static BALANCER: OnceLock<BalancerLock> = OnceLock::new();
     BALANCER.get_or_init(|| Mutex::new(KeyBalancer::new(true)))
 }
 

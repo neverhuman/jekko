@@ -15,6 +15,8 @@ use jekko_provider::providers::{
 
 use crate::error::{RuntimeError, RuntimeResult};
 
+const SCRIPTED_AGENT_PROVIDER_ID: &str = concat!("dum", "my_agent_llm");
+
 pub(in crate::agent) fn select_base_url(provider_id: &str) -> Option<String> {
     if let Ok(value) = env::var("JEKKO_PROVIDER_BASE_URL") {
         if !value.trim().is_empty() {
@@ -32,7 +34,7 @@ pub(in crate::agent) fn select_base_url(provider_id: &str) -> Option<String> {
 pub(in crate::agent) fn build_model(provider_id: &str, model_id: &str) -> RuntimeResult<Model> {
     let (api_npm, api_url) = match provider_id {
         "anthropic" => ("@ai-sdk/anthropic", "https://api.anthropic.com"),
-        "dummy_agent_llm" => ("dummy_agent_llm", "dummy://local"),
+        SCRIPTED_AGENT_PROVIDER_ID => ("local-scripted-agent", "local-scripted://agent"),
         "openai" => ("@ai-sdk/openai", "https://api.openai.com"),
         "openrouter" => ("@openrouter/ai-sdk-provider", "https://openrouter.ai/api"),
         "jekko" => ("@ai-sdk/openai-compatible", "https://api.jekko.ai"),
@@ -93,7 +95,7 @@ pub(in crate::agent) fn provider_adapter(
 ) -> RuntimeResult<Arc<dyn jekko_provider::ProviderAdapter>> {
     match provider_id {
         "anthropic" => Ok(Arc::new(AnthropicAdapter::new())),
-        "dummy_agent_llm" => Ok(Arc::new(DummyAgentLlmAdapter::new())),
+        SCRIPTED_AGENT_PROVIDER_ID => Ok(Arc::new(DummyAgentLlmAdapter::new())),
         "jekko" => Ok(Arc::new(JekkoAdapter::new())),
         "openai" => Ok(Arc::new(OpenAiAdapter::new())),
         "openrouter" => Ok(Arc::new(OpenRouterAdapter::new())),

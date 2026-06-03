@@ -27,11 +27,17 @@ SH
   PATH="${rtk_shim_dir}:${PATH}"
   export PATH
   trap cleanup_rtk_shim EXIT
-  log "rtk not found; using passthrough wrapper"
+  log "rtk not found; using passthrough shim"
 fi
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
 cd "$repo_root"
+
+lock_path="${repo_root}/.git/ci-fast-push-live.lock"
+exec {live_push_lock_fd}>"$lock_path"
+log "acquiring live push lock $lock_path"
+flock "$live_push_lock_fd"
+log "acquired live push lock $lock_path"
 
 utc_now() {
   date -u +%Y-%m-%dT%H:%M:%SZ
@@ -85,6 +91,8 @@ if ! git diff --cached --quiet --exit-code; then
 fi
 
 push_branch="${JAILGUN_CI_BRANCH:-codex/live-proof}"
+
+git fetch origin "$push_branch" || true
 
 git fetch origin main
 log "fetched origin/main $(git rev-parse --short origin/main) before push"

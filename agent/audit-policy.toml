@@ -229,7 +229,6 @@ excluded_paths = [
     "crates/sandboxctl/src/backend/docker.rs",
     "crates/sandboxctl/src/backend/bubblewrap.rs",
     "packages/jekko/src/server/server.ts",
-    "agent/zyal/sandbox-lanes.zyal",
     "packages/jekko/src/cli/cmd/tui/feature-plugins/sidebar/zyal/",
     "crates/jekko-tui/src/feature_plugins/zyal/",
     "crates/jekko-server/src/routes/tui.rs",

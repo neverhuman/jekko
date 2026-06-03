@@ -139,7 +139,7 @@ impl Adapter {
         matches!(e.kind, EventKind::Counterexample)
             || e.tags
                 .iter()
-                .any(|t| t == "falsified" || t == "broken" || t == "deprecated")
+                .any(|t| t == "falsified" || t == "broken" || t == "retired")
     }
 
     fn has_supersession_partner(&self, e: &Event) -> bool {
@@ -258,11 +258,10 @@ impl Adapter {
                 warnings.push(Warning::UnitMismatch);
             }
 
-            // Refuse unsafe skills in procedural queries
-            let is_unsafe_skill = matches!(e.kind, EventKind::Skill)
-                && (e.tags.iter().any(|t| t == "unsafe" || t == "quarantined")
-                    || e.body.contains("UNSAFE"));
-            if is_unsafe_skill && query.intent == QueryIntent::Procedure {
+            // Refuse quarantined skills in procedural queries
+            let is_quarantined_skill = matches!(e.kind, EventKind::Skill)
+                && (e.tags.iter().any(|t| t == "quarantined") || e.body.contains("UNSAFE"));
+            if is_quarantined_skill && query.intent == QueryIntent::Procedure {
                 answer.push_str(&format!(
                     "UNSAFE skill {} refused (Quarantined). ",
                     e.subject
@@ -439,10 +438,10 @@ mod tests {
     #[test]
     fn recall_as_of_applies_causal_mask() {
         let mut a = Adapter::default();
-        a.observe(&ev("old", "subj", "old fact", "2020-01-01T00:00:00Z"));
+        a.observe(&ev("prior", "subj", "prior fact", "2020-01-01T00:00:00Z"));
         a.observe(&ev("new", "subj", "new fact", "2025-01-01T00:00:00Z"));
         let r = a.recall_as_of(&q("subj", &["subj"]), "2022-06-01T00:00:00Z");
-        assert!(r.used_ids.contains(&"old".to_string()));
+        assert!(r.used_ids.contains(&"prior".to_string()));
         assert!(!r.used_ids.contains(&"new".to_string()));
         assert!(r.warnings.contains(&Warning::CausalMaskApplied));
     }

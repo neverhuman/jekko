@@ -379,7 +379,7 @@ check: fast doctor-full score security
 # Backed by crates/tuiwright-jekko-unlock rather than the deleted packages/ux-qa CLI.
 ux-qa:
 	mkdir -p {{jankurai_artifact_root}}
-	rtk jankurai ux audit --config agent/ux-qa.toml --out {{jankurai_artifact_root}}/ux-qa.json
+	rtk bash ops/ci/ux-qa-evidence.sh {{jankurai_artifact_root}}/ux-qa.json
 
 # Launch the fullscreen Codex/Claude-style chat surface against the live
 # bridge. Requires a configured provider (see `jekko auth status`) or a
@@ -650,7 +650,7 @@ zyal-super-redis run_id="zyal-super-redis-local":
 	JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" \
 	JEKKO_KEY_SOURCE_POLICY=users-only \
 		rtk cargo run -p jekko-cli --offline -- port-run \
-			--super agent/zyal/ambitious-superworkflow.zyal \
+			--super docs/zyal/ambitious-superworkflow.zyal \
 			--run-id "{{run_id}}"
 
 # Manual-only serious ZYAL live campaign. Never run in CI; requires both

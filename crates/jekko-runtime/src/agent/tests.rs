@@ -279,8 +279,8 @@ fn build_model_supports_dummy_agent_llm_provider() {
     let model = build_model("dummy_agent_llm", "tool-read").unwrap();
     assert_eq!(model.provider_id.as_str(), "dummy_agent_llm");
     assert_eq!(model.api.id, "tool-read");
-    assert_eq!(model.api.npm, "dummy_agent_llm");
-    assert_eq!(model.api.url, "dummy://local");
+    assert_eq!(model.api.npm, "local-scripted-agent");
+    assert_eq!(model.api.url, "local-scripted://agent");
     assert_eq!(model.cost.input, 0.0);
     assert_eq!(model.cost.output, 0.0);
 }

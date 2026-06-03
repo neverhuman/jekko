@@ -171,9 +171,7 @@ impl TemplateContext {
 fn select_scenario(req: &ProviderRequest) -> ProviderResult<&'static DummyScenario> {
     let id = option_scenario_id(req)
         .or_else(|| known_scenario_id(&req.api_model_id))
-        .or_else(|| {
-            known_scenario_id(req.model.rsplit('/').next().unwrap_or(req.model.as_str()))
-        })
+        .or_else(|| known_scenario_id(req.model.rsplit('/').next().unwrap_or(req.model.as_str())))
         .unwrap_or(DEFAULT_SCENARIO_ID);
     scenarios()?
         .iter()
@@ -219,7 +217,12 @@ fn select_stage<'a>(scenario: &'a DummyScenario, req: &ProviderRequest) -> &'a D
         .stages
         .iter()
         .find(|stage| stage.when == wanted)
-        .or_else(|| scenario.stages.iter().find(|stage| stage.when == StageWhen::Initial))
+        .or_else(|| {
+            scenario
+                .stages
+                .iter()
+                .find(|stage| stage.when == StageWhen::Initial)
+        })
         .expect("validated fixture must contain an initial stage")
 }
 
@@ -257,10 +260,12 @@ fn push_frame(
                 id: id.clone(),
                 name: name.clone(),
             })));
-            events.push(Ok(ProviderEvent::new(ProviderEventKind::ToolCallInputDelta {
-                id: id.clone(),
-                delta: input_json,
-            })));
+            events.push(Ok(ProviderEvent::new(
+                ProviderEventKind::ToolCallInputDelta {
+                    id: id.clone(),
+                    delta: input_json,
+                },
+            )));
             events.push(Ok(ProviderEvent::new(ProviderEventKind::ToolCallEnd {
                 id: id.clone(),
                 name: name.clone(),
@@ -282,7 +287,9 @@ fn push_frame(
         }
         DummyFrame::Metadata { metadata } => {
             let metadata = context.expand_value(metadata);
-            events.push(Ok(ProviderEvent::new(ProviderEventKind::Metadata { metadata })));
+            events.push(Ok(ProviderEvent::new(ProviderEventKind::Metadata {
+                metadata,
+            })));
         }
         DummyFrame::StreamEnd { stop_reason } => {
             events.push(Ok(ProviderEvent::new(ProviderEventKind::StreamEnd {
@@ -290,7 +297,9 @@ fn push_frame(
             })));
         }
         DummyFrame::Error { message } => {
-            events.push(Err(ProviderError::ProviderEvent(context.expand_str(message))));
+            events.push(Err(ProviderError::ProviderEvent(
+                context.expand_str(message),
+            )));
         }
     }
     Ok(())
@@ -313,7 +322,10 @@ fn load_scenarios() -> Result<Vec<DummyScenario>, String> {
             serde_json::from_str(fixture).map_err(|err| err.to_string())?;
         validate_scenario(&scenario)?;
         if !seen.insert(scenario.id.clone()) {
-            return Err(format!("duplicate dummy_agent_llm scenario id `{}`", scenario.id));
+            return Err(format!(
+                "duplicate dummy_agent_llm scenario id `{}`",
+                scenario.id
+            ));
         }
         scenarios.push(scenario);
     }
@@ -417,9 +429,9 @@ fn has_tool_result(messages: &[Value]) -> bool {
                 .get("content")
                 .and_then(Value::as_array)
                 .is_some_and(|parts| {
-                    parts.iter().any(|part| {
-                        part.get("type").and_then(Value::as_str) == Some("tool-result")
-                    })
+                    parts
+                        .iter()
+                        .any(|part| part.get("type").and_then(Value::as_str) == Some("tool-result"))
                 })
     })
 }
@@ -427,9 +439,8 @@ fn has_tool_result(messages: &[Value]) -> bool {
 fn first_absolute_path(text: &str) -> Option<String> {
     text.split_whitespace()
         .map(|token| {
-            token.trim_matches(|c: char| {
-                matches!(c, ',' | '.' | ':' | ';' | ')' | '(' | '"' | '\'')
-            })
+            token
+                .trim_matches(|c: char| matches!(c, ',' | '.' | ':' | ';' | ')' | '(' | '"' | '\''))
         })
         .find(|token| token.starts_with('/') && token.len() > 1)
         .map(str::to_string)

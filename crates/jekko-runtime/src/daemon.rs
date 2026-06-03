@@ -225,12 +225,11 @@ impl DaemonRegistry {
 
     async fn publish_status(&self, record: &DaemonRecord) {
         if let Some(bus) = &self.bus {
-            let _ = bus
-                .publish(
-                    "daemon.status",
-                    serde_json::to_value(record).unwrap_or_else(|_| serde_json::json!({})),
-                )
-                .await;
+            let payload = match serde_json::to_value(record) {
+                Ok(value) => value,
+                Err(_) => serde_json::json!({}),
+            };
+            let _ = bus.publish("daemon.status", payload).await;
         }
     }
 }
