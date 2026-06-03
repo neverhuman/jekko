@@ -86,6 +86,14 @@ fi
 
 push_branch="${JAILGUN_CI_BRANCH:-codex/live-proof}"
 
+git fetch origin "$push_branch" || true
+if git show-ref --verify --quiet "refs/remotes/origin/$push_branch"; then
+  if ! git merge-base --is-ancestor "origin/$push_branch" HEAD; then
+    log "rebasing HEAD $(git rev-parse --short HEAD) onto origin/$push_branch $(git rev-parse --short "origin/$push_branch")"
+    git rebase "origin/$push_branch"
+  fi
+fi
+
 git fetch origin main
 log "fetched origin/main $(git rev-parse --short origin/main) before push"
 require_origin_main_ancestor
