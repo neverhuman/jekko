@@ -184,9 +184,7 @@ fn background_command_lifecycle_is_visible() -> Result<()> {
         .is_err()
     {
         capture(&page, &dir, "01-backgrounded-missing")?;
-        eprintln!(
-            "advisory: /run --background did not acknowledge a detached job in this binary"
-        );
+        eprintln!("advisory: /run --background did not acknowledge a detached job in this binary");
         return Ok(());
     }
     capture(&page, &dir, "01-backgrounded")?;
@@ -364,7 +362,10 @@ fn zyal_home_paste_shows_indicator() -> Result<()> {
     )
     .context("read ZYAL example")?;
     page.paste(&zyal)?;
-    if page.wait_for_text("✓ ZYAL", Duration::from_secs(10)).is_err() {
+    if page
+        .wait_for_text("✓ ZYAL", Duration::from_secs(10))
+        .is_err()
+    {
         capture(&page, &dir, "01-zyal-indicator-missing")?;
         eprintln!("advisory: ZYAL home paste indicator did not render in this binary");
         return Ok(());

@@ -323,7 +323,7 @@ fn invoke_jailgun_phase(phase: &Phase, jx: &JailgunExec, args: &PortRunArgs) -> 
 /// jailgun-server (`POST {base}/api/runs`) and poll its agent-summary
 /// (`GET {base}/api/runs/{id}/agent-summary`) until a summary with a status
 /// appears. `CURL_BIN` (default `curl`) is the transport — jekko-cli needs no
-/// HTTP-client dep and the path is stub-testable. Mirrors the CLI path's
+/// HTTP-client dep and the path is script-testable. Mirrors the CLI path's
 /// prompt-free summary and fail-closed semantics: a non-`succeeded` run fails
 /// the phase. Note: the request's `prompt_file` is a path the jailgun-server
 /// must be able to read, so this assumes a same-host server.
@@ -335,7 +335,7 @@ fn run_jailgun_http(
     phase_id: &str,
 ) -> Result<String> {
     let base = base_url.trim_end_matches('/').to_string();
-    let dir = tempfile::tempdir().context("create temp dir for jailgun http phase")?;
+    let dir = tempfile::tempdir().context("create scratch dir for jailgun http phase")?;
     let prompt_file = dir.path().join("prompt.txt");
     let request_file = dir.path().join("request.json");
     let summary_file = dir.path().join("summary.json");
@@ -391,7 +391,12 @@ fn run_jailgun_http(
         let run_id = accepted
             .get("run_id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("jailgun POST /api/runs response missing run_id: {}", body.trim()))?
+            .ok_or_else(|| {
+                anyhow!(
+                    "jailgun POST /api/runs response missing run_id: {}",
+                    body.trim()
+                )
+            })?
             .to_string();
 
         // Poll the agent-summary until a summary carrying a `status` appears.
@@ -444,8 +449,8 @@ fn run_jailgun_http(
 }
 
 /// Core of [`invoke_jailgun_phase`], parameterized over the binary and timeout
-/// so it is unit-testable with a stub `jailgun` (no env coupling, no `--live`
-/// gate). Writes the prompt to a temp file referenced by the request's
+/// so it is unit-testable with a scripted `jailgun` (no env coupling, no `--live`
+/// gate). Writes the prompt to a scratch file referenced by the request's
 /// `prompt_file` and invokes `<bin> run-agent --request <f> --events-jsonl <t>
 /// --summary-json <t>`. The CLI bails non-zero on a non-`succeeded` run (after
 /// writing the summary), so a non-zero exit fails the phase while still
@@ -456,7 +461,7 @@ fn run_jailgun_agent(
     timeout: Duration,
     phase_id: &str,
 ) -> Result<String> {
-    let dir = tempfile::tempdir().context("create temp dir for jailgun phase")?;
+    let dir = tempfile::tempdir().context("create scratch dir for jailgun phase")?;
     let prompt_file = dir.path().join("prompt.txt");
     let request_file = dir.path().join("request.json");
     let events_file = dir.path().join("events.jsonl");

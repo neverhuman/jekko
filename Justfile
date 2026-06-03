@@ -379,7 +379,7 @@ check: fast doctor-full score security
 # Backed by crates/tuiwright-jekko-unlock rather than the deleted packages/ux-qa CLI.
 ux-qa:
 	mkdir -p {{jankurai_artifact_root}}
-	rtk jankurai ux audit --config agent/ux-qa.toml --out {{jankurai_artifact_root}}/ux-qa.json
+	rtk bash ops/ci/ux-qa-evidence.sh {{jankurai_artifact_root}}/ux-qa.json
 
 # Launch the fullscreen Codex/Claude-style chat surface against the live
 # bridge. Requires a configured provider (see `jekko auth status`) or a
