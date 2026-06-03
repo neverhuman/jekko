@@ -3,7 +3,6 @@
 # zyal: declarative target=superworkflow schema=zyal/superworkflow@1
 # zyalc: emits agent/superworkflows/ambitious-superworkflow.superworkflow.json
 # Target framing: target=redis (MiniRedis reference) replacement=candidate.
-<<<ZYAL v1:daemon id=ambitious-superworkflow-template>>>
 version: v1
 intent: daemon
 confirm: RUN_FOREVER
@@ -383,6 +382,3 @@ superworkflow:
           - supervisor
           - release_captain
           - critic
-
-<<<END_ZYAL id=ambitious-superworkflow-template>>>
-# ZYAL_ARM RUN_FOREVER id=ambitious-superworkflow-template
