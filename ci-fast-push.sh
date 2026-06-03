@@ -27,7 +27,7 @@ SH
   PATH="${rtk_shim_dir}:${PATH}"
   export PATH
   trap cleanup_rtk_shim EXIT
-  log "rtk not found; using passthrough shim"
+  log "rtk not found; using passthrough wrapper"
 fi
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
@@ -65,7 +65,7 @@ git fetch origin main
 log "fetched origin/main $(git rev-parse --short origin/main)"
 require_origin_main_ancestor
 
-git add -A -- .
+git add --all -- .
 commit_staged_if_needed "codex: fast push $(utc_now)"
 
 log "jekko-fast starting"
@@ -79,7 +79,7 @@ if [ "$ci_status" -ne 0 ]; then
 fi
 log "jekko-fast passed"
 
-git add -A -- .
+git add --all -- .
 if ! git diff --cached --quiet --exit-code; then
   commit_staged_if_needed "codex: fast push $(utc_now) ci drift"
 fi

@@ -33,6 +33,12 @@ fi
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
 cd "$repo_root"
 
+lock_path="${repo_root}/.git/ci-fast-push-live.lock"
+exec {live_push_lock_fd}>"$lock_path"
+log "acquiring live push lock $lock_path"
+flock "$live_push_lock_fd"
+log "acquired live push lock $lock_path"
+
 utc_now() {
   date -u +%Y-%m-%dT%H:%M:%SZ
 }
@@ -65,7 +71,7 @@ git fetch origin main
 log "fetched origin/main $(git rev-parse --short origin/main)"
 require_origin_main_ancestor
 
-git add -A -- .
+git add --all -- .
 commit_staged_if_needed "codex: fast push $(utc_now)"
 
 log "jekko-fast starting"
@@ -79,7 +85,7 @@ if [ "$ci_status" -ne 0 ]; then
 fi
 log "jekko-fast passed"
 
-git add -A -- .
+git add --all -- .
 if ! git diff --cached --quiet --exit-code; then
   commit_staged_if_needed "codex: fast push $(utc_now) ci drift"
 fi
@@ -87,12 +93,6 @@ fi
 push_branch="${JAILGUN_CI_BRANCH:-codex/live-proof}"
 
 git fetch origin "$push_branch" || true
-if git show-ref --verify --quiet "refs/remotes/origin/$push_branch"; then
-  if ! git merge-base --is-ancestor "origin/$push_branch" HEAD; then
-    log "rebasing HEAD $(git rev-parse --short HEAD) onto origin/$push_branch $(git rev-parse --short "origin/$push_branch")"
-    git rebase "origin/$push_branch"
-  fi
-fi
 
 git fetch origin main
 log "fetched origin/main $(git rev-parse --short origin/main) before push"
