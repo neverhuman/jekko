@@ -84,7 +84,7 @@ if ! git diff --cached --quiet --exit-code; then
   commit_staged_if_needed "codex: fast push $(utc_now) ci drift"
 fi
 
-push_branch="${JAILGUN_CI_BRANCH:-codex/live-proof}"
+push_branch="${JAILGUN_CI_BRANCH:-main}"
 
 git fetch origin main
 log "fetched origin/main $(git rev-parse --short origin/main) before push"
