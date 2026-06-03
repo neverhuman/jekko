@@ -16,19 +16,20 @@ cargo test -p jekko-tui --locked --no-fail-fast
 # cleanly when jankurai is absent, so a download failure must not fail the lane.
 (
   set -e
-  ver="1.5.1"
   cli_ver="1.6.10"
+  source_rev="3c804453e6c7a6e0e4028d95cc3bccea467277ef"
+  source_url="https://github.com/neverhuman/jankurai.git"
   current="$(jankurai --version 2>/dev/null | head -1 || true)"
   if [[ "$current" != *"jankurai ${cli_ver}"* ]]; then
-    target="x86_64-unknown-linux-gnu"
-    sha="a12dbb4a3805dee807fc101d4b073ac9386936b33c5579f606a655fe90d0bbac"
-    tmp="$(mktemp -d)"
-    arc="$tmp/jankurai-${ver}-${target}.tar.gz"
-    curl -fsSL "https://github.com/neverhuman/jankurai/releases/download/v${ver}/jankurai-${ver}-${target}.tar.gz" -o "$arc"
-    echo "${sha}  ${arc}" | sha256sum -c -
-    tar -xzf "$arc" -C "$tmp"
-    mkdir -p "${HOME}/.local/bin"
-    install -m 0755 "$tmp/jankurai-${ver}-${target}/jankurai" "${HOME}/.local/bin/jankurai"
+    mkdir -p "${HOME}/.local"
+    cargo install \
+      --git "${source_url}" \
+      jankurai \
+      --rev "${source_rev}" \
+      --locked \
+      --bin jankurai \
+      --root "${HOME}/.local" \
+      --force
   fi
 ) || echo "jankurai install failed; the real-audit render e2e will skip"
 export PATH="${HOME}/.local/bin:${PATH}"
