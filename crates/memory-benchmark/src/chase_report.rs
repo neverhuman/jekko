@@ -783,54 +783,25 @@ fn snapshot_from_score_json(
 ) -> Option<CandidateSnapshot> {
     let json = value?;
     let obj = json_object(json)?;
-    let source_name = match json_string(obj, "source") {
-        Some(name) => name,
-        None => source.to_string(),
-    };
-    let name = if let Some(name) = json_string(obj, "name") {
-        name
-    } else if let Some(name) = json_string(obj, "lane") {
-        name
-    } else if let Some(name) = json_string(obj, "id") {
-        name
-    } else {
-        fallback_name.to_string()
-    };
+    let source_name = json_string(obj, "source").unwrap_or_else(|| source.to_string());
+    let name = json_string(obj, "name")
+        .or_else(|| json_string(obj, "lane"))
+        .or_else(|| json_string(obj, "id"))
+        .unwrap_or_else(|| fallback_name.to_string());
     let total = json_number(obj, "total").unwrap_or(0.0);
-    let ci95_low = if let Some(value) = json_number_in(obj, &["bootstrap_ci", "ci95_low"]) {
-        value
-    } else {
-        total
-    };
-    let ci95_high = if let Some(value) = json_number_in(obj, &["bootstrap_ci", "ci95_high"]) {
-        value
-    } else {
-        total
-    };
-    let stress_total = if let Some(value) = json_number(obj, "stress_total") {
-        value
-    } else if let Some(value) = json_number(obj, "stress_score") {
-        value
-    } else if let Some(value) = json_number_in(obj, &["stress", "total"]) {
-        value
-    } else {
-        total
-    };
+    let ci95_low = json_number_in(obj, &["bootstrap_ci", "ci95_low"]).unwrap_or(total);
+    let ci95_high = json_number_in(obj, &["bootstrap_ci", "ci95_high"]).unwrap_or(total);
+    let stress_total = json_number(obj, "stress_total")
+        .or_else(|| json_number(obj, "stress_score"))
+        .or_else(|| json_number_in(obj, &["stress", "total"]))
+        .unwrap_or(total);
     let gates = gate_vector_from_value(json);
-    let cost_usd = if let Some(value) = json_number(obj, "cost_usd") {
-        value
-    } else if let Some(value) = json_number_in(obj, &["observability", "cost", "budget"]) {
-        value
-    } else {
-        0.0
-    };
+    let cost_usd = json_number(obj, "cost_usd")
+        .or_else(|| json_number_in(obj, &["observability", "cost", "budget"]))
+        .unwrap_or(0.0);
     let hypothesis = json_string(obj, "hypothesis");
     let observed_at_run = json_string(obj, "observed_at_run");
-    let patch = if let Some(patch) = json_string(obj, "patch") {
-        Some(patch)
-    } else {
-        json_string(obj, "best_patch")
-    };
+    let patch = json_string(obj, "patch").or_else(|| json_string(obj, "best_patch"));
     let dev_only = json_bool(obj, "dev_only").unwrap_or(false);
 
     Some(CandidateSnapshot {
@@ -861,19 +832,11 @@ fn snapshot_from_candidate_like(
 ) -> Result<CandidateSnapshot, String> {
     let source = source.into();
     let obj = json_object(json).ok_or_else(|| "invalid_lane_report".to_string())?;
-    let source_name = match json_string(obj, "source") {
-        Some(s) => s,
-        None => source.clone(),
-    };
-    let name = if let Some(n) = json_string(obj, "name") {
-        n
-    } else if let Some(n) = json_string(obj, "lane") {
-        n
-    } else if let Some(n) = json_string(obj, "id") {
-        n
-    } else {
-        source_name.clone()
-    };
+    let source_name = json_string(obj, "source").unwrap_or_else(|| source.clone());
+    let name = json_string(obj, "name")
+        .or_else(|| json_string(obj, "lane"))
+        .or_else(|| json_string(obj, "id"))
+        .unwrap_or_else(|| source_name.clone());
     let total = json_number(obj, "total").unwrap_or(0.0);
     let ci95_low_raw = json_number_in(obj, &["bootstrap_ci", "ci95_low"]);
     let ci95_low = if let Some(v) = ci95_low_raw {
@@ -886,35 +849,23 @@ fn snapshot_from_candidate_like(
         total
     };
     let ci95_high = json_number_in(obj, &["bootstrap_ci", "ci95_high"]).unwrap_or(total);
-    let stress_total = if let Some(v) = json_number(obj, "stress_total") {
-        v
-    } else if let Some(v) = json_number(obj, "stress_score") {
-        v
-    } else if let Some(v) = json_number_in(obj, &["stress", "total"]) {
-        v
-    } else {
-        total
-    };
+    let stress_total = json_number(obj, "stress_total")
+        .or_else(|| json_number(obj, "stress_score"))
+        .or_else(|| json_number_in(obj, &["stress", "total"]))
+        .unwrap_or(total);
     let gates = gate_vector_from_value(json);
-    let cost_usd = if let Some(v) = json_number(obj, "cost_usd") {
-        v
-    } else if let Some(v) = json_number_in(obj, &["observability", "cost", "budget"]) {
-        v
-    } else {
-        0.0
-    };
+    let cost_usd = json_number(obj, "cost_usd")
+        .or_else(|| json_number_in(obj, &["observability", "cost", "budget"]))
+        .unwrap_or(0.0);
     let hypothesis = json_string(obj, "hypothesis");
     let observed_at_run = json_string(obj, "observed_at_run");
     let dev_only = json_bool(obj, "dev_only").unwrap_or(false);
-    let patch = if let Some(p) = json_string(obj, "patch") {
-        Some(p)
-    } else if let Some(p) = json_string(obj, "best_patch") {
-        Some(p)
-    } else if let Some(patch_path) = json_string(obj, "patch_path") {
-        read_patch_content(report_path, &patch_path).ok()
-    } else {
-        None
-    };
+    let patch = json_string(obj, "patch")
+        .or_else(|| json_string(obj, "best_patch"))
+        .or_else(|| {
+            json_string(obj, "patch_path")
+                .and_then(|patch_path| read_patch_content(report_path, &patch_path).ok())
+        });
     if patch.is_none() && json_string(obj, "patch_path").is_some() {
         return Err("invalid_lane_report".to_string());
     }
@@ -1476,10 +1427,10 @@ const FORBIDDEN_TOKENS: &[&str] = &[
     "chrono::",
     "env::var(",
     "process::Command",
-    concat!(" un", "safe "),
-    concat!(" un", "safe{"),
-    concat!("pan", "ic!("),
-    concat!("un", "implemented!("),
+    " unsafe ",
+    " unsafe{",
+    "panic!(",
+    "unimplemented!(",
     "sk-",
     "SECRET_KEY",
     "SECRET_TOKEN",

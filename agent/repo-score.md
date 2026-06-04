@@ -7,15 +7,15 @@
 - Target stack ID: `rust-ts-vite-react-postgres-bounded-python`
 - Target stack: `Rust core + TypeScript/React/Vite + PostgreSQL + generated contracts + exception-only Python AI/data service`
 - Repo: `.`
-- Run ID: `1780505426`
-- Started at: `1780505426`
-- Elapsed: `14962` ms
+- Run ID: `1780114285`
+- Started at: `1780114285`
+- Elapsed: `14571` ms
 - Scope: `full`
-- Raw score: `84`
-- Final score: `70`
+- Raw score: `83`
+- Final score: `64`
 - Decision: `advisory`
 - Minimum score: `85`
-- Caps applied: `fallback-soup-in-product-code, generated-zone-mutation-risk, agent-tool-supply-chain-gap, rust-bad-behavior`
+- Caps applied: `vibe-placeholders-in-product-code, fallback-soup-in-product-code, future-hostile-dead-language-in-product-code, generated-zone-mutation-risk, agent-tool-supply-chain-gap, rust-bad-behavior`
 
 ## Hard Rule Caps
 
@@ -33,9 +33,9 @@
 | `non-optimal-product-language-found` | 74 | no |
 | `too-much-python-in-product-surface` | 72 | no |
 | `boundary-reclassification-evidence-gap` | 72 | no |
-| `vibe-placeholders-in-product-code` | 68 | no |
+| `vibe-placeholders-in-product-code` | 68 | yes |
 | `fallback-soup-in-product-code` | 70 | yes |
-| `future-hostile-dead-language-in-product-code` | 64 | no |
+| `future-hostile-dead-language-in-product-code` | 64 | yes |
 | `severe-duplication-in-product-code` | 70 | no |
 | `generated-zone-mutation-risk` | 76 | yes |
 | `direct-db-access-from-wrong-layer` | 66 | no |
@@ -70,15 +70,15 @@
 
 ## Copy-Code Redundancy
 
-- Status: `review` hard=`0` warning=`92` files=`925`
+- Status: `review` hard=`0` warning=`91` files=`924`
 - Policy: min-lines=`10` min-tokens=`100` max-findings=`50` include-tests=`false` strict=`false`
-- Duplicate volume: lines=`267` tokens=`770` bytes=`7278`
+- Duplicate volume: lines=`266` tokens=`766` bytes=`7228`
 
 - Notes:
   - hard classes are limited to exact active-source file matches and substantial exact same-name units
   - warning classes include same-body different-name units and token/block duplication
   - tests, fixtures, stories, config, Docker, and migrations are omitted unless --include-tests is set
-  - showing the top 50 classes and omitting 42 lower-ranked classes
+  - showing the top 50 classes and omitting 41 lower-ranked classes
 
 | Kind | Severity | Language | Lines | Tokens | Instances | Reason |
 | --- | --- | --- | ---: | ---: | --- | --- |
@@ -141,7 +141,7 @@
 | Contract and boundary integrity | 13 | 98 | 12.74 | contract surface found; generated contract artifacts found |
 | Proof lanes and test routing | 12 | 100 | 12.00 | one-command setup/validation lane found; deterministic fast lane found |
 | Security and supply-chain posture | 12 | 94 | 11.28 | lockfile present; secret or dependency scan tooling found |
-| Code shape and semantic surface | 12 | 12 | 1.44 | largest authored code file: crates/memory-benchmark/src/fixture/data.rs (2557 LOC); code file exceeds 500 LOC |
+| Code shape and semantic surface | 12 | 0 | 0.00 | largest authored code file: crates/memory-benchmark/src/fixture/data.rs (2557 LOC); code file exceeds 500 LOC |
 | Data truth and workflow safety | 8 | 95 | 7.60 | database surface present; structured db boundary manifest present |
 | Observability and repair evidence | 8 | 98 | 7.84 | observability libraries or patterns found; diagnostic shaping hints found |
 | Context economy and agent instructions | 7 | 100 | 7.00 | root `AGENTS.md` present; root `AGENTS.md` stays short |
@@ -224,23 +224,12 @@ No audited runtime boundary reclassifications declared.
    Check: `HLT-001-DEAD-MARKER:shape` `soft` confidence `0.76`
    Route: TLR `Entropy`, lane `fast`, owner `tools`
    Docs: `docs/audit-rubric.md#future-hostile-language-rule`
-   Reason: `Code shape and semantic surface` scored 12 below the standard floor of 85
+   Reason: `Code shape and semantic surface` scored 0 below the standard floor of 85
    Fix: split large or ambiguous authored code into smaller semantic modules with focused tests
    Rerun: `just fast`
-   Fingerprint: `sha256:17d78bcde9cb537b153a9dbaebec5813471f053e96468e31fdf1bc46203ebde0`
+   Fingerprint: `sha256:43c051648e5ad9a7abab39e3459675c52c7db75ef807709127066ad60a90582e`
    Evidence: largest authored code file: crates/memory-benchmark/src/fixture/data.rs (2557 LOC), code file exceeds 500 LOC, code file exceeds 1000 LOC, most code files stay under 300 LOC
-2. `medium` `proof` `.jankurai/language-bad-behavior.json:1437`
-   Rule: `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP`
-   Check: `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP:proof` `soft` confidence `0.88`
-   Route: TLR `Repair`, lane `audit`, owner `agent`
-   Docs: `docs/testing.md`
-   Matched term: `review evidence`
-   Reason: proof and review claims need receipts
-   Fix: attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries
-   Rerun: `just score`
-   Fingerprint: `sha256:bfc5cf5541f68b30dbcdf737bc6295610bf2e8988f2a7c12da6331334f2fec44`
-   Evidence: "Evidence: pub fabricated_citations: u32,"
-3. `high` `generated` `agent/generated-zones.toml:1`
+2. `high` `generated` `agent/generated-zones.toml:1`
    Rule: `HLT-002-GENERATED-MUTATION`
    Check: `HLT-002-GENERATED-MUTATION:generated` `hard` confidence `0.95`
    Route: TLR `Contracts/data`, lane `contract`, owner `workspace`
@@ -250,18 +239,18 @@ No audited runtime boundary reclassifications declared.
    Rerun: `just fast`
    Fingerprint: `sha256:944fb8ea13fac99bc4d88599306b0824999856bd7749785448443a4ec07984d7`
    Evidence: generated zone declaration `agent/sandbox-lanes.toml` targets protected source or control-plane code
-4. `high` `security` `agent/zyal/ambitious-superworkflow.zyal:6`
+3. `high` `security` `agent/zyal/ambitious-superworkflow.zyal:387`
    Rule: `HLT-024-AGENT-TOOL-SUPPLY-GAP`
    Check: `HLT-024-AGENT-TOOL-SUPPLY-GAP:security` `hard` confidence `0.88`
    Route: TLR `Security, secrets, agency`, lane `security`, owner `agent`
    Docs: `docs/audit-rubric.md#top-level-risk-mapping`
-   Matched term: `<<<ZYAL`
-   Reason: non-open sentinel
-   Fix: keep the runbook envelope at the top of the file after optional comments
+   Matched term: `ZYAL_ARM`
+   Reason: missing arm
+   Fix: append `ZYAL_ARM RUN_FOREVER id=<id>` on the final line
    Rerun: `just security`
-   Fingerprint: `sha256:69559f35cbb52ce51ad60e7551c08bdd98b7ef1ab101495d80069e096f84084c`
-   Evidence: supported_contract_version=2.4.0, runtime_sentinel_version=v1
-5. `high` `security` `agent/zyal/sandbox-lanes.zyal:3`
+   Fingerprint: `sha256:821aafc4672d2bf6d71f6d817435f9b4f9ba6cacd56aa8c796d8bb5a1ddfa2e4`
+   Evidence: open_id=ambitious-superworkflow-template
+4. `high` `security` `agent/zyal/sandbox-lanes.zyal:3`
    Rule: `HLT-024-AGENT-TOOL-SUPPLY-GAP`
    Check: `HLT-024-AGENT-TOOL-SUPPLY-GAP:security` `hard` confidence `0.88`
    Route: TLR `Security, secrets, agency`, lane `security`, owner `agent`
@@ -272,7 +261,7 @@ No audited runtime boundary reclassifications declared.
    Rerun: `just security`
    Fingerprint: `sha256:b2a299af938e370b48e782c2a21ac41d91eb6a027364994144504e2a12b4894e`
    Evidence: supported_contract_version=2.4.0, runtime_sentinel_version=v1
-6. `high` `security` `crates/jekko-runtime/src/agent/provider.rs:145`
+5. `high` `security` `crates/jekko-runtime/src/agent/provider.rs:145`
    Rule: `HLT-029-RUST-BAD-BEHAVIOR`
    Check: `HLT-029-RUST-BAD-BEHAVIOR:security` `hard` confidence `0.95`
    Route: TLR `Security, secrets, agency`, lane `fast`, owner `tools`
@@ -283,7 +272,7 @@ No audited runtime boundary reclassifications declared.
    Rerun: `just fast`
    Fingerprint: `sha256:4bbd50117d51b8864f533a622b6a06774deda2f952a4397bfef2439a4c335cf6`
    Evidence: detector=static mut, proof-window=NearbySafetyComment, snippet=fn balancer() -> &'static Mutex<Option<KeyBalancer>> {
-7. `high` `vibe` `crates/memory-benchmark/src/chase_report.rs:864`
+6. `high` `vibe` `crates/jekko-runtime/src/daemon.rs:231`
    Rule: `HLT-001-DEAD-MARKER`
    Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
    Route: TLR `Entropy`, lane `fast`, owner `tools`
@@ -291,8 +280,150 @@ No audited runtime boundary reclassifications declared.
    Reason: fallback soup detected in product code
    Fix: collapse fallback chains into explicit typed states with bounded retry policy, telemetry, and documented repair guidance
    Rerun: `just fast`
-   Fingerprint: `sha256:8169fcbb8b4c1d00f2b427af64a701222bb33513b92ba928d6246344d882fc5f`
-   Evidence: crates/memory-benchmark/src/chase_report.rs:864 let source_name = json_string(obj, "source").unwrap_or_else(|| source.clone());
+   Fingerprint: `sha256:a2080a15cdd4c06e7eb7e18334ca6813ce6fb2c9a8fe3786e04b75a085ddb27e`
+   Evidence: crates/jekko-runtime/src/daemon.rs:231 serde_json::to_value(record).unwrap_or_else(|_| serde_json::json!({})),
+7. `high` `vibe` `crates/memory-benchmark/src/adapters/reference_context_pack.rs:142`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `deprecated` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:4fc563586ba63a80b831f60984df89eaf87bd0459b608aa8e57590b3993e7c56`
+   Evidence: crates/memory-benchmark/src/adapters/reference_context_pack.rs:142, future-hostile/dead-language term `deprecated` appears
+8. `medium` `proof` `crates/memory-benchmark/src/chase_report.rs:39`
+   Rule: `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP`
+   Check: `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP:proof` `soft` confidence `0.88`
+   Route: TLR `Repair`, lane `audit`, owner `tools`
+   Docs: `docs/testing.md`
+   Matched term: `review evidence`
+   Reason: proof and review claims need receipts
+   Fix: attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries
+   Rerun: `just score`
+   Fingerprint: `sha256:423b3c5e9f34e3a76640a8101ac1746c1acfc060b044164a7fff0da274caab6b`
+   Evidence: pub fabricated_citations: u32,
+9. `high` `security` `crates/memory-benchmark/src/chase_report.rs:1431`
+   Rule: `HLT-029-RUST-BAD-BEHAVIOR`
+   Check: `HLT-029-RUST-BAD-BEHAVIOR:security` `hard` confidence `0.95`
+   Route: TLR `Security, secrets, agency`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#top-level-risk-mapping`
+   Matched term: `rust.unsafe.undocumented-block`
+   Reason: no nearby SAFETY comment was found
+   Fix: add a precise `SAFETY:` comment or remove the unsafe block
+   Rerun: `just fast`
+   Fingerprint: `sha256:b566690531c444a943081f587f64719af1ff3e839453f7e4f776c5c8a788d510`
+   Evidence: detector=unsafe {, proof-window=NearbySafetyComment, snippet=" unsafe{",
+10. `high` `vibe` `crates/memory-benchmark/src/chase_report.rs:1433`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: product code contains TODO/stub/unimplemented/unreachable placeholder markers
+   Fix: replace placeholders with implemented behavior, typed unsupported-state errors, or a tracked exception record with docs
+   Rerun: `just fast`
+   Fingerprint: `sha256:32446b812827c6375ed59c75267d53f335b77865abd5700593408b3474257166`
+   Evidence: crates/memory-benchmark/src/chase_report.rs:1433 "unimplemented!(",
+11. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:163`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `deprecated` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:83cac91ad2e5b770073e4e26a26ce0f8ef24b0643ef1f4fd342338f8426c61fc`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:163, future-hostile/dead-language term `deprecated` appears
+12. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:172`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `deprecated` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:637f3d961cda4e96d2019b7b23df1f8cb79715d41e72c0766af8448c290ac3d8`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:172, future-hostile/dead-language term `deprecated` appears
+13. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:1102`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `legacy` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:36577893d981c09f063e5bd50b78c413fc00150d1a68a5c93e41149020222fc3`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:1102, future-hostile/dead-language term `legacy` appears
+14. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:1851`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `stale` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:d6bbb11f209b912f1b01570c65a172edda3febbb8bc95c6da8ca8f33afd0a37b`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:1851, future-hostile/dead-language term `stale` appears
+15. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:1866`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `deprecated` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:3417e9ed6e6f1ca0f83bafd0abb59b3a87053ddf9558c7e5d78563495b4e1ae4`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:1866, future-hostile/dead-language term `deprecated` appears
+16. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:1867`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `stale` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:d7337d66e5473f897d8705f6730144a41dd0f6fa9a4e9d749172703829fe0d8b`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:1867, future-hostile/dead-language term `stale` appears
+17. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:1990`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `old` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:1b7e4ef517475da560005d2a483365ed5e5c40e3e4d6b7a3b5383981113ca6df`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:1990, future-hostile/dead-language term `old` appears
+18. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:2044`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `deprecated` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:c1cc167baf9cdfd1a9b9391c9bcba510fda04a23ab16a8c0e333b706ef1f5893`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:2044, future-hostile/dead-language term `deprecated` appears
+19. `high` `vibe` `crates/memory-benchmark/src/fixture/data.rs:2045`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `stale` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:a31990e16d0dcb3a39a63d9afaa4c6f7e33df28eef14a4ad8900dc89134018cb`
+   Evidence: crates/memory-benchmark/src/fixture/data.rs:2045, future-hostile/dead-language term `stale` appears
+20. `high` `vibe` `crates/memory-benchmark/src/scorer.rs:125`
+   Rule: `HLT-001-DEAD-MARKER`
+   Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
+   Route: TLR `Entropy`, lane `fast`, owner `tools`
+   Docs: `docs/audit-rubric.md#future-hostile-language-rule`
+   Reason: future-hostile/dead-language term `stale` appears in product/runtime code
+   Fix: remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Rerun: `just fast`
+   Fingerprint: `sha256:474199b89d64086dcca22341c7d3145f3013d582154f294a475295d673f17ac7`
+   Evidence: crates/memory-benchmark/src/scorer.rs:125, future-hostile/dead-language term `stale` appears
 
 ## Policy
 
@@ -304,15 +435,25 @@ No audited runtime boundary reclassifications declared.
 
 1. `high` `HLT-002-GENERATED-MUTATION` `agent/generated-zones.toml` - add `agent/generated-zones.toml`, require generated/do-not-edit markers, and route repairs to the source contract
    Route: `Contracts/data`/`contract`
-2. `medium` `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP` `.jankurai/language-bad-behavior.json` - attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries
+2. `medium` `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP` `crates/memory-benchmark/src/chase_report.rs` - attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries
    Route: `Repair`/`audit`
-3. `high` `HLT-024-AGENT-TOOL-SUPPLY-GAP` `agent/zyal/ambitious-superworkflow.zyal` - keep the runbook envelope at the top of the file after optional comments
+3. `high` `HLT-024-AGENT-TOOL-SUPPLY-GAP` `agent/zyal/ambitious-superworkflow.zyal` - append `ZYAL_ARM RUN_FOREVER id=<id>` on the final line
    Route: `Security, secrets, agency`/`security`
 4. `high` `HLT-024-AGENT-TOOL-SUPPLY-GAP` `agent/zyal/sandbox-lanes.zyal` - keep the runbook envelope at the top of the file after optional comments
    Route: `Security, secrets, agency`/`security`
 5. `high` `HLT-029-RUST-BAD-BEHAVIOR` `crates/jekko-runtime/src/agent/provider.rs` - replace the mutable static with explicit synchronization or scoped ownership
    Route: `Security, secrets, agency`/`fast`
-6. `high` `HLT-001-DEAD-MARKER` `crates/memory-benchmark/src/chase_report.rs` - collapse fallback chains into explicit typed states with bounded retry policy, telemetry, and documented repair guidance
+6. `high` `HLT-001-DEAD-MARKER` `crates/jekko-runtime/src/daemon.rs` - collapse fallback chains into explicit typed states with bounded retry policy, telemetry, and documented repair guidance
    Route: `Entropy`/`fast`
-7. `medium` `HLT-001-DEAD-MARKER` `.` - split large or ambiguous authored code into smaller semantic modules with focused tests
+7. `high` `HLT-001-DEAD-MARKER` `crates/memory-benchmark/src/adapters/reference_context_pack.rs` - remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Route: `Entropy`/`fast`
+8. `high` `HLT-029-RUST-BAD-BEHAVIOR` `crates/memory-benchmark/src/chase_report.rs` - add a precise `SAFETY:` comment or remove the unsafe block
+   Route: `Security, secrets, agency`/`fast`
+9. `high` `HLT-001-DEAD-MARKER` `crates/memory-benchmark/src/chase_report.rs` - replace placeholders with implemented behavior, typed unsupported-state errors, or a tracked exception record with docs
+   Route: `Entropy`/`fast`
+10. `high` `HLT-001-DEAD-MARKER` `crates/memory-benchmark/src/fixture/data.rs` - remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Route: `Entropy`/`fast`
+11. `high` `HLT-001-DEAD-MARKER` `crates/memory-benchmark/src/scorer.rs` - remove or rename the marker, implement the intended behavior, model a typed unsupported state, or move docs/generated/vendor/product-copy text into an allowlisted context
+   Route: `Entropy`/`fast`
+12. `medium` `HLT-001-DEAD-MARKER` `.` - split large or ambiguous authored code into smaller semantic modules with focused tests
    Route: `Entropy`/`fast`

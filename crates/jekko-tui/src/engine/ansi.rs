@@ -262,15 +262,8 @@ mod tests {
         term.feed(b"[00:00:02] ===  8/8 done");
         let rendered = term.render();
         assert!(rendered.contains("8/8 done"), "render: {rendered:?}");
-        assert!(
-            !rendered.contains("0/8"),
-            "stale frame leaked: {rendered:?}"
-        );
-        assert_eq!(
-            rendered.lines().count(),
-            1,
-            "expected one line: {rendered:?}"
-        );
+        assert!(!rendered.contains("0/8"), "stale frame leaked: {rendered:?}");
+        assert_eq!(rendered.lines().count(), 1, "expected one line: {rendered:?}");
     }
 
     #[test]

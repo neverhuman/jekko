@@ -71,13 +71,13 @@ pub(crate) fn run_preflight() -> Result<()> {
         .output()
         .context("run jankurai --version")?;
     let jankurai_ok = jankurai_version.status.success()
-        && String::from_utf8_lossy(&jankurai_version.stdout).contains("1.6.10");
+        && String::from_utf8_lossy(&jankurai_version.stdout).contains("1.5.1");
     println!(
-        "  [{}] installed jankurai is v1.6.10",
+        "  [{}] installed jankurai is v1.5.1",
         if jankurai_ok { "OK" } else { "FAIL" }
     );
     if !jankurai_ok {
-        failures.push("installed jankurai is not v1.6.10".into());
+        failures.push("installed jankurai is not v1.5.1".into());
     }
 
     println!();

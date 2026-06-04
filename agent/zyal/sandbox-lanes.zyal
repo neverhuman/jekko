@@ -1,23 +1,5 @@
-# Sandbox lane runbook. The compiled lane table lives in agent/sandbox-lanes.toml
-# (maintained as a standalone committed file). This runbook keeps the source spec
-# under agent/zyal/ with proper ZYAL sentinel structure for audit compliance.
-<<<ZYAL v1:daemon id=sandbox-lanes-spec>>>
-version: v1
-intent: daemon
-confirm: RUN_FOREVER
-
-job:
-  name: Sandbox lane specification
-  objective: Maintain the canonical sandbox lane definitions for jekko agent
-    sandboxing. Three lanes ship in v1 — worktree, bubblewrap, docker. The
-    compiled output lives in agent/sandbox-lanes.toml; regenerate via
-    cargo run -p zyalc -- compile agent/zyal/sandbox-lanes.zyal.
-
-stop:
-  all:
-    - git_clean:
-        allow_untracked: true
-
+# zyal: declarative target=toml schema=jankurai/sandbox-lanes@1
+# zyalc: emits agent/sandbox-lanes.toml
 schema_version: "1.0.0"
 sandbox_root: "~/.local/share/agent-sandboxes"
 lanes:
@@ -209,5 +191,3 @@ lanes:
       exit_code_expected: 0
       changed_files_max: 200
       required_patch_present: false
-<<<END_ZYAL id=sandbox-lanes-spec>>>
-ZYAL_ARM RUN_FOREVER id=sandbox-lanes-spec

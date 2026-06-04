@@ -122,7 +122,7 @@ pub fn contradiction(out: &RecallResult, exp: &Expected) -> Option<f32> {
         .required_warnings
         .iter()
         .copied()
-        .filter(|w| matches!(*w, "contradicted" | "superseded" | "skeptic_surfaced"))
+        .filter(|w| matches!(*w, "contradicted" | "stale" | "skeptic_surfaced"))
         .collect();
     if needed.is_empty() {
         return None;

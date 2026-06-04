@@ -355,8 +355,7 @@ mod tests {
         // `\r` returns to col 0 and ESC[2K clears the line, exactly like
         // indicatif; the final frame is newline-terminated.
         let script = "printf '0/3 scoring\\r\\x1b[2K1/3 scoring\\r\\x1b[2K3/3 done\\n'";
-        let cmd =
-            PtyCommand::new("pbar", "progress", "sh").with_args(vec!["-c".into(), script.into()]);
+        let cmd = PtyCommand::new("pbar", "progress", "sh").with_args(vec!["-c".into(), script.into()]);
         let runner = tokio::spawn(run(cmd, tx));
 
         let mut last_screen: Option<String> = None;
@@ -374,10 +373,7 @@ mod tests {
         let _ = runner.await;
 
         let screen = last_screen.expect("expected at least one ScreenUpdate");
-        assert!(
-            screen.contains("3/3 done"),
-            "final frame missing: {screen:?}"
-        );
+        assert!(screen.contains("3/3 done"), "final frame missing: {screen:?}");
         assert!(!screen.contains("0/3"), "stale frame leaked: {screen:?}");
         assert!(!screen.contains("1/3"), "stale frame leaked: {screen:?}");
         // The progress region collapses to one line regardless of how the OS
@@ -431,13 +427,9 @@ mod tests {
         ];
         // `JANKURAI_NO_UPDATE_CHECK=1` mirrors how the TUI spawns `/audit`: a
         // purely local scan, no network round-trip.
-        let cmd = PtyCommand::new(
-            "aud",
-            "jankurai audit",
-            jankurai.to_string_lossy().into_owned(),
-        )
-        .with_args(args)
-        .with_env(vec![("JANKURAI_NO_UPDATE_CHECK".into(), "1".into())]);
+        let cmd = PtyCommand::new("aud", "jankurai audit", jankurai.to_string_lossy().into_owned())
+            .with_args(args)
+            .with_env(vec![("JANKURAI_NO_UPDATE_CHECK".into(), "1".into())]);
 
         let (tx, mut rx) = mpsc::channel(256);
         let runner = tokio::spawn(run(cmd, tx));

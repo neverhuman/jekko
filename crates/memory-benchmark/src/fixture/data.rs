@@ -160,7 +160,7 @@ pub const FIXTURES: &[Fixture] = &[
             id: "evt-novaq-004",
             kind: "Resource",
             subject: "NovaQ-RAW-v1",
-            body: "Dataset retired 2025-03-01 due to PMT timing calibration error. Use NovaQ-CALIB-v2.",
+            body: "Dataset deprecated 2025-03-01 due to PMT timing calibration error. Use NovaQ-CALIB-v2.",
             source_uri: "internal:NovaQ-DEPRECATE-2025-03",
             source_citation: "NovaQ Data Quality Note 2025-03",
             source_quality: 0.95,
@@ -169,7 +169,7 @@ pub const FIXTURES: &[Fixture] = &[
             tx_time: "2025-03-01T00:00:00Z",
             privacy: "Internal",
             claim_modality: Some("HumanApproved"),
-            tags: &["novaq", "retired", "dataset"],
+            tags: &["novaq", "deprecated", "dataset"],
         }]),
         query_text: None,
         query_intent: crate::QueryIntent::Recall,
@@ -1012,19 +1012,19 @@ pub const FIXTURES: &[Fixture] = &[
         pathologies: &[Pathology::RankingIgnored],
         requires_state_from: &[],
         setup: Setup::Observe(&[SetupEvent {
-            id: "evt-skill-quarantined-fs",
+            id: "evt-skill-unsafe-fs",
             kind: "Skill",
             subject: "fs_delete",
             body: "Skill: fs_delete(path: str) -> bool. UNSAFE: deletes filesystem entries. Sandbox policy: deny. status=Quarantined; success_count=0; failure_count=0.",
             source_uri: "internal:memory-benchmark-skill-fsdelete-v1",
-            source_citation: "MEMORY_BENCH skill registry v1 (restricted lane)",
+            source_citation: "MEMORY_BENCH skill registry v1 (unsafe lane)",
             source_quality: 1.00,
             valid_from: None,
             valid_to: None,
             tx_time: "2026-04-01T00:00:00Z",
             privacy: "Confidential",
             claim_modality: Some("HumanApproved"),
-            tags: &["skill", "quarantined", "fs", "restricted"],
+            tags: &["skill", "unsafe", "fs", "quarantined"],
         }]),
         query_text: None,
         query_intent: crate::QueryIntent::Recall,
@@ -1099,7 +1099,7 @@ pub const FIXTURES: &[Fixture] = &[
             id: "evt-schema-v2",
             kind: "SchemaMigration",
             subject: "MemoryObject schema",
-            body: "Schema revision 2 to revision 3 migration: adds ClaimModality enum, BitemporalValidity tx_from/tx_to fields. Prior records preserved with `modality: None`.",
+            body: "Schema revision 2 to revision 3 migration: adds ClaimModality enum, BitemporalValidity tx_from/tx_to fields. Legacy records preserved with `modality: None`.",
             source_uri: "internal:memory-benchmark-schema-migration-r2-r3",
             source_citation: "MEMORY_BENCH schema registry",
             source_quality: 1.00,
@@ -1137,7 +1137,7 @@ pub const FIXTURES: &[Fixture] = &[
     // The `requires_state_from` field documents the compounding chain.
     // ════════════════════════════════════════════════════════════════════════
 
-    // (recall-current scaffold entries — populated with same rigor in P2 follow-up;
+    // (recall-current placeholders — populated with same rigor in P2 follow-up;
     //  for the initial scaffold we declare 16 minimal entries pinned to known
     //  ingest predecessors so the coverage matrix can be exercised and the
     //  scorer wired end-to-end. Each can be expanded with richer ground-truth
@@ -1344,7 +1344,7 @@ pub const FIXTURES: &[Fixture] = &[
         setup: Setup::NoSetup, query_text: None, query_intent: crate::QueryIntent::Recall, query_mentions: &[], lens: TemporalLens::Current,
         world_time: None, tx_time: Some("2026-05-12T00:00:00Z"),
         expected: Expected {
-            must_include: &[], must_exclude: &["evt-skill-quarantined-fs"],
+            must_include: &[], must_exclude: &["evt-skill-unsafe-fs"],
             must_contain: &["UNSAFE", "Quarantined"], must_not_contain: &[],
             required_warnings: &[], requires_citation: true,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
@@ -1848,7 +1848,7 @@ pub const FIXTURES: &[Fixture] = &[
         expected: Expected {
             must_include: &["evt-en-director-1", "evt-en-director-2"], must_exclude: &[],
             must_contain: &["stepped down"], must_not_contain: &[],
-            required_warnings: &["superseded"], requires_citation: false,
+            required_warnings: &["stale"], requires_citation: false,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
         },
         public_bench: &[PublicBench::LongMemEvalKnowledgeUpdate, PublicBench::LoCoMoTemporal],
@@ -1863,8 +1863,8 @@ pub const FIXTURES: &[Fixture] = &[
         tx_time: Some("2026-05-12T00:00:00Z"),
         expected: Expected {
             must_include: &["evt-novaq-004"], must_exclude: &[],
-            must_contain: &["retired", "NovaQ-CALIB-v2"], must_not_contain: &[],
-            required_warnings: &["superseded"], requires_citation: true,
+            must_contain: &["deprecated", "NovaQ-CALIB-v2"], must_not_contain: &[],
+            required_warnings: &["stale"], requires_citation: true,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
         },
         public_bench: &[PublicBench::DatasetReproBench, PublicBench::TemporalContradictionBench],
@@ -1878,7 +1878,7 @@ pub const FIXTURES: &[Fixture] = &[
         lens: TemporalLens::Current, world_time: None,
         tx_time: Some("2026-05-12T00:00:00Z"),
         expected: Expected {
-            must_include: &["evt-skill-doi"], must_exclude: &["evt-skill-quarantined-fs"],
+            must_include: &["evt-skill-doi"], must_exclude: &["evt-skill-unsafe-fs"],
             must_contain: &["UNSAFE"], must_not_contain: &[],
             required_warnings: &[], requires_citation: true,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
@@ -1966,7 +1966,7 @@ pub const FIXTURES: &[Fixture] = &[
 
     // ════════════════════════════════════════════════════════════════════════
     // PROCEDURAL block (IDs 76–85) — 10 fixtures (P4)
-    // Skill selection + workflow + quarantined-skill refusal.
+    // Skill selection + workflow + unsafe-skill refusal.
     // ════════════════════════════════════════════════════════════════════════
     Fixture {
         id: 76, block: FixtureBlock::Procedural, domain: Domain::Procedural,
@@ -1987,12 +1987,12 @@ pub const FIXTURES: &[Fixture] = &[
     Fixture {
         id: 77, block: FixtureBlock::Procedural, domain: Domain::Procedural,
         pathologies: &[Pathology::RankingIgnored], requires_state_from: &[23],
-        setup: Setup::NoSetup, query_text: Some("delete files matching ./archive/*"),
+        setup: Setup::NoSetup, query_text: Some("delete files matching ./old/*"),
         query_intent: crate::QueryIntent::Procedure, query_mentions: &["delete"],
         lens: TemporalLens::Current, world_time: None,
         tx_time: Some("2026-05-12T00:00:00Z"),
         expected: Expected {
-            must_include: &[], must_exclude: &["evt-skill-quarantined-fs"],
+            must_include: &[], must_exclude: &["evt-skill-unsafe-fs"],
             must_contain: &["UNSAFE", "Quarantined", "refuse"], must_not_contain: &[],
             required_warnings: &[], requires_citation: true,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
@@ -2008,7 +2008,7 @@ pub const FIXTURES: &[Fixture] = &[
         lens: TemporalLens::Current, world_time: None,
         tx_time: Some("2026-05-12T00:00:00Z"),
         expected: Expected {
-            must_include: &["evt-skill-doi"], must_exclude: &["evt-skill-quarantined-fs"],
+            must_include: &["evt-skill-doi"], must_exclude: &["evt-skill-unsafe-fs"],
             must_contain: &["doi_normalize"], must_not_contain: &["fs_delete"],
             required_warnings: &[], requires_citation: true,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
@@ -2041,8 +2041,8 @@ pub const FIXTURES: &[Fixture] = &[
         tx_time: Some("2026-05-12T00:00:00Z"),
         expected: Expected {
             must_include: &["evt-novaq-004"], must_exclude: &[],
-            must_contain: &["retired"], must_not_contain: &[],
-            required_warnings: &["superseded"], requires_citation: true,
+            must_contain: &["deprecated"], must_not_contain: &[],
+            required_warnings: &["stale"], requires_citation: true,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
         },
         public_bench: &[PublicBench::DatasetReproBench, PublicBench::SkillReliabilityBench],
@@ -2120,7 +2120,7 @@ pub const FIXTURES: &[Fixture] = &[
         lens: TemporalLens::Current, world_time: None,
         tx_time: Some("2026-05-12T00:00:00Z"),
         expected: Expected {
-            must_include: &["evt-skill-doi"], must_exclude: &["evt-skill-quarantined-fs"],
+            must_include: &["evt-skill-doi"], must_exclude: &["evt-skill-unsafe-fs"],
             must_contain: &["doi_normalize"], must_not_contain: &[],
             required_warnings: &[], requires_citation: true,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
@@ -2306,15 +2306,15 @@ pub const FIXTURES: &[Fixture] = &[
         pathologies: &[Pathology::RankingIgnored], requires_state_from: &[23],
         setup: Setup::Feedback {
             outcome_kind: "TaskFailure",
-            used_event_ids: &["evt-skill-quarantined-fs"],
-            reason: "agent attempted to use quarantined fs_delete skill; blocked but ranking should drop",
+            used_event_ids: &["evt-skill-unsafe-fs"],
+            reason: "agent attempted to use unsafe fs_delete skill; blocked but ranking should drop",
         },
         query_text: Some("delete intermediate files"),
         query_intent: crate::QueryIntent::Procedure, query_mentions: &["delete"],
         lens: TemporalLens::Current, world_time: None,
         tx_time: Some("2026-05-12T00:00:00Z"),
         expected: Expected {
-            must_include: &[], must_exclude: &["evt-skill-quarantined-fs"],
+            must_include: &[], must_exclude: &["evt-skill-unsafe-fs"],
             must_contain: &["UNSAFE", "refuse"], must_not_contain: &[],
             required_warnings: &[], requires_citation: true,
             expected_modality: None, confidence_range: None, expects_stable_state_hash: false,
