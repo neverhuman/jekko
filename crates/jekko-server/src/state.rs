@@ -17,6 +17,7 @@ use tokio::sync::RwLock;
 
 use crate::auth::AuthConfig;
 use crate::cors::CorsConfig;
+use crate::memory_observer::SharedMemory;
 
 /// Default working directory used when the OS denies `current_dir()`.
 const ROOT_DIR_DEFAULT: &str = "/";
@@ -70,6 +71,11 @@ pub struct AppState {
     pub instance: Arc<InstanceMeta>,
     /// Feature-flag toggle map (mirrors the experimental section of config).
     pub experimental: Arc<RwLock<BTreeMap<String, serde_json::Value>>>,
+    /// Live cogcore-backed memory service (W1). `None` until activated at
+    /// `serve()` via [`crate::memory_observer::activate_memory`]; the observe
+    /// subscriber and recall path read it. Optional so `AppState::new()` and
+    /// tests stay broker/DB-free.
+    pub memory: Option<SharedMemory>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -153,6 +159,7 @@ impl AppState {
             cors: Arc::new(CorsConfig::default()),
             instance: Arc::new(InstanceMeta::default()),
             experimental: Arc::new(RwLock::new(BTreeMap::new())),
+            memory: None,
         }
     }
 
@@ -180,6 +187,23 @@ impl AppState {
             *guard = config;
         }
         self
+    }
+
+    /// Attach the live cogcore-backed memory service (builder style). Set at
+    /// `serve()` after [`crate::memory_observer::activate_memory`] opens the DB,
+    /// restores the WAL, and spawns the observe subscriber.
+    pub fn with_memory(mut self, memory: SharedMemory) -> Self {
+        self.memory = Some(memory);
+        self
+    }
+
+    /// Server-side recall helper for future HTTP/session paths. Returns `None`
+    /// when memory is inactive or has nothing relevant. Jekko owns this context;
+    /// it never drives a runner.
+    pub fn recall_block_for(&self, text: &str, token_budget: u32) -> Option<String> {
+        let memory = self.memory.as_ref()?;
+        let mut guard = memory.lock().ok()?;
+        guard.recall_block(text, token_budget)
     }
 }
 

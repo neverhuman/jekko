@@ -7,16 +7,31 @@ pub fn spawn_chat_request(
     model: String,
     action_tx: Sender<Action>,
     cancel: CancellationToken,
+    recalled_context: Option<String>,
 ) {
     std::thread::Builder::new()
         .name("jekko-tui-chat-bridge".into())
         .spawn(move || {
             let result = wait_for_gateway_ready(GATEWAY_HOST, GATEWAY_PORT, &cancel)
-                .and_then(|_| run_chat(&prompt, &model, &action_tx, &cancel))
+                .and_then(|_| {
+                    run_chat(
+                        &prompt,
+                        &model,
+                        &action_tx,
+                        &cancel,
+                        recalled_context.as_deref(),
+                    )
+                })
                 .or_else(|e| {
                     if !cancel.is_cancelled() && e.to_string().contains("non-200") {
                         std::thread::sleep(Duration::from_secs(2));
-                        run_chat(&prompt, &model, &action_tx, &cancel)
+                        run_chat(
+                            &prompt,
+                            &model,
+                            &action_tx,
+                            &cancel,
+                            recalled_context.as_deref(),
+                        )
                     } else {
                         Err(e)
                     }

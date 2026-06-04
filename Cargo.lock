@@ -1817,6 +1817,7 @@ dependencies = [
  "jankurai-runner",
  "jekko-core",
  "jekko-jnoccio-boot",
+ "jekko-memory",
  "jekko-plugin-api",
  "jekko-provider",
  "jekko-runtime",
@@ -1855,6 +1856,17 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
+]
+
+[[package]]
+name = "jekko-memory"
+version = "2.0.6"
+dependencies = [
+ "chrono",
+ "cogcore",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1935,6 +1947,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "jekko-core",
+ "jekko-memory",
  "jekko-plugin-api",
  "jekko-provider",
  "jekko-runtime",
@@ -1962,6 +1975,7 @@ dependencies = [
  "chrono",
  "hex",
  "jekko-core",
+ "jekko-memory",
  "rusqlite",
  "serde",
  "serde_json",

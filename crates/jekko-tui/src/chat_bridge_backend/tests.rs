@@ -49,6 +49,25 @@ mod tests {
         );
     }
 
+    struct NoopRecallHook;
+
+    impl RecallHook for NoopRecallHook {
+        fn recall_block(&self, _prompt: &str) -> Option<String> {
+            None
+        }
+
+        fn observe_user(&self, _prompt: &str) {}
+
+        fn observe_assistant(&self, _text: &str) {}
+    }
+
+    #[test]
+    fn with_recall_hook_attaches_hook() {
+        let backend =
+            ChatBridgeBackend::with_default_config().with_recall_hook(Arc::new(NoopRecallHook));
+        assert!(backend.recall_hook.is_some());
+    }
+
     #[test]
     fn default_config_falls_back_to_constant() {
         std::env::remove_var(MODEL_ENV);

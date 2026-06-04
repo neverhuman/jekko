@@ -4,6 +4,7 @@ members = [
   "crates/jekko-cli",
   "crates/jekko-core",
   "crates/jekko-jnoccio-boot",
+  "crates/jekko-memory",
   "crates/jekko-plugin-api",
   "crates/jekko-provider",
   "crates/jekko-runtime",

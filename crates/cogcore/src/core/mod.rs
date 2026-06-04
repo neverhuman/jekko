@@ -262,6 +262,23 @@ impl Core {
     pub fn wal_len(&self) -> usize {
         self.wal.len()
     }
+    /// Borrow the full WAL entry log (seq + hash chain + op). Hosts that
+    /// persist the WAL to durable storage (e.g. `jekko-memory`'s `cogcore_wal`
+    /// table) read entries here; the hot path is unchanged.
+    pub fn wal_entries(&self) -> &[crate::ledger::WalEntry] {
+        self.wal.entries()
+    }
+    /// Clone WAL entries appended after `seq` (exclusive). Lets a host persist
+    /// only the new tail after each `observe`/`feedback`/recall rather than the
+    /// whole log. `seq` is 1-based and matches [`crate::ledger::WalEntry::seq`].
+    pub fn wal_since(&self, seq: u64) -> Vec<crate::ledger::WalEntry> {
+        self.wal
+            .entries()
+            .iter()
+            .filter(|e| e.seq > seq)
+            .cloned()
+            .collect()
+    }
     pub fn topic_count(&self) -> usize {
         self.topics.len()
     }

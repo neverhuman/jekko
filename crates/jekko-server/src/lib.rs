@@ -25,6 +25,7 @@ pub mod app;
 pub mod auth;
 pub mod cors;
 pub mod error;
+pub mod memory_observer;
 pub mod routes;
 pub mod state;
 

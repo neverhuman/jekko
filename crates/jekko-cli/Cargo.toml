@@ -19,6 +19,7 @@ clap = { workspace = true }
 clap_complete = "4"
 jekko-core = { path = "../jekko-core" }
 jekko-jnoccio-boot = { path = "../jekko-jnoccio-boot" }
+jekko-memory = { path = "../jekko-memory" }
 jekko-provider = { path = "../jekko-provider" }
 jekko-runtime = { path = "../jekko-runtime" }
 jekko-server = { path = "../jekko-server" }
