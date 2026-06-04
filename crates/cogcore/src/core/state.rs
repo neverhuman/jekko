@@ -11,6 +11,21 @@ use crate::ledger::WalOp;
 use crate::time::BENCH_NOW;
 
 impl Core {
+    /// Build a `Core` from a persisted WAL op list — e.g. rows loaded from a
+    /// host's `cogcore_wal` table on restart. The ops are appended to a fresh
+    /// WAL (reproducing the FNV-1a hash chain) and replayed via [`Core::rebuild`],
+    /// so the resulting `export_state_hash()` matches the original byte-for-byte
+    /// (cogcore's determinism contract). This is the bootstrap counterpart to
+    /// [`Core::wal_entries`] / [`Core::wal_since`].
+    pub fn from_wal_ops(ops: Vec<WalOp>) -> Core {
+        let mut core = Core::default();
+        for op in ops {
+            core.wal.append(op);
+        }
+        core.rebuild();
+        core
+    }
+
     /// Replay the WAL into a fresh in-memory state. Byte-identical to live
     /// state if no clock/random has been touched on the hot path.
     pub fn rebuild(&mut self) -> Receipt {
@@ -75,6 +90,10 @@ impl Core {
                     let _ = self.feedback(&sig);
                 }
                 WalOp::RecallTouch { used_ids, tx_time } => {
+                    self.wal.append(WalOp::RecallTouch {
+                        used_ids: used_ids.clone(),
+                        tx_time: tx_time.clone(),
+                    });
                     self.apply_recall_touch(&used_ids, &tx_time);
                 }
             }

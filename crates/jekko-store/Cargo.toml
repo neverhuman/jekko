@@ -14,6 +14,7 @@ anyhow = { workspace = true }
 chrono = { workspace = true, features = ["clock", "serde"] }
 hex = "0.4"
 jekko-core = { path = "../jekko-core" }
+jekko-memory = { path = "../jekko-memory" }
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

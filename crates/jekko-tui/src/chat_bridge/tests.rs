@@ -50,6 +50,35 @@ mod tests {
     }
 
     #[test]
+    fn request_body_includes_recalled_memory_as_system_context() {
+        let body = chat_request_body(
+            "continue the session",
+            DEFAULT_MODEL,
+            Some("=== RECALLED MEMORY (CONTEXT ONLY) ===\nprior fact"),
+        );
+        let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let messages = value["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0]["role"], "system");
+        assert!(messages[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains(RECALLED_MEMORY_POLICY));
+        assert!(messages[0]["content"].as_str().unwrap().contains("prior fact"));
+        assert_eq!(messages[1]["role"], "user");
+        assert_eq!(messages[1]["content"], "continue the session");
+    }
+
+    #[test]
+    fn request_body_omits_system_context_when_recall_empty() {
+        let body = chat_request_body("fresh question", DEFAULT_MODEL, Some("   "));
+        let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let messages = value["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0]["role"], "user");
+    }
+
+    #[test]
     fn wait_for_gateway_ready_retries_until_listener_arrives() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();

@@ -36,6 +36,42 @@ fn q(text: &str) -> RecallQuery {
 }
 
 #[test]
+fn from_wal_ops_roundtrip_preserves_state_hash() {
+    let mut c = Core::default();
+    c.observe(ev(
+        "e1",
+        "neutrino",
+        "neutrinos have mass",
+        "2020-01-01T00:00:00Z",
+    ));
+    c.observe(ev(
+        "e2",
+        "neutrino",
+        "mass ordering unknown",
+        "2021-01-01T00:00:00Z",
+    ));
+    let _ = c.recall(&q("neutrino")); // emits a RecallTouch op into the WAL
+    let before = c.export_state_hash();
+
+    // Simulate persist -> restart: pull the WAL op stream, rebuild a fresh Core.
+    let ops: Vec<_> = c.wal_entries().iter().map(|e| e.op.clone()).collect();
+    let loaded = Core::from_wal_ops(ops);
+
+    assert_eq!(loaded.export_state_hash(), before);
+}
+
+#[test]
+fn wal_since_returns_only_new_tail() {
+    let mut c = Core::default();
+    c.observe(ev("e1", "s", "a", "2020-01-01T00:00:00Z"));
+    let after_first = c.wal_len() as u64;
+    c.observe(ev("e2", "s", "b", "2021-01-01T00:00:00Z"));
+    let tail = c.wal_since(after_first);
+    assert_eq!(tail.len(), c.wal_len() - after_first as usize);
+    assert!(tail.iter().all(|e| e.seq > after_first));
+}
+
+#[test]
 fn observe_then_recall_returns_event() {
     let mut c = Core::default();
     c.observe(ev(

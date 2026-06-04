@@ -23,6 +23,7 @@ http = "1"
 http-body-util = "0.1"
 hyper = "1"
 jekko-core = { path = "../jekko-core" }
+jekko-memory = { path = "../jekko-memory" }
 jekko-plugin-api = { path = "../jekko-plugin-api" }
 jekko-provider = { path = "../jekko-provider" }
 jekko-runtime = { path = "../jekko-runtime" }

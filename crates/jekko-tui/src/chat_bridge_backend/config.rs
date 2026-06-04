@@ -19,6 +19,18 @@ pub struct ChatBridgeBackend {
     config: ChatBridgeConfig,
     /// T-INLINE-CLUSTER #11 / T-SANDBOX-ENF sidecar — see [`ChatBridgeRuntimePolicy`].
     policy: ChatBridgeRuntimePolicy,
+    recall_hook: Option<Arc<dyn RecallHook>>,
+}
+
+/// Optional memory hook for session recall and turn observation.
+pub trait RecallHook: Send + Sync {
+    /// Return a recalled memory block for `prompt`, or `None` when no relevant
+    /// memory exists.
+    fn recall_block(&self, prompt: &str) -> Option<String>;
+    /// Observe the current user prompt after recall has been computed.
+    fn observe_user(&self, prompt: &str);
+    /// Observe the final assistant text for the turn.
+    fn observe_assistant(&self, text: &str);
 }
 
 /// Configuration knobs surfaced to callers. Wire format / gateway URL are
@@ -62,6 +74,7 @@ impl ChatBridgeBackend {
         Self {
             config,
             policy: ChatBridgeRuntimePolicy::default(),
+            recall_hook: None,
         }
     }
 
@@ -77,6 +90,12 @@ impl ChatBridgeBackend {
         self
     }
 
+    /// Attach live session memory recall/observation.
+    pub fn with_recall_hook(mut self, hook: Arc<dyn RecallHook>) -> Self {
+        self.recall_hook = Some(hook);
+        self
+    }
+
     /// T-INLINE-CLUSTER #11 / T-SANDBOX-ENF: expose the resolved policy.
     pub fn policy(&self) -> &ChatBridgeRuntimePolicy {
         &self.policy
@@ -87,19 +106,45 @@ impl ChatBackend for ChatBridgeBackend {
     fn start_turn(&mut self, prompt: String, cancel: CancellationToken) -> Receiver<ChatEvent> {
         let (action_tx, action_rx) = mpsc::channel::<Action>();
         let (event_tx, event_rx) = mpsc::channel::<ChatEvent>();
+        let recalled_context = self
+            .recall_hook
+            .as_ref()
+            .and_then(|hook| hook.recall_block(&prompt))
+            .filter(|block| !block.trim().is_empty());
+        if let Some(hook) = &self.recall_hook {
+            hook.observe_user(&prompt);
+        }
 
-        spawn_chat_request(prompt, self.config.model.clone(), action_tx, cancel);
+        spawn_chat_request(
+            prompt,
+            self.config.model.clone(),
+            action_tx,
+            cancel,
+            recalled_context,
+        );
 
+        let recall_hook = self.recall_hook.clone();
         std::thread::Builder::new()
             .name("jekko-chat-bridge-translator".into())
             .spawn(move || {
                 let mut tool_stdout: HashMap<String, String> = HashMap::new();
+                let mut assistant_text = String::new();
                 for action in action_rx {
                     let events = translate_action_stateful(action, &mut tool_stdout);
                     let mut hit_terminal = false;
                     for evt in events {
+                        if let ChatEvent::AssistantDelta(text) = &evt {
+                            assistant_text.push_str(text);
+                        }
                         let terminal =
                             matches!(evt, ChatEvent::TurnComplete | ChatEvent::TurnFailed(_));
+                        if matches!(evt, ChatEvent::TurnComplete) {
+                            if let Some(hook) = &recall_hook {
+                                if !assistant_text.trim().is_empty() {
+                                    hook.observe_assistant(&assistant_text);
+                                }
+                            }
+                        }
                         if event_tx.send(evt).is_err() {
                             hit_terminal = true;
                             break;

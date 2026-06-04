@@ -21,6 +21,7 @@
 
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver};
+use std::sync::Arc;
 
 use crate::action::{Action, RuntimeEvent, ToolEvent};
 use crate::chat_bridge::spawn_chat_request;

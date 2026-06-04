@@ -15,9 +15,14 @@
 #![warn(missing_docs)]
 
 pub mod account;
+pub mod cogcore_wal {
+    //! Compatibility alias for the memory WAL storage module.
+    pub use crate::memory_wal::*;
+}
 pub mod daemon;
 pub mod db;
 pub mod error;
+pub mod memory_wal;
 pub mod migration;
 pub mod project;
 pub mod session;
