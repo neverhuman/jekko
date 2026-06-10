@@ -123,7 +123,7 @@ fn is_supported_runtime_provider(provider_id: &str) -> bool {
     matches!(
         provider_id,
         "anthropic"
-            | "dummy_agent_llm"
+            | "scripted_agent"
             | "jekko"
             | "openai"
             | "openrouter"

@@ -9,8 +9,8 @@ use jekko_core::provider::{
     ProviderInterleaved, ProviderLimit, ProviderModalities,
 };
 use jekko_provider::providers::{
-    AnthropicAdapter, DummyAgentLlmAdapter, JNoccioAdapter, JekkoAdapter, LiteLlmAdapter,
-    OpenAiAdapter, OpenRouterAdapter,
+    AnthropicAdapter, JNoccioAdapter, JekkoAdapter, LiteLlmAdapter, OpenAiAdapter,
+    OpenRouterAdapter, ScriptedAgentAdapter,
 };
 
 use crate::error::{RuntimeError, RuntimeResult};
@@ -32,7 +32,7 @@ pub(in crate::agent) fn select_base_url(provider_id: &str) -> Option<String> {
 pub(in crate::agent) fn build_model(provider_id: &str, model_id: &str) -> RuntimeResult<Model> {
     let (api_npm, api_url) = match provider_id {
         "anthropic" => ("@ai-sdk/anthropic", "https://api.anthropic.com"),
-        "dummy_agent_llm" => ("dummy_agent_llm", "dummy://local"),
+        "scripted_agent" => ("scripted_agent", "scripted://local"),
         "openai" => ("@ai-sdk/openai", "https://api.openai.com"),
         "openrouter" => ("@openrouter/ai-sdk-provider", "https://openrouter.ai/api"),
         "jekko" => ("@ai-sdk/openai-compatible", "https://api.jekko.ai"),
@@ -93,7 +93,7 @@ pub(in crate::agent) fn provider_adapter(
 ) -> RuntimeResult<Arc<dyn jekko_provider::ProviderAdapter>> {
     match provider_id {
         "anthropic" => Ok(Arc::new(AnthropicAdapter::new())),
-        "dummy_agent_llm" => Ok(Arc::new(DummyAgentLlmAdapter::new())),
+        "scripted_agent" => Ok(Arc::new(ScriptedAgentAdapter::new())),
         "jekko" => Ok(Arc::new(JekkoAdapter::new())),
         "openai" => Ok(Arc::new(OpenAiAdapter::new())),
         "openrouter" => Ok(Arc::new(OpenRouterAdapter::new())),

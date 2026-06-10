@@ -98,6 +98,25 @@ fn superworkflow_emit_requires_nine_to_twelve_phases() {
 }
 
 #[test]
+fn superworkflow_emit_accepts_job_nested_shape() {
+    let mut raw = String::from(
+        "# zyal: declarative target=superworkflow schema=zyal/superworkflow@1\n\
+         version: v1\nintent: daemon\nconfirm: RUN_FOREVER\nid: smoke\n\
+         job:\n  name: smoke\n  objective: smoke\n  superworkflow:\n",
+    );
+    raw.push_str("    stage_count: 9\n    phases:\n");
+    for idx in 0..9 {
+        raw.push_str(&format!(
+            "      - id: p{idx}\n        name: p{idx}\n        objective: p{idx}\n        exit:\n          required_artifacts: [target/p{idx}.json]\n          gates:\n            - kind: artifact_exists\n"
+        ));
+    }
+    let out = emit_superworkflow(&raw).expect("nested superworkflow json");
+    assert!(out.contains("\"job\""));
+    assert!(out.contains("\"superworkflow\""));
+    assert!(out.contains("\"phases\""));
+}
+
+#[test]
 fn superworkflow_rejects_too_few_phases() {
     let raw = superworkflow_with_phases(1);
     let err = emit_superworkflow(&raw).unwrap_err();

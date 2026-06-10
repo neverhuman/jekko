@@ -9,16 +9,16 @@
         "text",
         "offline"
       ],
-      "provider": "dummy_agent_llm",
+      "provider": "scripted_agent",
       "model": "default",
       "frames": [
         {
           "type": "stream-start",
-          "model": "dummy_agent_llm/default"
+          "model": "scripted_agent/default"
         },
         {
           "type": "text-delta",
-          "text": "dummy_agent_llm deterministic response"
+          "text": "scripted_agent deterministic response"
         },
         {
           "type": "usage",
@@ -42,12 +42,12 @@
         "tool-call",
         "offline"
       ],
-      "provider": "dummy_agent_llm",
+      "provider": "scripted_agent",
       "model": "tool-call",
       "frames": [
         {
           "type": "stream-start",
-          "model": "dummy_agent_llm/tool-call"
+          "model": "scripted_agent/tool-call"
         },
         {
           "type": "text-delta",
@@ -55,17 +55,17 @@
         },
         {
           "type": "tool-call-start",
-          "id": "call_dummy_read_1",
+          "id": "call_scenario_read_1",
           "name": "Read"
         },
         {
           "type": "tool-call-input-delta",
-          "id": "call_dummy_read_1",
+          "id": "call_scenario_read_1",
           "delta": "{\"path\":\"README.md\"}"
         },
         {
           "type": "tool-call-end",
-          "id": "call_dummy_read_1",
+          "id": "call_scenario_read_1",
           "name": "Read",
           "input": {
             "path": "README.md"
@@ -86,11 +86,11 @@
       "after_tool_frames": [
         {
           "type": "stream-start",
-          "model": "dummy_agent_llm/tool-call"
+          "model": "scripted_agent/tool-call"
         },
         {
           "type": "text-delta",
-          "text": "Read completed; dummy_agent_llm has the deterministic tool result."
+          "text": "Read completed; scripted_agent has the deterministic tool result."
         },
         {
           "type": "usage",
@@ -114,16 +114,16 @@
         "error",
         "offline"
       ],
-      "provider": "dummy_agent_llm",
+      "provider": "scripted_agent",
       "model": "error",
       "frames": [
         {
           "type": "stream-start",
-          "model": "dummy_agent_llm/error"
+          "model": "scripted_agent/error"
         },
         {
           "type": "error",
-          "message": "dummy_agent_llm scripted failure"
+          "message": "scripted_agent scripted failure"
         }
       ]
     }

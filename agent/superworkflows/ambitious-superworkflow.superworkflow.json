@@ -10,16 +10,16 @@
   "intent": "daemon",
   "job": {
     "name": "Ambitious challenge superworkflow template (MiniRedis port)",
-    "objective": "Drive a many-hour or many-day MiniRedis-class port from contract capture through parity, performance, hardening, release, and durable memory archive without scope sprawl.",
-    "replacement": "candidate",
-    "risk": [
-      "agent swarm sprawl",
-      "partial parity mistaken for completion",
-      "lost context across long runs",
-      "performance regressions masked by functionality wins",
-      "unreviewed sandbox artifacts leaking into primary checkout"
-    ],
-    "target": "redis"
+    "objective": "Drive a many-hour or many-day MiniRedis-class port from contract capture through parity, performance, hardening, release, and durable memory archive without scope sprawl."
+  },
+  "stop": {
+    "all": [
+      {
+        "shell": {
+          "command": "git status --short"
+        }
+      }
+    ]
   },
   "superworkflow": {
     "controller": {
@@ -491,6 +491,7 @@
         "parallel_group": "release"
       }
     ],
+    "replacement": "candidate",
     "repo_graph": {
       "backend": "sqlite",
       "indexes": [
@@ -509,6 +510,13 @@
         "test_failure_cluster"
       ]
     },
+    "risk": [
+      "agent swarm sprawl",
+      "partial parity mistaken for completion",
+      "lost context across long runs",
+      "performance regressions masked by functionality wins",
+      "unreviewed sandbox artifacts leaking into primary checkout"
+    ],
     "sandbox": {
       "destroy_unmerged_worktrees_after_archive": true,
       "export_patch_per_task": true,
@@ -518,7 +526,8 @@
       "workspace_root": ".zyal/sandboxes/{run_id}"
     },
     "stage_count": 12,
-    "strategy": "macro_plan_then_parallel_phases_then_fusion_hardening"
+    "strategy": "macro_plan_then_parallel_phases_then_fusion_hardening",
+    "target": "redis"
   },
   "version": "v1"
 }

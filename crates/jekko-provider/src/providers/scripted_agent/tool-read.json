@@ -2,20 +2,20 @@
   "id": "tool-read",
   "title": "Read tool loop",
   "tags": ["tool-call", "read", "deterministic", "no-network"],
-  "provider": "dummy_agent_llm",
+  "provider": "scripted_agent",
   "model": "tool-read",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start", "model": "dummy_agent_llm/tool-read" },
+        { "type": "stream-start", "model": "scripted_agent/tool-read" },
         {
           "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: requesting read for {{first_path}}."
+          "text": "scripted_agent/tool-read: requesting read for {{first_path}}."
         },
         {
           "type": "tool-call",
-          "id": "dummy-read-1",
+          "id": "scenario-read-1",
           "name": "read",
           "input": {
             "filePath": "{{first_path}}",
@@ -36,15 +36,15 @@
     {
       "when": "after-tool-result",
       "frames": [
-        { "type": "stream-start", "model": "dummy_agent_llm/tool-read" },
+        { "type": "stream-start", "model": "scripted_agent/tool-read" },
         {
           "type": "text-delta",
-          "text": "dummy_agent_llm/tool-read: tool result received."
+          "text": "scripted_agent/tool-read: tool result received."
         },
         {
           "type": "metadata",
           "metadata": {
-            "provider": "dummy_agent_llm",
+            "provider": "scripted_agent",
             "scenario_id": "tool-read",
             "deterministic": true,
             "network": false

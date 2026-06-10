@@ -101,9 +101,9 @@ mode = "auto"
 
 [[tools]]
 artifact_paths = [".jankurai/ux-qa.json"]
-ci_command = "rtk jankurai ux audit --config agent/ux-qa.toml --out .jankurai/ux-qa.json"
+ci_command = "bash ops/ci/ux-qa-evidence.sh .jankurai/ux-qa.json"
 id = "ux-qa"
-local_command = "rtk jankurai ux audit --config agent/ux-qa.toml --out .jankurai/ux-qa.json"
+local_command = "bash ops/ci/ux-qa-evidence.sh .jankurai/ux-qa.json"
 mode = "auto"
 
 [[tools]]

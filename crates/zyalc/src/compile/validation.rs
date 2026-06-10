@@ -49,8 +49,9 @@ pub(super) fn validate_superworkflow_profile(source: &Path, raw: &str) -> Result
 ///
 /// * `version`, `intent`, `confirm`, and `id` must be present with the
 ///   canonical SuperWorkflow literals.
-/// * `job` and `superworkflow` must be mappings; `job.name` and
-///   `job.objective` are required.
+/// * `job` must be a mapping; `job.name` and `job.objective` are required.
+/// * `superworkflow` must be a mapping either at the root or nested under
+///   `job` for detector-compatible daemon envelopes.
 /// * `superworkflow.phases` must be a sequence of 9-12 mappings.
 /// * Each phase must have a unique non-empty `id`, an `objective`, and an
 ///   `exit` block with non-empty `required_artifacts` and `gates`.
@@ -73,7 +74,10 @@ pub(super) fn validate_superworkflow_value(source: &Path, value: &serde_yaml::Va
     require_present(job, "name")?;
     require_present(job, "objective")?;
 
-    let sw = require_map(root, "superworkflow")?;
+    let sw = match lookup(root, "superworkflow") {
+        Some(_) => require_map(root, "superworkflow")?,
+        None => require_map(job, "superworkflow")?,
+    };
     let phases = require_seq(sw, "phases")?;
     if !(9..=12).contains(&phases.len()) {
         return Err(anyhow!(

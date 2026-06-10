@@ -50,9 +50,32 @@ pub(super) fn emit_superworkflow(raw: &str) -> Result<String> {
     // pure JSON has no comment syntax so we surface that header as a
     // top-level `_generated` object instead).
     let json_value = serde_json::to_value(&parsed).context("YAML → JSON for SuperWorkflow")?;
+    let json_value = normalize_superworkflow_shape(json_value);
     let stamped = stamp_generated_header(json_value);
     let rendered = serde_json::to_string_pretty(&stamped).context("render SuperWorkflow JSON")?;
     Ok(format!("{rendered}\n"))
+}
+
+fn normalize_superworkflow_shape(mut value: serde_json::Value) -> serde_json::Value {
+    let Some(root) = value.as_object_mut() else {
+        return value;
+    };
+    if root.contains_key("superworkflow") {
+        return value;
+    }
+    let superworkflow = {
+        let Some(job) = root
+            .get_mut("job")
+            .and_then(serde_json::Value::as_object_mut)
+        else {
+            return value;
+        };
+        job.remove("superworkflow")
+    };
+    if let Some(superworkflow) = superworkflow {
+        root.insert("superworkflow".to_string(), superworkflow);
+    }
+    value
 }
 
 /// Prepend a `_generated` top-level object to the rendered JSON so the

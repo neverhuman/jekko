@@ -205,7 +205,7 @@ jankurai proofmark rust . --obligations "${artifact_root}/proofbind/obligations.
 mkdir -p "${artifact_root}"
 # Rendered UX QA is backed by the Rust tuiwright lane now; do not gate on the
 # deleted packages/ux-qa CLI. Always emit the audit artifact.
-jankurai ux audit --config agent/ux-qa.toml --out "${artifact_root}/ux-qa.json"
+bash ops/ci/ux-qa-evidence.sh "${artifact_root}/ux-qa.json"
 cd crates/tuiwright-jekko-unlock && jankurai rust witness build .
 cd "$ROOT"
 cargo run --manifest-path crates/zyalc/Cargo.toml --locked --quiet -- compile --all --check

@@ -37,8 +37,8 @@ just_has() {
 pick_ci_entrypoint() {
   if [[ -f ops/ci/pr-ci.sh ]]; then
     printf 'bash ops/ci/pr-ci.sh'
-  elif [[ -x ./ci-fast-push.sh ]]; then
-    printf './ci-fast-push.sh --no-push --ci'
+  elif just_has jekko-fast; then
+    printf 'just jekko-fast'
   elif [[ -f scripts/ci-local.sh ]]; then
     printf 'bash scripts/ci-local.sh'
   elif just_has fast; then
@@ -62,14 +62,14 @@ run_ci() {
   local entrypoint="$1"
   say "ci-entrypoint: $entrypoint"
   case "$entrypoint" in
-    './ci-fast-push.sh --no-push --ci')
-      WORKERS="$workers" ./ci-fast-push.sh --no-push --ci
-      ;;
     'bash ops/ci/pr-ci.sh')
       bash ops/ci/pr-ci.sh
       ;;
     'bash scripts/ci-local.sh')
       bash scripts/ci-local.sh
+      ;;
+    'just jekko-fast')
+      just jekko-fast
       ;;
     'just fast')
       just fast
