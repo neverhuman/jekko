@@ -10,10 +10,7 @@ pub(super) struct TemplateContext {
 
 impl TemplateContext {
     pub(super) fn from_request(req: &ProviderRequest) -> Self {
-        let last_user_text = match last_message_text(&req.messages, "user") {
-            Some(text) => text,
-            None => String::new(),
-        };
+        let last_user_text = last_message_text(&req.messages, "user").unwrap_or_default();
         let first_path = match first_absolute_path(&last_user_text) {
             Some(path) => path,
             None => String::from("README.md"),
