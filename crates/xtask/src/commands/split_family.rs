@@ -395,14 +395,16 @@ fn validate_jankurai_pin(repo_path: &Path, repo: &SplitRepo) -> Result<()> {
             EXPECTED_AUDITOR_VERSION
         );
     }
-    let agents = fs::read_to_string(repo_path.join("AGENTS.md"))
-        .with_context(|| format!("read AGENTS.md in {}", repo_path.display()))?;
-    if !agents.contains(EXPECTED_AUDITOR_VERSION) {
-        bail!(
-            "split repo {} AGENTS.md does not mention jankurai {}",
-            repo.path,
-            EXPECTED_AUDITOR_VERSION
-        );
+    if repo.role != "portal" {
+        let agents = fs::read_to_string(repo_path.join("AGENTS.md"))
+            .with_context(|| format!("read AGENTS.md in {}", repo_path.display()))?;
+        if !agents.contains(EXPECTED_AUDITOR_VERSION) {
+            bail!(
+                "split repo {} AGENTS.md does not mention jankurai {}",
+                repo.path,
+                EXPECTED_AUDITOR_VERSION
+            );
+        }
     }
     Ok(())
 }
