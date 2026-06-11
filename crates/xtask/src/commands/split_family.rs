@@ -118,6 +118,7 @@ const EXPECTED_REPOS: &[SplitRepoSpec] = &[
 struct SplitManifest {
     schema_version: String,
     family: String,
+    repo_family: String,
     umbrella_repo: String,
     import_branch_source: String,
     import_branch_dirty: String,
@@ -131,11 +132,18 @@ struct SplitRepo {
     path: String,
     name: String,
     slug: String,
+    github_slug: String,
+    jeryu_slug: String,
     role: String,
     profile: String,
     branch: String,
+    default_branch: String,
     rollout_wave: u8,
+    has_jeryu_std: bool,
     onboarded: bool,
+    mirror_github_main: bool,
+    current_tag: String,
+    required_check: String,
     gates: BTreeMap<String, bool>,
     remotes: SplitRemotes,
 }
@@ -181,6 +189,11 @@ fn validate_manifest(manifest: &SplitManifest) -> Result<()> {
         EXPECTED_SCHEMA_VERSION,
     )?;
     ensure_eq("family", manifest.family.as_str(), EXPECTED_FAMILY)?;
+    ensure_eq(
+        "repo_family",
+        manifest.repo_family.as_str(),
+        EXPECTED_FAMILY,
+    )?;
     ensure_eq(
         "umbrella_repo",
         manifest.umbrella_repo.as_str(),
@@ -230,19 +243,43 @@ fn validate_manifest(manifest: &SplitManifest) -> Result<()> {
         let spec = EXPECTED_REPOS
             .get(index)
             .ok_or_else(|| anyhow::anyhow!("unexpected repo at index {index}"))?;
+        let expected_path = format!("/home/ubuntu/{EXPECTED_FAMILY}/{}", spec.path);
         let expected_origin = expected_origin(spec.path);
         let expected_github = expected_github(spec.path);
-        ensure_eq("path", repo.path.as_str(), spec.path)?;
+        let expected_jeryu_slug = format!("jeryu/{}", spec.path);
+        let expected_required_check = format!("{}/required", spec.path);
+        ensure_eq("path", repo.path.as_str(), expected_path.as_str())?;
         ensure_eq("name", repo.name.as_str(), spec.path)?;
         ensure_eq("slug", repo.slug.as_str(), spec.path)?;
+        ensure_eq(
+            "github_slug",
+            repo.github_slug.as_str(),
+            expected_github_slug(spec.path).as_str(),
+        )?;
+        ensure_eq(
+            "jeryu_slug",
+            repo.jeryu_slug.as_str(),
+            expected_jeryu_slug.as_str(),
+        )?;
         ensure_eq("role", repo.role.as_str(), spec.role)?;
         ensure_eq("branch", repo.branch.as_str(), "main")?;
+        ensure_eq("default_branch", repo.default_branch.as_str(), "main")?;
         ensure_eq(
             "profile",
             repo.profile.as_str(),
             expected_profile(spec.path),
         )?;
         ensure_eq("rollout_wave", repo.rollout_wave, spec.wave)?;
+        ensure_eq("has_jeryu_std", repo.has_jeryu_std, true)?;
+        ensure_eq("mirror_github_main", repo.mirror_github_main, true)?;
+        ensure_eq(
+            "required_check",
+            repo.required_check.as_str(),
+            expected_required_check.as_str(),
+        )?;
+        if repo.current_tag.trim().is_empty() {
+            bail!("repo {} current_tag must not be empty", repo.name);
+        }
         validate_repo_gates(repo)?;
 
         ensure_eq(
@@ -327,7 +364,7 @@ fn split_root_for(repo_root: &Path) -> Result<PathBuf> {
 
 fn validate_local_checkouts(split_root: &Path, manifest: &SplitManifest) -> Result<()> {
     for repo in &manifest.repo {
-        let repo_path = split_root.join(&repo.path);
+        let repo_path = repo_path_for(split_root, repo);
         if !repo_path.is_dir() {
             bail!("split repo missing locally: {}", repo_path.display());
         }
@@ -537,19 +574,24 @@ fn expected_github(repo: &str) -> String {
     format!("https://github.com/neverhuman/{repo}.git")
 }
 
+fn expected_github_slug(repo: &str) -> String {
+    format!("neverhuman/{repo}")
+}
+
+fn repo_path_for(split_root: &Path, repo: &SplitRepo) -> PathBuf {
+    let path = PathBuf::from(&repo.path);
+    if path.is_absolute() {
+        path
+    } else {
+        split_root.join(path)
+    }
+}
+
 fn expected_profile(repo: &str) -> &'static str {
-    match repo {
-        "jekko" => "rust-portal",
-        "jekko-core" => "rust-core",
-        "jekko-mcp" => "rust-mcp",
-        "jekko-deploy" => "ops",
-        "jekko-jnoccio" => "rust-router",
-        "jekko-jailgun" => "rust-web",
-        "jekko-zyal" => "rust-domain",
-        "jekko-search" => "rust-shared",
-        "jekko-memory" => "rust-data",
-        "jekko-agent" => "rust-agent",
-        other => panic!("unexpected split repo: {other}"),
+    if repo == "jekko" {
+        "public-portal"
+    } else {
+        "split-member"
     }
 }
 
