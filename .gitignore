@@ -24,6 +24,15 @@ ts-dist
 refs
 Session.vim
 /jekko.json
+/jekko-agent/
+/jekko-core/
+/jekko-deploy/
+/jekko-jailgun/
+/jekko-jnoccio/
+/jekko-memory/
+/jekko-mcp/
+/jekko-search/
+/jekko-zyal/
 a.out
 target
 .scripts

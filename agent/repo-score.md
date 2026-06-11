@@ -1,15 +1,15 @@
 # jankurai Repo Score
 
 - Standard: `jankurai`
-- Auditor: `1.5.1`
+- Auditor: `1.6.1`
 - Schema: `1.9.0`
 - Paper edition: `2026.05-ed8`
 - Target stack ID: `rust-ts-vite-react-postgres-bounded-python`
 - Target stack: `Rust core + TypeScript/React/Vite + PostgreSQL + generated contracts + exception-only Python AI/data service`
 - Repo: `.`
-- Run ID: `1780114285`
-- Started at: `1780114285`
-- Elapsed: `14571` ms
+- Run ID: `1781139758`
+- Started at: `1781139758`
+- Elapsed: `15084` ms
 - Scope: `full`
 - Raw score: `83`
 - Final score: `64`
@@ -70,7 +70,7 @@
 
 ## Copy-Code Redundancy
 
-- Status: `review` hard=`0` warning=`91` files=`924`
+- Status: `review` hard=`0` warning=`91` files=`935`
 - Policy: min-lines=`10` min-tokens=`100` max-findings=`50` include-tests=`false` strict=`false`
 - Duplicate volume: lines=`266` tokens=`766` bytes=`7228`
 
@@ -130,8 +130,8 @@
 | `ExactUnitDifferentName` | `Warning` | `rust` | 3 | 4 | `crates/jekko-tui/src/transcript/syntax/renderer.rs:147-150, crates/jekko-tui/src/transcript/syntax/renderer.rs:166-169` | `same body appears under different names across files` |
 | `ExactUnitSameName` | `Warning` | `rust` | 3 | 2 | `crates/jekko-runtime/src/lib.rs:132-135, crates/jekko-runtime/src/session.rs:182-185` | `same-name semantic unit copied across multiple files` |
 | `ExactUnitDifferentName` | `Warning` | `rust` | 1 | 7 | `crates/jekko-tui/src/osc52.rs:131-132, crates/jekko-tui/src/osc52.rs:141-142, crates/jekko-tui/src/osc52.rs:149-150` | `same body appears under different names across files` |
+| `ExactUnitDifferentName` | `Warning` | `rust` | 1 | 5 | `crates/xtask/src/commands/jankurai_gate.rs:254-255, crates/xtask/src/commands/jankurai_gate.rs:275-276, crates/xtask/src/commands/jankurai_gate.rs:295-296` | `same body appears under different names across files` |
 | `ExactUnitDifferentName` | `Warning` | `rust` | 1 | 5 | `crates/memory-benchmark/src/adapters/cogcore_adapter.rs:311-312, crates/memory-benchmark/src/adapters/cogcore_adapter.rs:325-326, crates/memory-benchmark/src/adapters/cogcore_adapter.rs:336-337` | `same body appears under different names across files` |
-| `ExactUnitSameName` | `Warning` | `rust` | 2 | 9 | `crates/jekko-store/build.rs:186-188, crates/jekko-store/src/migration.rs:226-228` | `same-name semantic unit copied across multiple files` |
 
 ## Dimensions
 
@@ -239,18 +239,29 @@ No audited runtime boundary reclassifications declared.
    Rerun: `just fast`
    Fingerprint: `sha256:944fb8ea13fac99bc4d88599306b0824999856bd7749785448443a4ec07984d7`
    Evidence: generated zone declaration `agent/sandbox-lanes.toml` targets protected source or control-plane code
-3. `high` `security` `agent/zyal/ambitious-superworkflow.zyal:387`
+3. `medium` `proof` `agent/repo-score.md:242`
+   Rule: `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP`
+   Check: `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP:proof` `soft` confidence `0.88`
+   Route: TLR `Repair`, lane `audit`, owner `workspace`
+   Docs: `docs/testing.md`
+   Matched term: `review evidence`
+   Reason: proof and review claims need receipts
+   Fix: attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries
+   Rerun: `just score`
+   Fingerprint: `sha256:13e6e7ca5353d1fc015010c226aeaa78574ae41b57685dd8f3c58c5ef69240c0`
+   Evidence: Evidence: "Evidence: pub fabricated_citations: u32,"
+4. `high` `security` `agent/zyal/ambitious-superworkflow.zyal`
    Rule: `HLT-024-AGENT-TOOL-SUPPLY-GAP`
    Check: `HLT-024-AGENT-TOOL-SUPPLY-GAP:security` `hard` confidence `0.88`
    Route: TLR `Security, secrets, agency`, lane `security`, owner `agent`
    Docs: `docs/audit-rubric.md#top-level-risk-mapping`
-   Matched term: `ZYAL_ARM`
-   Reason: missing arm
-   Fix: append `ZYAL_ARM RUN_FOREVER id=<id>` on the final line
+   Matched term: `superworkflow`
+   Reason: unknown key
+   Fix: remove the unknown key or move the data into a supported block
    Rerun: `just security`
-   Fingerprint: `sha256:821aafc4672d2bf6d71f6d817435f9b4f9ba6cacd56aa8c796d8bb5a1ddfa2e4`
-   Evidence: open_id=ambitious-superworkflow-template
-4. `high` `security` `agent/zyal/sandbox-lanes.zyal:3`
+   Fingerprint: `sha256:a4cac6a7d64daaf6ffec8a676376fbe14716a406f27cc45ce1f089dd6022a4db`
+   Evidence: path=job, key=superworkflow, supported_contract_version=2.4.0, release_tag=v1.0.0
+5. `high` `security` `agent/zyal/sandbox-lanes.zyal:3`
    Rule: `HLT-024-AGENT-TOOL-SUPPLY-GAP`
    Check: `HLT-024-AGENT-TOOL-SUPPLY-GAP:security` `hard` confidence `0.88`
    Route: TLR `Security, secrets, agency`, lane `security`, owner `agent`
@@ -261,7 +272,7 @@ No audited runtime boundary reclassifications declared.
    Rerun: `just security`
    Fingerprint: `sha256:b2a299af938e370b48e782c2a21ac41d91eb6a027364994144504e2a12b4894e`
    Evidence: supported_contract_version=2.4.0, runtime_sentinel_version=v1
-5. `high` `security` `crates/jekko-runtime/src/agent/provider.rs:145`
+6. `high` `security` `crates/jekko-runtime/src/agent/provider.rs:145`
    Rule: `HLT-029-RUST-BAD-BEHAVIOR`
    Check: `HLT-029-RUST-BAD-BEHAVIOR:security` `hard` confidence `0.95`
    Route: TLR `Security, secrets, agency`, lane `fast`, owner `tools`
@@ -272,7 +283,7 @@ No audited runtime boundary reclassifications declared.
    Rerun: `just fast`
    Fingerprint: `sha256:4bbd50117d51b8864f533a622b6a06774deda2f952a4397bfef2439a4c335cf6`
    Evidence: detector=static mut, proof-window=NearbySafetyComment, snippet=fn balancer() -> &'static Mutex<Option<KeyBalancer>> {
-6. `high` `vibe` `crates/jekko-runtime/src/daemon.rs:231`
+7. `high` `vibe` `crates/jekko-runtime/src/daemon.rs:231`
    Rule: `HLT-001-DEAD-MARKER`
    Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
    Route: TLR `Entropy`, lane `fast`, owner `tools`
@@ -282,7 +293,7 @@ No audited runtime boundary reclassifications declared.
    Rerun: `just fast`
    Fingerprint: `sha256:a2080a15cdd4c06e7eb7e18334ca6813ce6fb2c9a8fe3786e04b75a085ddb27e`
    Evidence: crates/jekko-runtime/src/daemon.rs:231 serde_json::to_value(record).unwrap_or_else(|_| serde_json::json!({})),
-7. `high` `vibe` `crates/memory-benchmark/src/adapters/reference_context_pack.rs:142`
+8. `high` `vibe` `crates/memory-benchmark/src/adapters/reference_context_pack.rs:142`
    Rule: `HLT-001-DEAD-MARKER`
    Check: `HLT-001-DEAD-MARKER:vibe` `hard` confidence `0.88`
    Route: TLR `Entropy`, lane `fast`, owner `tools`
@@ -292,17 +303,6 @@ No audited runtime boundary reclassifications declared.
    Rerun: `just fast`
    Fingerprint: `sha256:4fc563586ba63a80b831f60984df89eaf87bd0459b608aa8e57590b3993e7c56`
    Evidence: crates/memory-benchmark/src/adapters/reference_context_pack.rs:142, future-hostile/dead-language term `deprecated` appears
-8. `medium` `proof` `crates/memory-benchmark/src/chase_report.rs:39`
-   Rule: `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP`
-   Check: `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP:proof` `soft` confidence `0.88`
-   Route: TLR `Repair`, lane `audit`, owner `tools`
-   Docs: `docs/testing.md`
-   Matched term: `review evidence`
-   Reason: proof and review claims need receipts
-   Fix: attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries
-   Rerun: `just score`
-   Fingerprint: `sha256:423b3c5e9f34e3a76640a8101ac1746c1acfc060b044164a7fff0da274caab6b`
-   Evidence: pub fabricated_citations: u32,
 9. `high` `security` `crates/memory-benchmark/src/chase_report.rs:1431`
    Rule: `HLT-029-RUST-BAD-BEHAVIOR`
    Check: `HLT-029-RUST-BAD-BEHAVIOR:security` `hard` confidence `0.95`
@@ -435,9 +435,9 @@ No audited runtime boundary reclassifications declared.
 
 1. `high` `HLT-002-GENERATED-MUTATION` `agent/generated-zones.toml` - add `agent/generated-zones.toml`, require generated/do-not-edit markers, and route repairs to the source contract
    Route: `Contracts/data`/`contract`
-2. `medium` `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP` `crates/memory-benchmark/src/chase_report.rs` - attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries
+2. `medium` `HLT-027-HUMAN-REVIEW-EVIDENCE-GAP` `agent/repo-score.md` - attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries
    Route: `Repair`/`audit`
-3. `high` `HLT-024-AGENT-TOOL-SUPPLY-GAP` `agent/zyal/ambitious-superworkflow.zyal` - append `ZYAL_ARM RUN_FOREVER id=<id>` on the final line
+3. `high` `HLT-024-AGENT-TOOL-SUPPLY-GAP` `agent/zyal/ambitious-superworkflow.zyal` - remove the unknown key or move the data into a supported block
    Route: `Security, secrets, agency`/`security`
 4. `high` `HLT-024-AGENT-TOOL-SUPPLY-GAP` `agent/zyal/sandbox-lanes.zyal` - keep the runbook envelope at the top of the file after optional comments
    Route: `Security, secrets, agency`/`security`

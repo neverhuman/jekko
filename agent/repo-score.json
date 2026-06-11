@@ -1,21 +1,21 @@
 {
-  "report_fingerprint": "sha256:a9ed7106efa630dfcda723c73a03d4ca4b8282495e722fdccc536f50998a917f",
-  "input_fingerprint": "sha256:bbd608b24bdaf23d3d0b21990704b789fad8ca35484fa075dec96eae93c9952a",
-  "policy_fingerprint": "sha256:66de2d03fdf91ac464e652fd019c2a95cec2b7726c8c1a82ea253fad0b3c2475",
+  "report_fingerprint": "sha256:a010ed19b82738d44a7e14524a9f1148109a9fe67c8a871a11aef47e4be4803b",
+  "input_fingerprint": "sha256:c9905e90862e626677820cfd53250a6714695abc3be715d5dd1e82d03ac052c3",
+  "policy_fingerprint": "sha256:921271fabb96873d04ec35e26fff61574fd0bcea5139a162f50a65e37243dafc",
   "manifest_fingerprints": {
-    "owner_map": "sha256:1f21851b7e4df74aeb678dc410d2ad194ee88e6741977a020d59c8f9d1ba1614",
-    "test_map": "sha256:5314935de57b00095687bd8c92757cd586eee5168f060f6518552930b1a38249",
-    "generated_zones": "sha256:26e316b98bfe7ed125fe8a95fe5e9f07f228eb0f4732b9b09d4bf8647280418b",
+    "owner_map": "sha256:58bb93efb022846cf24c6b217c9012e30aae81052db62eac3ef42b3486872bd3",
+    "test_map": "sha256:67f463af8807d0a54415fa1d1e849b34643e080eb039e372b69a949e5b569e6f",
+    "generated_zones": "sha256:3a6523c0381b45f5d8db25b1f6889cb1de1a4f727f34a260f4607a8939f3db88",
     "boundaries": "sha256:a7d902610988c389275705c0c130f5879f9aeac7b83ac16291a81de46d861a41",
     "proof_lanes": "sha256:3300ad5c4520ddf97ea5b8a95c545516b7c100851dba3ba352519019962613e7",
-    "standard_version": "sha256:43da686bca9db9c56652d0e4582cceab44dd01fa0c3954cb73edb60db41dcd47"
+    "standard_version": "sha256:b220562cf69ed856bd4dc47bdb560fa39172d5c4f9533a016dffdfc947496319"
   },
-  "dirty_worktree": false,
-  "generated_at": "1780114285",
+  "dirty_worktree": true,
+  "generated_at": "1781139758",
   "schema_url": "schemas/repo-score.schema.json",
   "standard": "jankurai",
   "standard_version": "0.9.0",
-  "auditor_version": "1.5.1",
+  "auditor_version": "1.6.1",
   "schema_version": "1.9.0",
   "paper_edition": "2026.05-ed8",
   "target_stack_id": "rust-ts-vite-react-postgres-bounded-python",
@@ -44,9 +44,9 @@
     "HLT-001-DEAD-MARKER on crates/memory-benchmark/src/scorer.rs"
   ],
   "repo": ".",
-  "run_id": "1780114285",
-  "started_at": "1780114285",
-  "elapsed_ms": 14571,
+  "run_id": "1781139758",
+  "started_at": "1781139758",
+  "elapsed_ms": 15084,
   "scope": {
     "mode": "full",
     "paths": []
@@ -73,11 +73,11 @@
     }
   },
   "git": {
-    "head": "ad4267252",
+    "head": "cbad4b486",
     "base": null,
     "changed_files": 0,
     "mode": "full",
-    "dirty_worktree": false
+    "dirty_worktree": true
   },
   "policy": {
     "path": "./agent/audit-policy.toml",
@@ -92,7 +92,7 @@
     ],
     "mode": "advisory",
     "standard_version": "0.9.0",
-    "auditor_version": "1.6.0",
+    "auditor_version": "1.6.10",
     "schema_version": "1.9.0",
     "paper_edition": "2026.05-ed8",
     "target_stack": "rust-ts-vite-react-postgres-bounded-python"
@@ -375,8 +375,8 @@
         "rust bad-behavior hard findings: 2",
         "ci bad-behavior advisory signals: 1",
         "git bad-behavior advisory signals: 2",
-        "gittools bad-behavior advisory signals: 1",
-        "web security bad-behavior advisory signals: 10",
+        "release bad-behavior advisory signals: 1",
+        "web security bad-behavior advisory signals: 50",
         "Rust and npm dependency audits are operational commands",
         "secret scanning command is operational"
       ],
@@ -401,7 +401,7 @@
         "rust bad-behavior hard findings: 2",
         "ci bad-behavior advisory signals: 1",
         "git bad-behavior advisory signals: 2",
-        "gittools bad-behavior advisory signals: 1"
+        "release bad-behavior advisory signals: 1"
       ],
       "notes": [
         "product/runtime code contains future-hostile or dead-language terms",
@@ -512,7 +512,9 @@
         "agent/repo-score.json",
         "agent/repo-score.md"
       ],
-      "api_mocks": [],
+      "api_mocks": [
+        "agent/e2e/generated-api-mocks.md"
+      ],
       "artifact_backed_proof": [
         "agent/baselines/main.repo-score.json",
         "agent/repo-score.json",
@@ -523,16 +525,15 @@
       "design_tokens": [
         "agent/baselines/main.repo-score.json",
         "agent/e2e/design-tokens.md",
-        "agent/repo-score.json",
-        "agent/repo-score.md"
+        "agent/repo-score.json"
       ],
       "geometry_runtime": [
-        "agent/repo-score.md",
-        "agent/ux-qa.toml"
+        "agent/ux-qa.toml",
+        "ops/ci/ux-qa-evidence.sh"
       ],
       "layout_stability": [
-        "agent/repo-score.md",
-        "crates/memory-benchmark/data/real-paper-bank/papers/b25618f10e3dc66b072236fb2dd3b3a5751adfda7e09d8b3e58e0f0ff7903a41.json"
+        "crates/memory-benchmark/data/real-paper-bank/papers/b25618f10e3dc66b072236fb2dd3b3a5751adfda7e09d8b3e58e0f0ff7903a41.json",
+        "ops/ci/ux-qa-evidence.sh"
       ],
       "playwright_visual": [
         "crates/tuiwright-jekko-unlock/tests/common/mod.rs",
@@ -545,7 +546,6 @@
         "agent/TUI_UPGRADE.md",
         "agent/baselines/main.repo-score.json",
         "agent/repo-score.json",
-        "agent/repo-score.md",
         "crates/memory-benchmark/data/real-paper-bank/papers/e50ea7b1c2493f5b3cb7931b52a0da82e024b0a0225d25068f83c9cb44ea9aa7.json"
       ],
       "tuiwright": {
@@ -677,8 +677,7 @@
         ]
       },
       "visual_review": [
-        "agent/TUI_UPGRADE.md",
-        "agent/repo-score.md"
+        "agent/TUI_UPGRADE.md"
       ]
     }
   },
@@ -1244,9 +1243,9 @@
   "copy_code": {
     "schema_version": "1.1.0",
     "generated_by": "jankurai copy-code",
-    "generated_at": "2026-05-30T04:11:11.760039126+00:00",
+    "generated_at": "2026-06-11T01:02:24.218666827+00:00",
     "repo": ".",
-    "auditor_version": "1.6.0",
+    "auditor_version": "1.6.10",
     "status": "review",
     "policy": {
       "active_source_only": true,
@@ -1282,20 +1281,20 @@
       ]
     },
     "summary": {
-      "files_scanned": 1828,
-      "files_considered": 924,
-      "active_files": 924,
+      "files_scanned": 2416,
+      "files_considered": 935,
+      "active_files": 935,
       "exact_file_classes": 0,
       "hard_classes": 0,
       "warning_classes": 91,
       "hard_instances": 0,
-      "warning_instances": 263,
+      "warning_instances": 264,
       "duplicate_lines": 266,
       "duplicate_tokens": 766,
       "duplicate_bytes": 7228,
-      "total_redundant_lines": 402,
-      "total_redundant_tokens": 1082,
-      "total_redundant_bytes": 10733
+      "total_redundant_lines": 403,
+      "total_redundant_tokens": 1087,
+      "total_redundant_bytes": 10780
     },
     "classes": [
       {
@@ -3516,6 +3515,48 @@
         ]
       },
       {
+        "id": "copy-code-body-rust-a0350927b5e4ed3e",
+        "kind": "exact_unit_different_name",
+        "severity": "warning",
+        "confidence": "medium",
+        "language": "rust",
+        "duplicate_lines": 1,
+        "duplicate_tokens": 5,
+        "duplicate_bytes": 47,
+        "instance_count": 3,
+        "total_redundant_lines": 2,
+        "total_redundant_tokens": 10,
+        "total_redundant_bytes": 94,
+        "effective_severity": "warning",
+        "hard_fail": false,
+        "fingerprint": "ab86329039f78e7b",
+        "reason": "same body appears under different names across files",
+        "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
+        "instances": [
+          {
+            "path": "crates/xtask/src/commands/jankurai_gate.rs",
+            "language": "rust",
+            "start_line": 254,
+            "end_line": 255,
+            "unit_name": "evidence_filter_narrows_match"
+          },
+          {
+            "path": "crates/xtask/src/commands/jankurai_gate.rs",
+            "language": "rust",
+            "start_line": 275,
+            "end_line": 276,
+            "unit_name": "non_high_severities_are_ignored"
+          },
+          {
+            "path": "crates/xtask/src/commands/jankurai_gate.rs",
+            "language": "rust",
+            "start_line": 295,
+            "end_line": 296,
+            "unit_name": "counts_strict_blockers_caps_and_finding_fallbacks"
+          }
+        ]
+      },
+      {
         "id": "copy-code-body-rust-aa2b62532b614c8e",
         "kind": "exact_unit_different_name",
         "severity": "warning",
@@ -3554,42 +3595,6 @@
             "start_line": 336,
             "end_line": 337,
             "unit_name": "export_state_hash_stable"
-          }
-        ]
-      },
-      {
-        "id": "copy-code-unit-rust-00417a3514aef289",
-        "kind": "exact_unit_same_name",
-        "severity": "warning",
-        "confidence": "high",
-        "language": "rust",
-        "unit_name": "is_leap_year",
-        "duplicate_lines": 2,
-        "duplicate_tokens": 9,
-        "duplicate_bytes": 61,
-        "instance_count": 2,
-        "total_redundant_lines": 2,
-        "total_redundant_tokens": 9,
-        "total_redundant_bytes": 61,
-        "effective_severity": "warning",
-        "hard_fail": false,
-        "fingerprint": "a17893b45ca1ed92",
-        "reason": "same-name semantic unit copied across multiple files",
-        "recommended_action": "keep the named unit in one owner and call it from the other sites",
-        "instances": [
-          {
-            "path": "crates/jekko-store/build.rs",
-            "language": "rust",
-            "start_line": 186,
-            "end_line": 188,
-            "unit_name": "is_leap_year"
-          },
-          {
-            "path": "crates/jekko-store/src/migration.rs",
-            "language": "rust",
-            "start_line": 226,
-            "end_line": 228,
-            "unit_name": "is_leap_year"
           }
         ]
       }
@@ -3913,28 +3918,54 @@
       "line": 1
     },
     {
+      "severity": "medium",
+      "category": "proof",
+      "path": "agent/repo-score.md",
+      "problem": "human review or proof claim lacks reproducible evidence",
+      "agent_fix": "attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries",
+      "evidence": [
+        "Evidence: \"Evidence: pub fabricated_citations: u32,\""
+      ],
+      "check_id": "HLT-027-HUMAN-REVIEW-EVIDENCE-GAP:proof",
+      "hardness": "soft",
+      "confidence": 0.88,
+      "evidence_kind": "receipt",
+      "rerun_command": "just score",
+      "fingerprint": "sha256:13e6e7ca5353d1fc015010c226aeaa78574ae41b57685dd8f3c58c5ef69240c0",
+      "rule_id": "HLT-027-HUMAN-REVIEW-EVIDENCE-GAP",
+      "tlr": "Repair",
+      "lane": "audit",
+      "docs_url": "docs/testing.md",
+      "owner": "workspace",
+      "line": 242,
+      "matched_term": "review evidence",
+      "reason": "proof and review claims need receipts"
+    },
+    {
       "severity": "high",
       "category": "security",
       "path": "agent/zyal/ambitious-superworkflow.zyal",
-      "problem": "missing trailing ZYAL_ARM sentinel",
-      "agent_fix": "append `ZYAL_ARM RUN_FOREVER id=<id>` on the final line",
+      "problem": "Unknown ZYAL key: job.superworkflow",
+      "agent_fix": "remove the unknown key or move the data into a supported block",
       "evidence": [
-        "open_id=ambitious-superworkflow-template"
+        "path=job",
+        "key=superworkflow",
+        "supported_contract_version=2.4.0",
+        "release_tag=v1.0.0"
       ],
       "check_id": "HLT-024-AGENT-TOOL-SUPPLY-GAP:security",
       "hardness": "hard",
       "confidence": 0.88,
       "evidence_kind": "policy-manifest",
       "rerun_command": "just security",
-      "fingerprint": "sha256:821aafc4672d2bf6d71f6d817435f9b4f9ba6cacd56aa8c796d8bb5a1ddfa2e4",
+      "fingerprint": "sha256:a4cac6a7d64daaf6ffec8a676376fbe14716a406f27cc45ce1f089dd6022a4db",
       "rule_id": "HLT-024-AGENT-TOOL-SUPPLY-GAP",
       "tlr": "Security, secrets, agency",
       "lane": "security",
       "docs_url": "docs/audit-rubric.md#top-level-risk-mapping",
       "owner": "agent",
-      "line": 387,
-      "matched_term": "ZYAL_ARM",
-      "reason": "missing arm"
+      "matched_term": "superworkflow",
+      "reason": "unknown key"
     },
     {
       "severity": "high",
@@ -4031,30 +4062,6 @@
       "docs_url": "docs/audit-rubric.md#future-hostile-language-rule",
       "owner": "tools",
       "line": 142
-    },
-    {
-      "severity": "medium",
-      "category": "proof",
-      "path": "crates/memory-benchmark/src/chase_report.rs",
-      "problem": "human review or proof claim lacks reproducible evidence",
-      "agent_fix": "attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries",
-      "evidence": [
-        "pub fabricated_citations: u32,"
-      ],
-      "check_id": "HLT-027-HUMAN-REVIEW-EVIDENCE-GAP:proof",
-      "hardness": "soft",
-      "confidence": 0.88,
-      "evidence_kind": "receipt",
-      "rerun_command": "just score",
-      "fingerprint": "sha256:423b3c5e9f34e3a76640a8101ac1746c1acfc060b044164a7fff0da274caab6b",
-      "rule_id": "HLT-027-HUMAN-REVIEW-EVIDENCE-GAP",
-      "tlr": "Repair",
-      "lane": "audit",
-      "docs_url": "docs/testing.md",
-      "owner": "tools",
-      "line": 39,
-      "matched_term": "review evidence",
-      "reason": "proof and review claims need receipts"
     },
     {
       "severity": "high",
@@ -4347,12 +4354,12 @@
       "why": "generated zone is not protected strongly enough against hand edits"
     },
     {
-      "path": "crates/memory-benchmark/src/chase_report.rs",
+      "path": "agent/repo-score.md",
       "priority": "medium",
       "rule_id": "HLT-027-HUMAN-REVIEW-EVIDENCE-GAP",
       "tlr": "Repair",
       "lane": "audit",
-      "owner": "tools",
+      "owner": "workspace",
       "task": "attach raw CI logs, review receipts, and replayable commands instead of accepting claims or summaries",
       "why": "human review or proof claim lacks reproducible evidence"
     },
@@ -4363,8 +4370,8 @@
       "tlr": "Security, secrets, agency",
       "lane": "security",
       "owner": "agent",
-      "task": "append `ZYAL_ARM RUN_FOREVER id=<id>` on the final line",
-      "why": "missing trailing ZYAL_ARM sentinel"
+      "task": "remove the unknown key or move the data into a supported block",
+      "why": "Unknown ZYAL key: job.superworkflow"
     },
     {
       "path": "agent/zyal/sandbox-lanes.zyal",

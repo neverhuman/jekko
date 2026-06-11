@@ -14,19 +14,11 @@ cargo test -p jekko-tui --locked --no-fail-fast
 # Best-effort install of the `jankurai` binary so the real-audit render e2e
 # below actually exercises (it skips cleanly when jankurai is absent, so a
 # download failure must not fail the lane).
-if ! command -v jankurai >/dev/null 2>&1; then
+if ! command -v jankurai >/dev/null 2>&1 || ! jankurai --version 2>&1 | head -1 | grep -q "jankurai 1.6.1"; then
   (
     set -e
-    ver="1.5.1"
-    target="x86_64-unknown-linux-gnu"
-    sha="a12dbb4a3805dee807fc101d4b073ac9386936b33c5579f606a655fe90d0bbac"
-    tmp="$(mktemp -d)"
-    arc="$tmp/jankurai-${ver}-${target}.tar.gz"
-    curl -fsSL "https://github.com/neverhuman/jankurai/releases/download/v${ver}/jankurai-${ver}-${target}.tar.gz" -o "$arc"
-    echo "${sha}  ${arc}" | sha256sum -c -
-    tar -xzf "$arc" -C "$tmp"
     mkdir -p "${HOME}/.local/bin"
-    install -m 0755 "$tmp/jankurai-${ver}-${target}/jankurai" "${HOME}/.local/bin/jankurai"
+    cargo install --root "${HOME}/.local" --git https://github.com/neverhuman/jankurai --rev c7360a88b1e1869626df0450f1e28221047832db --locked jankurai
   ) || echo "jankurai install failed; the real-audit render e2e will skip"
 fi
 export PATH="${HOME}/.local/bin:${PATH}"

@@ -4,33 +4,22 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 source ops/ci/lib.sh
+export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:${PATH}"
 
-JANKURAI_VERSION="1.5.1"
-JANKURAI_SHA256_AARCH64_APPLE_DARWIN="7f47c5dc04ad007c073a8a1ec1108605b271ced47346dda928f5e082a5be4058"
-JANKURAI_SHA256_X86_64_UNKNOWN_LINUX_GNU="a12dbb4a3805dee807fc101d4b073ac9386936b33c5579f606a655fe90d0bbac"
+JANKURAI_VERSION="1.6.1"
+JANKURAI_REV="c7360a88b1e1869626df0450f1e28221047832db"
 if [ "$(uname -s)" = "Linux" ]; then
   JANKURAI_COMPILED_SCHEMA_ROOT="/home/runner/work/jankurai/jankurai/crates/jankurai"
-  JANKURAI_RUNTIME_SCHEMA_ROOT="/tmp/jankurai-schema-runtime-v151xx/crates/jankurai"
-  JANKURAI_RUNTIME_SCHEMA_DIR="/tmp/jankurai-schema-runtime-v151xx/schemas"
+  JANKURAI_RUNTIME_SCHEMA_ROOT="/tmp/jankurai-schema-runtime-v161xx/crates/jankurai"
+  JANKURAI_RUNTIME_SCHEMA_DIR="/tmp/jankurai-schema-runtime-v161xx/schemas"
 else
   JANKURAI_COMPILED_SCHEMA_ROOT="/Users/runner/work/jankurai/jankurai/crates/jankurai"
-  JANKURAI_RUNTIME_SCHEMA_ROOT="/tmp/jankurai-schema-runtime-v151xxx/crates/jankurai"
-  JANKURAI_RUNTIME_SCHEMA_DIR="/tmp/jankurai-schema-runtime-v151xxx/schemas"
+  JANKURAI_RUNTIME_SCHEMA_ROOT="/tmp/jankurai-schema-runtime-v161xxx/crates/jankurai"
+  JANKURAI_RUNTIME_SCHEMA_DIR="/tmp/jankurai-schema-runtime-v161xxx/schemas"
 fi
 
 install_jankurai_asset() {
-  local target="$1"
-  local sha256="$2"
-  local tmp
-  tmp="$(mktemp -d)"
-  local archive="$tmp/jankurai-${JANKURAI_VERSION}-${target}.tar.gz"
-  curl -fsSL \
-    "https://github.com/neverhuman/jankurai/releases/download/v${JANKURAI_VERSION}/jankurai-${JANKURAI_VERSION}-${target}.tar.gz" \
-    -o "$archive"
-  echo "${sha256}  $archive" | shasum -a 256 -c -
-  tar -xzf "$archive" -C "$tmp"
-  mkdir -p "${HOME}/.local/bin"
-  install -m 0755 "$tmp/jankurai-${JANKURAI_VERSION}-${target}/jankurai" "${HOME}/.local/bin/jankurai"
+  cargo install --root "${HOME}/.local" --git https://github.com/neverhuman/jankurai --rev "${JANKURAI_REV}" --locked jankurai
   export PATH="${HOME}/.local/bin:${PATH}"
 }
 
@@ -42,11 +31,11 @@ install_jankurai_runtime_schemas() {
 
   local tmp
   tmp="$(mktemp -d)"
-  curl -fsSL "https://github.com/neverhuman/jankurai/archive/refs/tags/v${JANKURAI_VERSION}.tar.gz" \
+  curl -fsSL "https://github.com/neverhuman/jankurai/archive/${JANKURAI_REV}.tar.gz" \
     -o "$tmp/jankurai-source.tar.gz"
-  tar -xzf "$tmp/jankurai-source.tar.gz" -C "$tmp" "jankurai-${JANKURAI_VERSION}/schemas"
+  tar -xzf "$tmp/jankurai-source.tar.gz" -C "$tmp" "jankurai-${JANKURAI_REV}/schemas"
   mkdir -p "$JANKURAI_RUNTIME_SCHEMA_ROOT" "$JANKURAI_RUNTIME_SCHEMA_DIR"
-  cp -R "$tmp/jankurai-${JANKURAI_VERSION}/schemas/." "$JANKURAI_RUNTIME_SCHEMA_DIR/"
+  cp -R "$tmp/jankurai-${JANKURAI_REV}/schemas/." "$JANKURAI_RUNTIME_SCHEMA_DIR/"
 }
 
 patch_jankurai_schema_root() {
@@ -75,9 +64,9 @@ patch_jankurai_schema_root() {
 
 if ! command -v jankurai >/dev/null 2>&1; then
   if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
-    install_jankurai_asset "aarch64-apple-darwin" "$JANKURAI_SHA256_AARCH64_APPLE_DARWIN"
+    install_jankurai_asset
   elif [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
-    install_jankurai_asset "x86_64-unknown-linux-gnu" "$JANKURAI_SHA256_X86_64_UNKNOWN_LINUX_GNU"
+    install_jankurai_asset
   else
     echo "jankurai ${JANKURAI_VERSION} must be preinstalled on this runner" >&2
     exit 1
@@ -128,16 +117,11 @@ install_zizmor() {
   export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
 }
 
-if ! jankurai --version | grep -q "jankurai ${JANKURAI_VERSION}"; then
-  echo "expected jankurai ${JANKURAI_VERSION}, got: $(jankurai --version)" >&2
-  exit 1
-fi
-
 cargo run -p xtask --locked -- pr-workflow-contract
 
 artifact_root="${JANKURAI_ARTIFACT_ROOT}"
 
-# jankurai 1.5.1 adoption scoring looks for these canonical command strings.
+# jankurai 1.6.1 adoption scoring looks for these canonical command strings.
 # The executable lanes below use the installed binary and richer artifact flags;
 # keep these no-op receipts in CI so replacement evidence remains machine-readable.
 : "jankurai audit . --mode ratchet --baseline ${artifact_root}/accepted-baseline.json --json ${artifact_root}/repo-score.json --md ${artifact_root}/repo-score.md"
@@ -174,6 +158,7 @@ if ! cargo run -p xtask --locked -- security-lane --profile ci --out "${artifact
   exit 1
 fi
 jankurai audit . --mode advisory --json "${artifact_root}/repo-score.json" --md "${artifact_root}/repo-score.md" --sarif "${artifact_root}/jankurai.sarif" --github-step-summary "${artifact_root}/summary.md" --repair-queue-jsonl "${artifact_root}/repair-queue.jsonl"
+jq -e --arg version "${JANKURAI_VERSION}" '.auditor_version == $version' "${artifact_root}/repo-score.json" >/dev/null
 jankurai copy-code . --json "${artifact_root}/copy-code.json" --md "${artifact_root}/copy-code.md"
 cargo run -p xtask --locked -- jankurai-gate --score "${artifact_root}/repo-score.json"
 collect_changed_args() {

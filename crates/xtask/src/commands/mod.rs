@@ -20,4 +20,5 @@ pub mod release;
 pub mod schema;
 pub mod security_lane;
 pub mod session_fixture_parity;
+pub mod split_family;
 pub mod tool_schema_parity;

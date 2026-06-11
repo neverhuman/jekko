@@ -1,7 +1,7 @@
-auditor_version = "1.5.1"
+auditor_version = "1.6.1"
 paper_edition = "2026.05-ed8"
 published = "2026-05-11"
-release_tag = "v1.5.1"
+release_tag = "v1.6.1"
 schema_version = "1.9.0"
 standard = "jankurai"
 standard_version = "0.9.0"
@@ -13,8 +13,8 @@ generated = false
 id = "agent-standard-brief"
 kind = "agent-brief"
 path = "agent/JANKURAI_STANDARD.md"
-source = "https://github.com/neverhuman/jankurai/blob/v1.5.1/agent/JANKURAI_STANDARD.md"
-version = "1.5.1"
+source = "https://github.com/neverhuman/jankurai/blob/v1.6.1/agent/JANKURAI_STANDARD.md"
+version = "1.6.1"
 version_field = "standard_version"
 
 [[artifact]]
@@ -44,7 +44,7 @@ id = "repo-score-json"
 kind = "audit-report"
 path = "agent/repo-score.json"
 source = "installed jankurai binary"
-version = "1.5.1"
+version = "1.6.1"
 version_field = "auditor_version"
 
 [[artifact]]
@@ -54,7 +54,7 @@ id = "repo-score-md"
 kind = "audit-report"
 path = "agent/repo-score.md"
 source = "installed jankurai binary"
-version = "1.5.1"
+version = "1.6.1"
 version_field = "auditor_version"
 
 [[artifact]]
