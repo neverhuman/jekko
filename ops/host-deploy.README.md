@@ -9,8 +9,8 @@ rebuilds `jekko-cli` in release mode, and installs the binary to
 
 ```bash
 mkdir -p ~/.config/systemd/user
-ln -sf /home/ubuntu/jekko/ops/host-deploy.service ~/.config/systemd/user/host-deploy.service
-ln -sf /home/ubuntu/jekko/ops/host-deploy.timer   ~/.config/systemd/user/host-deploy.timer
+ln -sf /home/ubuntu/jekko-split/jekko/ops/host-deploy.service ~/.config/systemd/user/host-deploy.service
+ln -sf /home/ubuntu/jekko-split/jekko/ops/host-deploy.timer   ~/.config/systemd/user/host-deploy.timer
 systemctl --user daemon-reload
 systemctl --user enable --now host-deploy.timer
 sudo loginctl enable-linger ubuntu  # keeps the user manager alive on logout
@@ -27,7 +27,7 @@ tail -f ~/.jekko/host-deploy/deploy.log
 ## Tmux/screen fallback (no systemd)
 
 ```bash
-tmux new -d -s jekko-deploy 'bash /home/ubuntu/jekko/ops/host-deploy.sh loop'
+tmux new -d -s jekko-deploy 'bash /home/ubuntu/jekko-split/jekko/ops/host-deploy.sh loop'
 ```
 
 ## State files
@@ -40,7 +40,7 @@ tmux new -d -s jekko-deploy 'bash /home/ubuntu/jekko/ops/host-deploy.sh loop'
 ## Manual one-shot
 
 ```bash
-JEKKO_REPO_DIR=/home/ubuntu/jekko bash ops/host-deploy.sh once
+JEKKO_REPO_DIR=/home/ubuntu/jekko-split/jekko bash ops/host-deploy.sh once
 ```
 
 ## Env overrides

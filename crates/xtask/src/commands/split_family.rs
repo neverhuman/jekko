@@ -363,13 +363,23 @@ fn split_root_for(repo_root: &Path) -> Result<PathBuf> {
 }
 
 fn validate_local_checkouts(split_root: &Path, manifest: &SplitManifest) -> Result<()> {
+    let github_head_ref = env::var("GITHUB_HEAD_REF")
+        .ok()
+        .filter(|branch| !branch.trim().is_empty());
+
     for repo in &manifest.repo {
         let repo_path = repo_path_for(split_root, repo);
         if !repo_path.is_dir() {
             bail!("split repo missing locally: {}", repo_path.display());
         }
         ensure_git_eq(&repo_path, &["rev-parse", "--is-inside-work-tree"], "true")?;
-        ensure_git_eq(&repo_path, &["branch", "--show-current"], "main")?;
+        let current_branch = git_stdout(&repo_path, &["branch", "--show-current"])?;
+        let checkout_policy = checkout_policy_for(
+            repo.role.as_str(),
+            repo.path.as_str(),
+            current_branch.as_str(),
+            github_head_ref.as_deref(),
+        )?;
         ensure_git_eq(
             &repo_path,
             &["remote", "get-url", "origin"],
@@ -386,7 +396,14 @@ fn validate_local_checkouts(split_root: &Path, manifest: &SplitManifest) -> Resu
             repo.remotes.github.as_str(),
         )?;
         ensure_remote_main_ref(repo.remotes.jeryu.as_str())?;
-        ensure_git_eq(&repo_path, &["status", "--short"], "")?;
+        let status = git_stdout(&repo_path, &["status", "--short"])?;
+        if checkout_policy.requires_clean() {
+            ensure_eq(
+                &format!("git {:?} in {}", ["status", "--short"], repo_path.display()),
+                status.as_str(),
+                "",
+            )?;
+        }
         for rel in expected_local_files(repo) {
             let path = repo_path.join(rel);
             if !path.exists() {
@@ -403,6 +420,50 @@ fn validate_local_checkouts(split_root: &Path, manifest: &SplitManifest) -> Resu
     }
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CheckoutPolicy {
+    StrictMain,
+    PortalPrBranch,
+}
+
+impl CheckoutPolicy {
+    fn requires_clean(self) -> bool {
+        matches!(self, Self::StrictMain)
+    }
+}
+
+fn checkout_policy_for(
+    role: &str,
+    repo_path: &str,
+    current_branch: &str,
+    github_head_ref: Option<&str>,
+) -> Result<CheckoutPolicy> {
+    if role != "portal" {
+        ensure_eq("git branch --show-current", current_branch, "main")?;
+        return Ok(CheckoutPolicy::StrictMain);
+    }
+
+    if current_branch == "main" {
+        return Ok(CheckoutPolicy::StrictMain);
+    }
+
+    if current_branch.trim().is_empty() {
+        bail!(
+            "portal repo {} is in a detached checkout; check out main for final validation or the PR branch for PR validation",
+            repo_path
+        );
+    }
+
+    let expected_pr_branch = github_head_ref
+        .map(str::trim)
+        .filter(|branch| !branch.is_empty());
+    if let Some(expected) = expected_pr_branch {
+        ensure_eq("portal PR branch", current_branch, expected)?;
+    }
+
+    Ok(CheckoutPolicy::PortalPrBranch)
 }
 
 fn expected_local_files(repo: &SplitRepo) -> &'static [&'static str] {
@@ -537,6 +598,12 @@ fn ensure_remote_main_ref(remote_url: &str) -> Result<()> {
 }
 
 fn ensure_git_eq(repo_path: &Path, args: &[&str], expected: &str) -> Result<()> {
+    let actual = git_stdout(repo_path, args)?;
+    ensure_eq(&format!("git {:?}", args), actual.as_str(), expected)?;
+    Ok(())
+}
+
+fn git_stdout(repo_path: &Path, args: &[&str]) -> Result<String> {
     let output = Command::new("git")
         .arg("-C")
         .arg(repo_path)
@@ -551,9 +618,7 @@ fn ensure_git_eq(repo_path: &Path, args: &[&str], expected: &str) -> Result<()> 
             String::from_utf8_lossy(&output.stderr).trim()
         );
     }
-    let actual = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    ensure_eq(&format!("git {:?}", args), actual.as_str(), expected)?;
-    Ok(())
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
 fn ensure_eq<T>(label: &str, actual: T, expected: T) -> Result<()>
@@ -617,5 +682,50 @@ mod tests {
         let manifest: SplitManifest = toml::from_str(&mutated).expect("parse mutated manifest");
         let err = validate_manifest(&manifest).expect_err("bad remote should fail");
         assert!(err.to_string().contains("github remote"));
+    }
+
+    #[test]
+    fn portal_main_uses_final_clean_policy() {
+        let policy = checkout_policy_for("portal", "/home/ubuntu/jekko-split/jekko", "main", None)
+            .expect("portal main is valid");
+        assert_eq!(policy, CheckoutPolicy::StrictMain);
+        assert!(policy.requires_clean());
+    }
+
+    #[test]
+    fn portal_pr_branch_can_validate_before_final_main() {
+        let policy = checkout_policy_for(
+            "portal",
+            "/home/ubuntu/jekko-split/jekko",
+            "reconcile/jekko-portal-20260611",
+            None,
+        )
+        .expect("portal PR branch is valid");
+        assert_eq!(policy, CheckoutPolicy::PortalPrBranch);
+        assert!(!policy.requires_clean());
+    }
+
+    #[test]
+    fn portal_pr_branch_must_match_ci_head_ref_when_present() {
+        let err = checkout_policy_for(
+            "portal",
+            "/home/ubuntu/jekko-split/jekko",
+            "reconcile/jekko-portal-20260611",
+            Some("other-branch"),
+        )
+        .expect_err("wrong PR branch should fail");
+        assert!(err.to_string().contains("portal PR branch"));
+    }
+
+    #[test]
+    fn supporting_repos_must_stay_on_main() {
+        let err = checkout_policy_for(
+            "core",
+            "/home/ubuntu/jekko-split/jekko-core",
+            "feature-work",
+            None,
+        )
+        .expect_err("supporting repo branch should fail");
+        assert!(err.to_string().contains("git branch --show-current"));
     }
 }

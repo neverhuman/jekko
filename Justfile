@@ -229,8 +229,7 @@ run: jekko-build-fast
 	rtk cargo run -p jekko-cli -- --version
 
 # Build and deploy the host binary wrapper to ~/.local/bin.
-deploy:
-	packages/jekko/script/deploy-local.sh
+deploy: install-binary
 
 # Narrow lane for the jnoccio-fusion Rust crate compile path.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
