@@ -10,8 +10,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use crate::health::{probe_health_combined, HealthResult};
 use crate::fusion_root::find_jnoccio_fusion_root;
+use crate::health::{probe_health_combined, HealthResult};
 use crate::spawn::ensure_and_spawn;
 use crate::unlock::is_unlocked;
 

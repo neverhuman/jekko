@@ -5,18 +5,18 @@
 //! HTTP plumbing lives in [`shared`].
 
 pub mod anthropic;
-pub mod dummy_agent_llm;
 pub mod jekko;
 pub mod jnoccio;
 pub mod litellm;
 pub mod openai;
 pub mod openrouter;
+pub mod scripted_agent;
 pub mod shared;
 
 pub use anthropic::AnthropicAdapter;
-pub use dummy_agent_llm::DummyAgentLlmAdapter;
 pub use jekko::JekkoAdapter;
 pub use jnoccio::JNoccioAdapter;
 pub use litellm::LiteLlmAdapter;
 pub use openai::OpenAiAdapter;
 pub use openrouter::OpenRouterAdapter;
+pub use scripted_agent::ScriptedAgentAdapter;

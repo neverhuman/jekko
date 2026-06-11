@@ -107,7 +107,7 @@ pub struct ModelKeyStatus {
 /// Sourced from `model-keys.catalog.ts` plus local-only test providers.
 pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
-        provider_id: "dummy_agent_llm",
+        provider_id: "scripted_agent",
         env_names: &[],
         signup_url: None,
         recommended_model_id: Some("basic"),
@@ -444,8 +444,8 @@ mod tests {
         assert!(CATALOG.iter().any(|e| e.provider_id == "openai"));
         assert!(CATALOG.iter().any(|e| e.provider_id == "anthropic"));
         assert!(CATALOG.iter().any(|e| e.provider_id == "jnoccio"));
-        let dummy = catalog_entry("dummy_agent_llm").unwrap();
-        assert_eq!(dummy.recommended_model_id, Some("basic"));
+        let scenario = catalog_entry("scripted_agent").unwrap();
+        assert_eq!(scenario.recommended_model_id, Some("basic"));
         let cf = catalog_entry("cloudflare").unwrap();
         assert_eq!(cf.companion_env_names.unwrap().len(), 2);
     }

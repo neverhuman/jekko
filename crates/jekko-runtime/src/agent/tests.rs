@@ -216,32 +216,32 @@ async fn provider_executor_runs_a_tool_loop() {
 }
 
 #[tokio::test]
-async fn provider_executor_runs_dummy_agent_llm_without_credentials() {
+async fn provider_executor_runs_scripted_agent_without_credentials() {
     let rt = Runtime::new();
     let result = rt
         .run_oneshot(RunRequest {
             prompt: "summarize deterministic behavior".into(),
             cwd: PathBuf::from("/work"),
             agent: None,
-            provider: Some("dummy_agent_llm".into()),
+            provider: Some("scripted_agent".into()),
             model: None,
             ephemeral: true,
         })
         .await
         .unwrap();
 
-    assert_eq!(result.provider_id.as_deref(), Some("dummy_agent_llm"));
+    assert_eq!(result.provider_id.as_deref(), Some("scripted_agent"));
     assert_eq!(result.model_id.as_deref(), Some("basic"));
     let assistant_text = result.assistant_text.unwrap();
-    assert!(assistant_text.contains("dummy_agent_llm/basic"));
+    assert!(assistant_text.contains("scripted_agent/basic"));
     assert!(assistant_text.contains("summarize deterministic behavior"));
     assert!(result.accepted);
 }
 
 #[tokio::test]
-async fn provider_executor_runs_dummy_agent_llm_tool_read_loop() {
+async fn provider_executor_runs_scripted_agent_tool_read_loop() {
     let dir = tempdir().unwrap();
-    let tool_path = dir.path().join("dummy-tool-loop.txt");
+    let tool_path = dir.path().join("scenario-tool-loop.txt");
     std::fs::write(&tool_path, "alpha\nbeta\n").unwrap();
 
     let rt = Runtime::new();
@@ -250,7 +250,7 @@ async fn provider_executor_runs_dummy_agent_llm_tool_read_loop() {
             prompt: format!("please read {}", tool_path.display()),
             cwd: dir.path().to_path_buf(),
             agent: Some("review".into()),
-            provider: Some("dummy_agent_llm".into()),
+            provider: Some("scripted_agent".into()),
             model: Some("tool-read".into()),
             ephemeral: true,
         })
@@ -259,9 +259,9 @@ async fn provider_executor_runs_dummy_agent_llm_tool_read_loop() {
 
     assert_eq!(
         result.assistant_text.as_deref(),
-        Some("dummy_agent_llm/tool-read: tool result received.")
+        Some("scripted_agent/tool-read: tool result received.")
     );
-    assert_eq!(result.provider_id.as_deref(), Some("dummy_agent_llm"));
+    assert_eq!(result.provider_id.as_deref(), Some("scripted_agent"));
     assert_eq!(result.model_id.as_deref(), Some("tool-read"));
     assert!(result.tool_calls.is_empty());
 }
@@ -275,12 +275,12 @@ fn build_model_supports_jekko_provider() {
 }
 
 #[test]
-fn build_model_supports_dummy_agent_llm_provider() {
-    let model = build_model("dummy_agent_llm", "tool-read").unwrap();
-    assert_eq!(model.provider_id.as_str(), "dummy_agent_llm");
+fn build_model_supports_scripted_agent_provider() {
+    let model = build_model("scripted_agent", "tool-read").unwrap();
+    assert_eq!(model.provider_id.as_str(), "scripted_agent");
     assert_eq!(model.api.id, "tool-read");
-    assert_eq!(model.api.npm, "dummy_agent_llm");
-    assert_eq!(model.api.url, "dummy://local");
+    assert_eq!(model.api.npm, "scripted_agent");
+    assert_eq!(model.api.url, "scripted://local");
     assert_eq!(model.cost.input, 0.0);
     assert_eq!(model.cost.output, 0.0);
 }
@@ -292,8 +292,8 @@ fn provider_adapter_supports_jekko() {
 }
 
 #[test]
-fn provider_adapter_supports_dummy_agent_llm() {
-    let adapter = provider_adapter("dummy_agent_llm").unwrap();
+fn provider_adapter_supports_scripted_agent() {
+    let adapter = provider_adapter("scripted_agent").unwrap();
     let caps = adapter.capabilities();
     assert!(caps.streaming);
     assert!(caps.tool_streaming);

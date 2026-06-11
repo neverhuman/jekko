@@ -1,7 +1,7 @@
 # Jekko
 
 <!-- jankurai-badge:start -->
-[![Jankurai score: 95/100](agent/jankurai-badge.svg)](agent/baselines/main.repo-score.json)
+[![Jankurai score: 91/100](agent/jankurai-badge.svg)](agent/baselines/main.repo-score.json)
 <!-- jankurai-badge:end -->
 
 The open source AI coding agent, rebuilt in Rust. Jekko is a terminal-first
@@ -15,25 +15,31 @@ single static binary.
 
 ## Install
 
-Current Rust release target: `v0.1.1`. Once tagged, install via Cargo:
+Download a prebuilt binary from the public release page:
 
-```bash
-cargo install --git https://github.com/neverhuman/jekko --tag v0.1.1 jekko-cli
+```text
+https://github.com/neverhuman/jekko/releases
 ```
 
-Or via the Nix flake (provides `jekko` on `$PATH` and a dev shell):
+Or install the Rust binary directly from a tagged source release:
+
+```bash
+cargo install --git https://github.com/neverhuman/jekko --tag v2.0.6 jekko-cli
+```
+
+The Nix flake provides `jekko` on `$PATH` and a dev shell:
 
 ```bash
 nix profile install github:neverhuman/jekko
 ```
 
-Or build from source:
+To build and install from source:
 
 ```bash
-git clone https://github.com/neverhuman/jekko
+git clone https://github.com/neverhuman/jekko.git
 cd jekko
 cargo build -p jekko-cli --release --locked
-# Binary at target/release/jekko
+just install-binary
 ```
 
 The release binary is self-contained: rusqlite is bundled, no system SQLite
@@ -100,6 +106,25 @@ cargo run -p xtask -- ci-fast
 cargo run -p xtask -- package
 cargo run -p xtask -- guard-forbidden-runtime
 ```
+
+## Contributor Split Family
+
+Jekko users only need the portal repo above. Contributors who need the full
+split family can explicitly sync the supporting public repositories into a
+parent split root:
+
+```bash
+just split-sync
+scripts/split-sync.sh --remote github --root "$HOME/jekko-split"
+```
+
+For local forge work, use the same explicit script with the local remote mode:
+
+```bash
+scripts/split-sync.sh --remote jeryu --root "$HOME/jekko-split"
+```
+
+No split-family sync runs automatically during `git clone`.
 
 GitHub Actions runs the remote CI suite on the pull request itself, and
 protected branches or rulesets should require those checks to pass before

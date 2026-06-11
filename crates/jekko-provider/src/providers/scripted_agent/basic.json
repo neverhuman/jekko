@@ -2,21 +2,21 @@
   "id": "basic",
   "title": "Deterministic text response",
   "tags": ["text", "deterministic", "no-network"],
-  "provider": "dummy_agent_llm",
+  "provider": "scripted_agent",
   "model": "basic",
   "stages": [
     {
       "when": "initial",
       "frames": [
-        { "type": "stream-start", "model": "dummy_agent_llm/basic" },
+        { "type": "stream-start", "model": "scripted_agent/basic" },
         {
           "type": "text-delta",
-          "text": "dummy_agent_llm/basic: deterministic response for {{last_user_text}}"
+          "text": "scripted_agent/basic: deterministic response for {{last_user_text}}"
         },
         {
           "type": "metadata",
           "metadata": {
-            "provider": "dummy_agent_llm",
+            "provider": "scripted_agent",
             "scenario_id": "basic",
             "deterministic": true,
             "network": false

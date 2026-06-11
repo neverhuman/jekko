@@ -35,7 +35,7 @@ pub fn recommended_models() -> &'static BTreeMap<&'static str, &'static str> {
         m.insert("cloudflare", "cloudflare-gpt-oss-120b");
         m.insert("jekko", "big-pickle");
         m.insert("jnoccio", "jnoccio-router");
-        m.insert("dummy_agent_llm", "basic");
+        m.insert("scripted_agent", "basic");
         m
     })
 }
@@ -70,7 +70,7 @@ mod tests {
         assert_eq!(recommended_model_id("openai"), Some("gpt-5.3-codex"));
         assert_eq!(recommended_model_id("jekko"), Some("big-pickle"));
         assert_eq!(recommended_model_id("jnoccio"), Some("jnoccio-router"));
-        assert_eq!(recommended_model_id("dummy_agent_llm"), Some("basic"));
+        assert_eq!(recommended_model_id("scripted_agent"), Some("basic"));
         assert_eq!(recommended_model_id("nonexistent"), None);
     }
 

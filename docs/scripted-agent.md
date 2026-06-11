@@ -1,10 +1,10 @@
-# `dummy_agent_llm`
+# `scripted_agent`
 
-`dummy_agent_llm` is a local deterministic provider for agent workflow tests. It implements the normal provider streaming interface, but it never performs network I/O, never reads API keys, and reports zero token usage in its built-in scenarios.
+`scripted_agent` is a local deterministic provider for agent workflow tests. It implements the normal provider streaming interface, but it never performs network I/O, never reads API keys, and reports zero token usage in its built-in scenarios.
 
 ## Selecting it
 
-Use provider `dummy_agent_llm`. If no model is supplied, the runtime recommendation is `basic`.
+Use provider `scripted_agent`. If no model is supplied, the runtime recommendation is `basic`.
 
 Useful model/scenario ids:
 
@@ -16,7 +16,7 @@ The adapter also accepts an explicit scenario override through provider options 
 
 ```json
 {
-  "dummy_agent_llm": { "scenario_id": "tool-read" }
+  "scripted_agent": { "scenario_id": "tool-read" }
 }
 ```
 
@@ -24,7 +24,7 @@ For runtime/CLI tests where provider options are not exposed, choose the scenari
 
 ## Adding scenarios
 
-Scenarios live as strict JSON fixtures beside the adapter in `crates/jekko-provider/src/providers/dummy_agent_llm/`. Each fixture declares:
+Scenarios live as strict JSON fixtures beside the adapter in `crates/jekko-provider/src/providers/scripted_agent/`. Each fixture declares:
 
 - stable `id`, `title`, `tags`, `provider`, and `model` metadata;
 - ordered stages (`initial`, optionally `after-tool-result`);

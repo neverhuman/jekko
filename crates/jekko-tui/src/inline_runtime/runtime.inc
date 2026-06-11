@@ -844,7 +844,7 @@ async fn run_loop_async<B: ChatBackend>(
                                     composer.clear_all();
                                     match action {
                                         SlashAction::Run => {
-                                            let raw = slash_args(&raw_line_for_args, &cmd_id);
+                                            let raw = slash_args(&raw_line_for_args, cmd_id);
                                             let (background, cmd) = parse_run_args(&raw);
                                             if cmd.is_empty() {
                                                 let lines = render_system_notice(
@@ -901,7 +901,7 @@ async fn run_loop_async<B: ChatBackend>(
                                             }
                                         }
                                         SlashAction::Stop => {
-                                            let arg = slash_args(&raw_line_for_args, &cmd_id);
+                                            let arg = slash_args(&raw_line_for_args, cmd_id);
                                             if !arg.is_empty() {
                                                 match arg.parse::<JobId>() {
                                                     Ok(id) => {

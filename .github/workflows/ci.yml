@@ -24,6 +24,7 @@ jobs:
           set -euo pipefail
           if [[ -f ops/ci/pr-ci.sh ]]; then bash ops/ci/pr-ci.sh
           elif [[ -x ./ci-fast-push.sh ]]; then WORKERS=20 ./ci-fast-push.sh --no-push --ci
+          elif command -v just >/dev/null 2>&1 && { [[ -f justfile ]] || [[ -f Justfile ]]; } && just --summary 2>/dev/null | tr ' ' '\n' | grep -qx jekko-fast; then just jekko-fast
           elif [[ -f scripts/ci-local.sh ]]; then bash scripts/ci-local.sh
           elif command -v just >/dev/null 2>&1 && { [[ -f justfile ]] || [[ -f Justfile ]]; }; then just check
           elif [[ -f Cargo.toml ]]; then cargo nextest run --workspace --no-fail-fast || cargo test --workspace --no-fail-fast

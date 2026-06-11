@@ -61,6 +61,21 @@ fn hard_findings(json: &Value) -> i64 {
     {
         return nested;
     }
+    if let Some(findings) = json.get("findings").and_then(Value::as_array) {
+        return findings
+            .iter()
+            .filter(|finding| {
+                finding
+                    .get("hardness")
+                    .and_then(Value::as_str)
+                    .is_some_and(|hardness| hardness == "hard")
+                    || finding
+                        .get("severity")
+                        .and_then(Value::as_str)
+                        .is_some_and(|severity| severity == "high" || severity == "critical")
+            })
+            .count() as i64;
+    }
     0
 }
 
@@ -252,5 +267,20 @@ mod tests {
             }],
         };
         assert_eq!(count_waived(&json, &overrides), 0);
+    }
+
+    #[test]
+    fn counts_finding_fallbacks() {
+        let json: Value = serde_json::from_str(
+            r#"{
+                "findings":[
+                    {"severity":"medium","hardness":"soft"},
+                    {"severity":"low","hardness":"hard"},
+                    {"severity":"critical","hardness":"soft"}
+                ]
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(hard_findings(&json), 2);
     }
 }
