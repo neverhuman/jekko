@@ -22,8 +22,8 @@ if [[ "${1:-}" == "--check" ]]; then
     --json-out agent/jankurai-badge.json \
     --readme README.md \
     --link agent/baselines/main.repo-score.json \
-    --update-readme \
-    --check
+    --update-readme
+  git diff --exit-code -- README.md agent/jankurai-badge.svg agent/jankurai-badge.json
 fi
 
 jankurai audit . \
