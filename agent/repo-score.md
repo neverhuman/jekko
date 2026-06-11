@@ -7,9 +7,9 @@
 - Target stack ID: `rust-ts-vite-react-postgres-bounded-python`
 - Target stack: `Rust core + TypeScript/React/Vite + PostgreSQL + generated contracts + exception-only Python AI/data service`
 - Repo: `.`
-- Run ID: `1781138846`
-- Started at: `1781138846`
-- Elapsed: `7879` ms
+- Run ID: `1781139584`
+- Started at: `1781139584`
+- Elapsed: `7920` ms
 - Scope: `full`
 - Raw score: `91`
 - Final score: `91`
@@ -102,7 +102,7 @@
 | `ExactUnitSameName` | `Warning` | `rust` | 4 | 12 | `crates/xtask/src/pr_compliance.rs:69-73, crates/xtask/src/pr_standards.rs:137-141` | `same-name semantic unit copied across multiple files` |
 | `ExactUnitDifferentName` | `Warning` | `rust` | 3 | 4 | `crates/jekko-tui/src/transcript/syntax/renderer.rs:147-150, crates/jekko-tui/src/transcript/syntax/renderer.rs:166-169` | `same body appears under different names across files` |
 | `ExactUnitDifferentName` | `Warning` | `rust` | 1 | 7 | `crates/jekko-tui/src/osc52.rs:131-132, crates/jekko-tui/src/osc52.rs:141-142, crates/jekko-tui/src/osc52.rs:149-150` | `same body appears under different names across files` |
-| `ExactUnitDifferentName` | `Warning` | `rust` | 1 | 5 | `crates/xtask/src/commands/jankurai_gate.rs:257-258, crates/xtask/src/commands/jankurai_gate.rs:278-279, crates/xtask/src/commands/jankurai_gate.rs:298-299` | `same body appears under different names across files` |
+| `ExactUnitDifferentName` | `Warning` | `rust` | 1 | 5 | `crates/xtask/src/commands/jankurai_gate.rs:254-255, crates/xtask/src/commands/jankurai_gate.rs:275-276, crates/xtask/src/commands/jankurai_gate.rs:295-296` | `same body appears under different names across files` |
 | `ExactUnitDifferentName` | `Warning` | `rust` | 2 | 6 | `crates/qbank-builder/src/cli/discover.rs:224-226, crates/qbank-builder/src/full_text_import_detail_support.rs:161-163` | `same body appears under different names across files` |
 | `ExactUnitDifferentName` | `Warning` | `rust` | 1 | 3 | `crates/jekko-tui/src/layout/status_pack/tests.rs:61-62, crates/jekko-tui/src/layout/status_pack/tests.rs:119-120, crates/jekko-tui/src/layout/status_pack/tests.rs:130-131` | `same body appears under different names across files` |
 | `ExactUnitDifferentName` | `Warning` | `rust` | 2 | 5 | `crates/xtask/src/pr_compliance.rs:102-104, crates/xtask/src/pr_standards.rs:172-174` | `same body appears under different names across files` |

@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 source ops/ci/lib.sh
+export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:${PATH}"
 
 JANKURAI_VERSION="1.6.1"
 JANKURAI_REV="c7360a88b1e1869626df0450f1e28221047832db"
@@ -61,7 +62,7 @@ patch_jankurai_schema_root() {
   fi
 }
 
-if ! command -v jankurai >/dev/null 2>&1 || ! jankurai --version | grep -q "jankurai ${JANKURAI_VERSION}"; then
+if ! command -v jankurai >/dev/null 2>&1; then
   if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
     install_jankurai_asset
   elif [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
@@ -116,11 +117,6 @@ install_zizmor() {
   export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
 }
 
-if ! jankurai --version | grep -q "jankurai ${JANKURAI_VERSION}"; then
-  echo "expected jankurai ${JANKURAI_VERSION}, got: $(jankurai --version)" >&2
-  exit 1
-fi
-
 cargo run -p xtask --locked -- pr-workflow-contract
 
 artifact_root="${JANKURAI_ARTIFACT_ROOT}"
@@ -162,6 +158,7 @@ if ! cargo run -p xtask --locked -- security-lane --profile ci --out "${artifact
   exit 1
 fi
 jankurai audit . --mode advisory --json "${artifact_root}/repo-score.json" --md "${artifact_root}/repo-score.md" --sarif "${artifact_root}/jankurai.sarif" --github-step-summary "${artifact_root}/summary.md" --repair-queue-jsonl "${artifact_root}/repair-queue.jsonl"
+jq -e --arg version "${JANKURAI_VERSION}" '.auditor_version == $version' "${artifact_root}/repo-score.json" >/dev/null
 jankurai copy-code . --json "${artifact_root}/copy-code.json" --md "${artifact_root}/copy-code.md"
 cargo run -p xtask --locked -- jankurai-gate --score "${artifact_root}/repo-score.json"
 collect_changed_args() {

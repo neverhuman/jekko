@@ -1,17 +1,17 @@
 {
-  "report_fingerprint": "sha256:8d25aa06f4bb5126b0e7b4a613b8bdc64461e340da6d4adf0ca4251c0813ad9d",
-  "input_fingerprint": "sha256:b790e04dd3724dd5c94d86720d52539be9a966c19ddc1fa1144d300cd4cd97f8",
+  "report_fingerprint": "sha256:64f378601d636fa9fc33d60b85857b98b2b88e3bb086b2e369908160ef72d317",
+  "input_fingerprint": "sha256:59466f01fee3ee05b85eff9f4f594593de2a69f3fd81885f5a6792890eb85db1",
   "policy_fingerprint": "sha256:921271fabb96873d04ec35e26fff61574fd0bcea5139a162f50a65e37243dafc",
   "manifest_fingerprints": {
     "owner_map": "sha256:58bb93efb022846cf24c6b217c9012e30aae81052db62eac3ef42b3486872bd3",
     "test_map": "sha256:67f463af8807d0a54415fa1d1e849b34643e080eb039e372b69a949e5b569e6f",
-    "generated_zones": "sha256:26e316b98bfe7ed125fe8a95fe5e9f07f228eb0f4732b9b09d4bf8647280418b",
+    "generated_zones": "sha256:3a6523c0381b45f5d8db25b1f6889cb1de1a4f727f34a260f4607a8939f3db88",
     "boundaries": "sha256:a7d902610988c389275705c0c130f5879f9aeac7b83ac16291a81de46d861a41",
     "proof_lanes": "sha256:3300ad5c4520ddf97ea5b8a95c545516b7c100851dba3ba352519019962613e7",
     "standard_version": "sha256:b220562cf69ed856bd4dc47bdb560fa39172d5c4f9533a016dffdfc947496319"
   },
   "dirty_worktree": true,
-  "generated_at": "1781138846",
+  "generated_at": "1781139584",
   "schema_url": "schemas/repo-score.schema.json",
   "standard": "jankurai",
   "standard_version": "0.9.0",
@@ -25,9 +25,9 @@
   "conformance_decision": "pass",
   "conformance_blockers": [],
   "repo": ".",
-  "run_id": "1781138846",
-  "started_at": "1781138846",
-  "elapsed_ms": 7879,
+  "run_id": "1781139584",
+  "started_at": "1781139584",
+  "elapsed_ms": 7920,
   "scope": {
     "mode": "full",
     "paths": []
@@ -1202,7 +1202,7 @@
   "copy_code": {
     "schema_version": "1.1.0",
     "generated_by": "jankurai copy-code",
-    "generated_at": "2026-06-11T00:47:19.200143705+00:00",
+    "generated_at": "2026-06-11T00:59:37.321141021+00:00",
     "repo": ".",
     "auditor_version": "1.5.1",
     "status": "review",
@@ -2214,22 +2214,22 @@
           {
             "path": "crates/xtask/src/commands/jankurai_gate.rs",
             "language": "rust",
-            "start_line": 257,
-            "end_line": 258,
+            "start_line": 254,
+            "end_line": 255,
             "unit_name": "evidence_filter_narrows_match"
           },
           {
             "path": "crates/xtask/src/commands/jankurai_gate.rs",
             "language": "rust",
-            "start_line": 278,
-            "end_line": 279,
+            "start_line": 275,
+            "end_line": 276,
             "unit_name": "non_high_severities_are_ignored"
           },
           {
             "path": "crates/xtask/src/commands/jankurai_gate.rs",
             "language": "rust",
-            "start_line": 298,
-            "end_line": 299,
+            "start_line": 295,
+            "end_line": 296,
             "unit_name": "counts_strict_blockers_caps_and_finding_fallbacks"
           }
         ]

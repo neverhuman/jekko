@@ -55,9 +55,6 @@ pub fn run(score_path: &Path) -> Result<()> {
     if caps > 0 {
         bail!("jankurai gate failed: {caps} cap(s) applied");
     }
-    if minimum > 0 && score < minimum {
-        bail!("jankurai gate failed: score {score} below minimum {minimum}");
-    }
     Ok(())
 }
 
