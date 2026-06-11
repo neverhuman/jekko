@@ -11,7 +11,7 @@ fn spawn_jankurai_turn(
     cancel: CancellationToken,
 ) -> std::result::Result<tokio::sync::mpsc::Receiver<ChatEvent>, String> {
     let Some(jankurai) = which_in_path("jankurai") else {
-        return Err("jankurai not in PATH — install jankurai v1.5.1".to_string());
+        return Err("jankurai not in PATH — install jankurai v1.6.1".to_string());
     };
     let program = jankurai.display().to_string();
     let args = JANKURAI_AUDIT_ARGS

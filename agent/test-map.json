@@ -192,13 +192,9 @@
       "command": "just fast",
       "purpose": "verify tasklist proof route stays visible"
     },
-    "JANKURAI_TASKLIST.md.bak": {
-      "command": "just fast",
-      "purpose": "verify tasklist backup proof route stays visible"
-    },
-    "JANKURAI_TASKLIST.md.corrupted_backup": {
-      "command": "just fast",
-      "purpose": "verify tasklist backup proof route stays visible"
+    "jekko-split/": {
+      "command": "just split-family-check",
+      "purpose": "verify the Jekko split-family registry stays parseable, remote-safe, and onboarding-complete"
     },
     "Justfile": {
       "command": "just zyal-superreasoning-fast",
@@ -215,10 +211,6 @@
     "README": {
       "command": "just fast",
       "purpose": "verify README proof route stays visible"
-    },
-    "README-jankurai-scaffold.md": {
-      "command": "just doctor-fast",
-      "purpose": "verify scaffold marker does not hide missing control-plane files"
     },
     "README.": {
       "command": "just fast",
@@ -572,6 +564,10 @@
       "command": "just fast",
       "purpose": "verify script proof routes stay visible"
     },
+    "scripts/bootstrap-split-family.sh": {
+      "command": "bash -n scripts/bootstrap-split-family.sh && echo OK",
+      "purpose": "verify the split-family bootstrap generator parses before local forge use"
+    },
     "scripts/ci-doctor.sh": {
       "command": "just ci-doctor",
       "purpose": "verify local CI prereq checker stays visible"
@@ -579,6 +575,10 @@
     "scripts/ci-local.sh": {
       "command": "just ci-local",
       "purpose": "verify local CI lane shell wrapper stays visible"
+    },
+    "scripts/split-sync.sh": {
+      "command": "bash -n scripts/split-sync.sh && cargo run -p xtask --locked -- split-family-check",
+      "purpose": "verify the split-family contributor sync wrapper parses and stays aligned with the manifest"
     },
     "scripts/tui-battle-local.sh": {
       "command": "bash -n scripts/tui-battle-local.sh && echo OK",

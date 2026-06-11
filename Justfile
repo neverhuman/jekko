@@ -7,6 +7,7 @@ export PATH := home + "/.local/bin:" + home + "/.cargo/bin:" + env_var_or_defaul
 export TURBO_CACHE_DIR := ".turbo"
 memory_benchmark_seed := env_var_or_default("MEMORY_BENCHMARK_SEED", "public-dev-0001")
 jankurai_artifact_root := env_var_or_default("JANKURAI_ARTIFACT_ROOT", ".jankurai")
+split_sync_root := env_var_or_default("JEKKO_SPLIT_ROOT", home + "/jekko-split")
 
 # fast deterministic build/test targets, caches, and narrow proof lanes for agent iteration.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
@@ -23,26 +24,46 @@ hooks-install:
 	@echo "  ops/git-hooks/pre-push"
 	@echo "This target is informational; clone-local hook installation is manual."
 
-# Build release jekko, install to ~/.local/bin/jekko, and re-sign with adhoc
-# codesign. The re-sign is critical on macOS Sequoia — `cp` over an existing
-# Mach-O caches the previous signature hash and amfid kills the new binary on
-# launch (SIGKILL = exit 137). `codesign --force --sign -` refreshes the
-# cached hash so the new binary actually runs.
-install:
-	rtk cargo build -p jekko-cli --release
-	mkdir -p ~/.local/bin
-	cp target/release/jekko ~/.local/bin/jekko
-	codesign --force --sign - ~/.local/bin/jekko
-	# Also overwrite /opt/homebrew/bin/jekko if it exists + is writable. Brew
-	# prepends /opt/homebrew/bin to PATH, so an earlier binary there shadows
-	# ~/.local/bin/jekko and silently serves the previous build to the user.
-	if [ -w /opt/homebrew/bin ]; then \
-		cp target/release/jekko /opt/homebrew/bin/jekko && \
-		codesign --force --sign - /opt/homebrew/bin/jekko ; \
+# Build release jekko, install to ~/.local/bin/jekko, and verify the installed
+# binary is the one PATH resolves when ~/.local/bin is prepended.
+install: install-binary
+
+install-binary:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	rtk cargo build -p jekko-cli --release --locked
+	built="$PWD/target/release/jekko"
+	install_dir="${JEKKO_INSTALL_DIR:-$HOME/.local/bin}"
+	mkdir -p "$install_dir"
+	install_dir="$(cd "$install_dir" && pwd)"
+	tmp="$(mktemp "$install_dir/.jekko.XXXXXX")"
+	trap 'rm -f "$tmp"' EXIT
+	install -m 0755 "$built" "$tmp"
+	mv -f "$tmp" "$install_dir/jekko"
+	trap - EXIT
+	installed="$install_dir/jekko"
+	if [[ "$(uname -s)" == "Darwin" ]] && command -v codesign >/dev/null 2>&1; then
+		codesign --force --sign - "$installed"
 	fi
-	# Print which binary PATH actually resolves so we can spot shadowing fast.
-	jekko --version
-	@printf 'resolved: ' && command -v jekko
+	expected="$("$built" --version)"
+	actual="$("$installed" --version)"
+	if [[ "$actual" != "$expected" ]]; then
+		echo "installed binary version mismatch: expected '$expected', got '$actual'" >&2
+		exit 1
+	fi
+	if ! cmp -s "$built" "$installed"; then
+		echo "installed binary differs from target/release/jekko" >&2
+		exit 1
+	fi
+	resolved="$(PATH="$install_dir:$PATH" command -v jekko)"
+	if [[ "$resolved" != "$installed" ]]; then
+		echo "PATH resolution mismatch: expected $installed, got $resolved" >&2
+		exit 1
+	fi
+	"$resolved" --version
+	printf 'resolved: %s\n' "$resolved"
+
+binary-install-smoke: install-binary
 
 # one-command validation lane for agent iteration.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
@@ -69,6 +90,7 @@ workspace-fast:
 # `baseline-diff` (TUI screenshot lane); that lives in `tui-ci`.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=cargo-build narrow-targets=true
 xtask-parity-fast:
+	cargo run -p xtask --locked -- split-family-check
 	cargo run -p xtask --locked -- db-migration-smoke
 	cargo run -p xtask --locked -- cli-help-parity --strict
 	cargo run -p xtask --locked -- tool-schema-parity --strict
@@ -308,6 +330,20 @@ doctor-fast: doctor
 # Narrow composed lane for fast release-precheck iteration.
 # jankurai:proof HLT-018-PERF-CONCURRENCY-DRIFT parallel=1 cache=turbo-build narrow-targets=true
 check-fast: fast doctor-fast score-fast
+
+# Validate the split-family registry and onboarding metadata.
+split-family-check:
+	cargo run -p xtask --locked -- split-family-check
+
+# Clone or update supporting split-family repos for contributors.
+split-sync *args:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if [[ -z "{{args}}" ]]; then
+		bash scripts/split-sync.sh --remote github --root "{{split_sync_root}}"
+	else
+		bash scripts/split-sync.sh {{args}}
+	fi
 
 # PR-ready local confidence gate: fast validation, security evidence,
 # proof binding/marking, rendered TUI CI, and score-only audit.

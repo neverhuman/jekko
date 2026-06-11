@@ -6,7 +6,6 @@ Audit receipt:
 - Binary version: `0.8.12`
 - Report auditor version: `0.8.11`
 - Standard version: `0.8.0`
-- Schema: `1.6.0`
 - Repair-plan schema: `1.0.0`
 - Paper edition: `2026.05-ed8`
 - Target stack: `rust-ts-vite-react-postgres-bounded-python`

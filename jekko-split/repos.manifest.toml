@@ -1,0 +1,133 @@
+# Jekko split-family manifest.
+#
+# This file tracks the public portal repo plus the supporting split-family
+# repos. The split root is a directory of independent Git repositories, not a
+# Cargo workspace.
+
+schema_version = "1.2.0"
+family = "jekko-split"
+umbrella_repo = "jekko"
+import_branch_source = "import/source-20260610"
+import_branch_dirty = "import/dirty-20260610"
+onboarding_gates = ["remote-wired", "ci-skeleton", "jankurai-1.6.1", "audit-clean"]
+rollout_wave_order = [0, 1, 2, 3]
+
+[[repo]]
+path = "jekko"
+name = "jekko"
+slug = "jekko"
+role = "portal"
+profile = "rust-portal"
+branch = "main"
+rollout_wave = 0
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko.git", github = "https://github.com/neverhuman/jekko.git" }
+
+[[repo]]
+path = "jekko-core"
+name = "jekko-core"
+slug = "jekko-core"
+role = "core"
+profile = "rust-core"
+branch = "main"
+rollout_wave = 1
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-core.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-core.git", github = "https://github.com/neverhuman/jekko-core.git" }
+
+[[repo]]
+path = "jekko-mcp"
+name = "jekko-mcp"
+slug = "jekko-mcp"
+role = "mcp"
+profile = "rust-mcp"
+branch = "main"
+rollout_wave = 1
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-mcp.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-mcp.git", github = "https://github.com/neverhuman/jekko-mcp.git" }
+
+[[repo]]
+path = "jekko-deploy"
+name = "jekko-deploy"
+slug = "jekko-deploy"
+role = "deploy"
+profile = "ops"
+branch = "main"
+rollout_wave = 1
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-deploy.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-deploy.git", github = "https://github.com/neverhuman/jekko-deploy.git" }
+
+[[repo]]
+path = "jekko-jnoccio"
+name = "jekko-jnoccio"
+slug = "jekko-jnoccio"
+role = "router"
+profile = "rust-router"
+branch = "main"
+rollout_wave = 2
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-jnoccio.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-jnoccio.git", github = "https://github.com/neverhuman/jekko-jnoccio.git" }
+
+[[repo]]
+path = "jekko-jailgun"
+name = "jekko-jailgun"
+slug = "jekko-jailgun"
+role = "web"
+profile = "rust-web"
+branch = "main"
+rollout_wave = 2
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-jailgun.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-jailgun.git", github = "https://github.com/neverhuman/jekko-jailgun.git" }
+
+[[repo]]
+path = "jekko-zyal"
+name = "jekko-zyal"
+slug = "jekko-zyal"
+role = "domain"
+profile = "rust-domain"
+branch = "main"
+rollout_wave = 2
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-zyal.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-zyal.git", github = "https://github.com/neverhuman/jekko-zyal.git" }
+
+[[repo]]
+path = "jekko-search"
+name = "jekko-search"
+slug = "jekko-search"
+role = "shared"
+profile = "rust-shared"
+branch = "main"
+rollout_wave = 3
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-search.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-search.git", github = "https://github.com/neverhuman/jekko-search.git" }
+
+[[repo]]
+path = "jekko-memory"
+name = "jekko-memory"
+slug = "jekko-memory"
+role = "data"
+profile = "rust-data"
+branch = "main"
+rollout_wave = 3
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-memory.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-memory.git", github = "https://github.com/neverhuman/jekko-memory.git" }
+
+[[repo]]
+path = "jekko-agent"
+name = "jekko-agent"
+slug = "jekko-agent"
+role = "agent"
+profile = "rust-agent"
+branch = "main"
+rollout_wave = 3
+onboarded = true
+gates = { "remote-wired" = true, "ci-skeleton" = true, "jankurai-1.6.1" = true, "audit-clean" = true }
+remotes = { origin = "http://127.0.0.1:8787/git/jeryu/jekko-agent.git", jeryu = "http://127.0.0.1:8787/git/jeryu/jekko-agent.git", github = "https://github.com/neverhuman/jekko-agent.git" }

@@ -3,9 +3,9 @@
 
 schema_version = "1.0.0"
 installed_at = 1779966863
-jankurai_version = "1.5.1"
+jankurai_version = "1.6.1"
 standard_version = "0.9.0"
-auditor_version = "1.5.1"
+auditor_version = "1.6.1"
 schema_contract_version = "1.9.0"
 paper_edition = "2026.05-ed8"
 target_stack_id = "rust-ts-vite-react-postgres-bounded-python"
@@ -43,11 +43,6 @@ merge_policy = "merge-lines"
 path = ".gitignore"
 hash = "21c7d2f66dcdcccaaf369c1c6bcf72401f26e41d0ba25ef17f403ea093e10c88"
 merge_policy = "merge-lines"
-
-[[templates]]
-path = "README-jankurai-scaffold.md"
-hash = "a7e20757eec66bdd43ec6f3faa0eebf444dc66bfc91727d6f8ca0fde8356f3d7"
-merge_policy = "keep-existing"
 
 [[templates]]
 hash = "50ba4c89a0088f58624c0a67483b65a8be60a8ad1fd4b9dff2555623b9109da2"

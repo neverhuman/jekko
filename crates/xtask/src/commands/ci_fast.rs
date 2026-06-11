@@ -1,18 +1,19 @@
-//! `xtask ci-fast` — run fmt/clippy/test + all 7 parity gates in sequence,
-//! fail fast.
+//! `xtask ci-fast` — run fmt/clippy/test, the split-family registry check, and
+//! all parity gates in sequence, fail fast.
 //!
 //! Mirrors the local-CI hook flow documented in `docs/ci-local.md`:
 //!
 //! 1. `cargo fmt --all -- --check`
 //! 2. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-//! 3. `cargo test --workspace --locked --no-fail-fast`
-//! 4. `xtask db-migration-smoke`
-//! 5. `xtask cli-help-parity --strict`
-//! 6. `xtask tool-schema-parity --strict`
-//! 7. `xtask session-fixture-parity --strict`
-//! 8. `xtask openapi-check --strict`
-//! 9. `xtask httpapi-parity --strict`
-//! 10. `xtask baseline-diff --threshold 80`
+//! 3. `xtask split-family-check`
+//! 4. `cargo test --workspace --locked --no-fail-fast`
+//! 5. `xtask db-migration-smoke`
+//! 6. `xtask cli-help-parity --strict`
+//! 7. `xtask tool-schema-parity --strict`
+//! 8. `xtask session-fixture-parity --strict`
+//! 9. `xtask openapi-check --strict`
+//! 10. `xtask httpapi-parity --strict`
+//! 11. `xtask baseline-diff --threshold 80`
 //!
 //! Each step prints its start/end timestamps and total duration. The
 //! first non-zero exit short-circuits the rest of the pipeline.
@@ -49,6 +50,11 @@ const STEPS: &[Step] = &[
             "-D",
             "warnings",
         ],
+    },
+    Step {
+        label: "split-family-check",
+        program: "cargo",
+        args: &["run", "-p", "xtask", "--quiet", "--", "split-family-check"],
     },
     Step {
         label: "test",
@@ -212,6 +218,7 @@ mod tests {
             vec![
                 "fmt",
                 "clippy",
+                "split-family-check",
                 "test",
                 "db-migration-smoke",
                 "cli-help-parity",

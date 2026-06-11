@@ -42,14 +42,14 @@ check_cmd python3 "brew install python"
 check_cmd gitleaks "brew install gitleaks"
 check_cmd syft "brew install syft"
 check_cmd latexmk "brew install --cask mactex (or texlive on linux)"
-check_cmd jankurai "cargo install --git https://github.com/neverhuman/jankurai --tag v1.5.1 --locked jankurai"
+check_cmd jankurai "cargo install --git https://github.com/neverhuman/jankurai --rev c7360a88b1e1869626df0450f1e28221047832db --locked jankurai"
 
 if command -v jankurai >/dev/null 2>&1; then
   version="$(jankurai --version 2>&1 | head -1 || true)"
   case "$version" in
-    *"jankurai 1.5.1"*) ;;
+    *"jankurai 1.6.1"*) ;;
     *)
-      printf 'expected jankurai 1.5.1, got: %s\n' "${version:-unknown}" >&2
+      printf 'expected jankurai 1.6.1, got: %s\n' "${version:-unknown}" >&2
       exit 1
       ;;
   esac

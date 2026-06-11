@@ -115,6 +115,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = commands::security_lane::SecurityProfile::Local)]
         profile: commands::security_lane::SecurityProfile,
     },
+    SplitFamilyCheck,
     GitHook {
         hook: String,
     },
@@ -245,6 +246,7 @@ fn main() -> Result<()> {
             commands::proof_receipt::run(&lane, &status, &out)
         }
         Command::SecurityLane { out, profile } => commands::security_lane::run(&out, profile),
+        Command::SplitFamilyCheck => commands::split_family::run(&repo_root()?),
         Command::GitHook { hook } => commands::git_hook::run(&hook),
         Command::Release { command } => match command {
             ReleaseCommand::Package { target, dry_run } => {

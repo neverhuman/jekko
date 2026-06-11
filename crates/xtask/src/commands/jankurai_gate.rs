@@ -22,27 +22,38 @@ pub fn run(score_path: &Path) -> Result<()> {
         .get("minimum_score")
         .and_then(Value::as_i64)
         .unwrap_or(0);
+    let blockers = conformance_blockers(&json);
     let reported = hard_findings(&json);
+    let caps = caps_applied(&json);
 
-    // Walk the findings list and subtract entries that match an allow rule.
+    // Walk the findings list for visibility into stale allow rules. Strict
+    // gates still require the raw hard-finding count to be zero.
     let overrides_path = resolve_overrides_path(score_path);
     let overrides = load_overrides(&overrides_path)?;
     let waived = count_waived(&json, &overrides);
-    let effective = (reported - waived).max(0);
 
     if waived > 0 {
         println!(
             "jankurai-gate: score={score} minimum={minimum} \
-             hard_findings={reported} waived={waived} effective={effective} \
-             (overrides: {})",
+             blockers={blockers} hard_findings={reported} caps={caps} \
+             waived_configured={waived} (strict gate ignores waivers; overrides: {})",
             overrides_path.display()
         );
     } else {
-        println!("jankurai-gate: score={score} minimum={minimum} hard_findings={effective}");
+        println!(
+            "jankurai-gate: score={score} minimum={minimum} \
+             blockers={blockers} hard_findings={reported} caps={caps}"
+        );
     }
 
-    if effective > 0 {
-        bail!("jankurai gate failed: {effective} hard finding(s) (after {waived} waived)");
+    if blockers > 0 {
+        bail!("jankurai gate failed: {blockers} conformance blocker(s)");
+    }
+    if reported > 0 {
+        bail!("jankurai gate failed: {reported} hard finding(s)");
+    }
+    if caps > 0 {
+        bail!("jankurai gate failed: {caps} cap(s) applied");
     }
     if minimum > 0 && score < minimum {
         bail!("jankurai gate failed: score {score} below minimum {minimum}");
@@ -61,7 +72,36 @@ fn hard_findings(json: &Value) -> i64 {
     {
         return nested;
     }
+    if let Some(findings) = json.get("findings").and_then(Value::as_array) {
+        return findings
+            .iter()
+            .filter(|finding| {
+                finding
+                    .get("hardness")
+                    .and_then(Value::as_str)
+                    .is_some_and(|hardness| hardness == "hard")
+                    || finding
+                        .get("severity")
+                        .and_then(Value::as_str)
+                        .is_some_and(|severity| severity == "high" || severity == "critical")
+            })
+            .count() as i64;
+    }
     0
+}
+
+fn conformance_blockers(json: &Value) -> i64 {
+    json.get("conformance_blockers")
+        .and_then(Value::as_array)
+        .map(|blockers| blockers.len() as i64)
+        .unwrap_or(0)
+}
+
+fn caps_applied(json: &Value) -> i64 {
+    json.get("caps_applied")
+        .and_then(Value::as_array)
+        .map(|caps| caps.len() as i64)
+        .unwrap_or(0)
 }
 
 /// `agent/jankurai-gate-overrides.toml` relative to the repo root. We
@@ -252,5 +292,24 @@ mod tests {
             }],
         };
         assert_eq!(count_waived(&json, &overrides), 0);
+    }
+
+    #[test]
+    fn counts_strict_blockers_caps_and_finding_fallbacks() {
+        let json: Value = serde_json::from_str(
+            r#"{
+                "conformance_blockers":["HLT-001 on src/lib.rs"],
+                "caps_applied":["rust-bad-behavior"],
+                "findings":[
+                    {"severity":"medium","hardness":"soft"},
+                    {"severity":"low","hardness":"hard"},
+                    {"severity":"critical","hardness":"soft"}
+                ]
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(conformance_blockers(&json), 1);
+        assert_eq!(caps_applied(&json), 1);
+        assert_eq!(hard_findings(&json), 2);
     }
 }
