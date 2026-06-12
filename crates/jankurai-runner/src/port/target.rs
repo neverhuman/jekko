@@ -94,6 +94,38 @@ pub struct PortProofs {
     pub reasoning_benchmark: bool,
 }
 
+/// Operator-supplied executable parity oracle.
+///
+/// These commands come from the trusted run/mission config (not model output),
+/// so they are equivalent to a CI test command rather than model-driven exec.
+/// When both `reference_command` and `candidate_command` are set, the parity
+/// gate runs them for real via `CommandTargetAdapter` (reference vs candidate)
+/// instead of the deterministic fake adapter, so `parity_gate_passed` reflects
+/// actual execution. When unset, behavior is unchanged (fake adapter).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParityExec {
+    /// Shell command driving the reference system, run as `sh -c <command>`
+    /// with each case step piped to stdin and stdout compared to `expect`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_command: Option<String>,
+    /// Shell command driving the candidate (replacement) system.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub candidate_command: Option<String>,
+    /// Working directory for the reference command. Defaults to the run repo.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_cwd: Option<String>,
+    /// Working directory for the candidate command. Defaults to the run repo.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub candidate_cwd: Option<String>,
+}
+
+impl ParityExec {
+    /// The executable oracle is active only when both commands are present.
+    pub fn is_active(&self) -> bool {
+        self.reference_command.is_some() && self.candidate_command.is_some()
+    }
+}
+
 /// Runtime proof options shared by generic and advanced port runners.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PortRuntimeOptions {
@@ -109,6 +141,9 @@ pub struct PortRuntimeOptions {
     /// Model routing policy.
     #[serde(default)]
     pub model_policy: ModelPolicy,
+    /// Optional executable parity oracle (operator-supplied commands).
+    #[serde(default)]
+    pub parity_exec: ParityExec,
 }
 
 fn default_evidence_max_bytes() -> usize {

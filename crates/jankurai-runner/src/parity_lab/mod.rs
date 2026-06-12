@@ -134,6 +134,25 @@ mod tests {
     }
 
     #[test]
+    fn command_oracle_blocks_gate_when_candidate_disagrees() {
+        // Real reference/candidate switch: the reference echoes stdin so it
+        // matches the expected text; the candidate prints a fixed wrong value.
+        // The summary must be non-passing with gaps, so the orchestrator's
+        // `parity_gate_passed` would be false — i.e. the gate is now truthful
+        // rather than always-pass (the U2 fix).
+        let mut case = required_case("switch");
+        case.steps[0].send = "PONG".into();
+        case.steps[0].expect = "PONG".into();
+        let mut reference = CommandTargetAdapter::new("reference", "cat", ".");
+        let mut candidate = CommandTargetAdapter::new("candidate", "printf NOPE", ".");
+        let report =
+            run_target_switched_cases(&mut reference, &mut candidate, &[case.clone()]).unwrap();
+        let summary = summarize_report(&[case], report);
+        assert_ne!(summary.status, "passed");
+        assert!(!summary.gaps.is_empty());
+    }
+
+    #[test]
     fn writes_raw_and_summary_artifacts() {
         let dir = tempfile::tempdir().unwrap();
         let cases = vec![required_case("ping")];
