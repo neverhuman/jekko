@@ -13,7 +13,7 @@ job:
   objective: Drive a many-hour or many-day MiniRedis-class port from contract
     capture through parity, performance, hardening, release, and durable
     memory archive without scope sprawl.
-superworkflow:
+workflow:
   stage_count: 12
   target: redis
   replacement: candidate

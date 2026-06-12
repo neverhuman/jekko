@@ -492,10 +492,10 @@ pub fn read_current_best(
         }
     }
 
-    fallback_current_best(read_errors, baseline, exec)
+    default_current_best(read_errors, baseline, exec)
 }
 
-fn fallback_current_best(
+fn default_current_best(
     read_errors: Vec<ReadError>,
     baseline: Option<&Json>,
     exec: Option<&Json>,
@@ -778,7 +778,7 @@ fn snapshot_from_state_wrapper(path: &Path, value: &Json) -> Result<CandidateSna
 
 fn snapshot_from_score_json(
     source: &str,
-    fallback_name: &str,
+    default_name: &str,
     value: Option<&Json>,
 ) -> Option<CandidateSnapshot> {
     let json = value?;
@@ -787,7 +787,7 @@ fn snapshot_from_score_json(
     let name = json_string(obj, "name")
         .or_else(|| json_string(obj, "lane"))
         .or_else(|| json_string(obj, "id"))
-        .unwrap_or_else(|| fallback_name.to_string());
+        .unwrap_or_else(|| default_name.to_string());
     let total = json_number(obj, "total").unwrap_or(0.0);
     let ci95_low = json_number_in(obj, &["bootstrap_ci", "ci95_low"]).unwrap_or(total);
     let ci95_high = json_number_in(obj, &["bootstrap_ci", "ci95_high"]).unwrap_or(total);

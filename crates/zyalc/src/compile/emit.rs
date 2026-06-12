@@ -147,6 +147,11 @@ fn yaml_to_toml(value: serde_yaml::Value) -> Result<toml::Value> {
         Y::Mapping(m) => m,
         _ => return Err(anyhow!("declarative body must be a YAML mapping")),
     };
+    let map = match map.get(Y::String("sandbox".to_string())) {
+        Some(Y::Mapping(sandbox)) => sandbox.clone(),
+        Some(_) => return Err(anyhow!("sandbox must be a mapping")),
+        None => map,
+    };
     let mut tbl = toml::value::Table::new();
     for (k, v) in map {
         let key = match k.as_str() {

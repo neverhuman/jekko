@@ -232,7 +232,7 @@ impl DaemonRegistry {
                         target: "daemon",
                         daemon_id = %record.id,
                         error = %err,
-                        "failed to serialize daemon status; publishing typed fallback"
+                        "failed to serialize daemon status; publishing typed record"
                     );
                     serde_json::json!({
                         "id": record.id,
