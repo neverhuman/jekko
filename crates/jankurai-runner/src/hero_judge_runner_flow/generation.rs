@@ -10,6 +10,7 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::json;
 
+use crate::calibration::calibrate_blend;
 use crate::daemon_store;
 use crate::events::EventKind;
 use crate::hero_judge::{
@@ -115,6 +116,9 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
     // feed forward into prompts and block exact re-promotion.
     let mut negative_memory: Vec<NegativeApproach> = Vec::new();
     let mut rejected_shas: HashSet<String> = HashSet::new();
+    // Labeled samples for advisory weight calibration (U6): only populated when
+    // an objective oracle (U1) is configured.
+    let mut calibration_samples: Vec<(f64, f64, bool)> = Vec::new();
 
     for generation in 1..=input.generations {
         daemon_store::mark_daemon_run(
@@ -288,6 +292,17 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
                 }
             }
         }
+        // U6: record a labeled calibration sample (winner self-score, verifier
+        // score, oracle outcome) whenever an objective oracle graded this gen.
+        if let Some(verdict) = oracle {
+            if let Some(winner) = decision
+                .winner_candidate_id
+                .as_deref()
+                .and_then(|id| heroes.iter().find(|hero| hero.id == id))
+            {
+                calibration_samples.push((winner.score, verifier_score, verdict.passed));
+            }
+        }
         scoreboard.extend(scoreboard_for_generation(
             generation,
             &heroes,
@@ -379,6 +394,13 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
             &meta,
             &curated,
         ]));
+    }
+
+    // U6: emit advisory calibrated blend weights from this run's labeled
+    // samples. Advisory only — it does not mutate the live deterministic score.
+    if !calibration_samples.is_empty() {
+        let weights = calibrate_blend(&calibration_samples);
+        write_json_pretty(&input.output_dir.join("calibrated-weights.json"), &weights)?;
     }
 
     Ok(GenerationState {

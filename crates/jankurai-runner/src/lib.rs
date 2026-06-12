@@ -8,6 +8,7 @@
 //! daemon-side glue lands in PR4 by tailing `target/zyal/runner-events.jsonl`.
 
 pub mod bootstrap_check;
+pub mod calibration;
 pub mod classifier;
 pub mod command_floor;
 pub mod commit;
