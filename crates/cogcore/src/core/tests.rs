@@ -169,3 +169,27 @@ fn recall_touch_promotes_strength() {
         "strength must increase after repeated recalls (before={before}, after={after})"
     );
 }
+
+#[test]
+fn consolidation_due_respects_cadence() {
+    use super::consolidate::consolidation_due;
+    assert!(!consolidation_due(0, 0, 0)); // every == 0 disables the cadence
+    assert!(!consolidation_due(2, 0, 3)); // 2 events < 3
+    assert!(consolidation_due(3, 0, 3)); // 3 >= 3
+    assert!(consolidation_due(5, 1, 3)); // 4 new >= 3
+    assert!(!consolidation_due(5, 5, 1)); // no new events since last
+}
+
+#[test]
+fn consolidate_if_due_runs_on_cadence_then_resets() {
+    let mut c = Core::default();
+    // Nothing observed yet -> not due.
+    assert!(!c.consolidate_if_due(1));
+    c.observe(ev("e1", "subj", "fact one", "2026-01-01T00:00:00Z"));
+    c.observe(ev("e2", "subj", "fact two", "2026-01-02T00:00:00Z"));
+    assert!(c.wal_len() >= 1);
+    // Enough events have entered the WAL -> it consolidates.
+    assert!(c.consolidate_if_due(1));
+    // Cursor advanced; no new events -> not due again.
+    assert!(!c.consolidate_if_due(1));
+}

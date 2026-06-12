@@ -195,6 +195,9 @@ pub struct Core {
     pub(super) citation_quality_floor: f32,
     pub(super) wal: Wal,
     pub(super) consolidation_budget: Budget,
+    /// WAL length at the last consolidation, used by the automatic cadence
+    /// [`consolidate_if_due`](Core::consolidate_if_due) (U9). Runtime-only.
+    pub(super) last_consolidated_wal: usize,
 }
 
 impl Default for Core {
@@ -218,6 +221,7 @@ impl Default for Core {
             citation_quality_floor: DEFAULT_CITATION_QUALITY_FLOOR,
             wal: Wal::default(),
             consolidation_budget: Budget::ZERO,
+            last_consolidated_wal: 0,
         }
     }
 }
