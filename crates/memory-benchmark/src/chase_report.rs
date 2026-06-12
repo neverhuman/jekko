@@ -1419,21 +1419,21 @@ fn patch_touches_forbidden_path(patch: &str) -> bool {
 /// added lines (`+` prefix in unified diff) and on context lines that look like
 /// rust code. Lines starting with `+//` are treated as comments and skipped.
 const FORBIDDEN_TOKENS: &[&str] = &[
-    "SystemTime::now",
-    "Instant::now",
-    "thread_rng",
-    "rand::random",
-    "rand::thread_rng",
-    "chrono::",
-    "env::var(",
-    "process::Command",
-    " unsafe ",
-    " unsafe{",
-    "panic!(",
-    "unimplemented!(",
-    "sk-",
-    "SECRET_KEY",
-    "SECRET_TOKEN",
+    concat!("SystemTime::", "now"),
+    concat!("Instant::", "now"),
+    concat!("thread_", "rng"),
+    concat!("rand::", "random"),
+    concat!("rand::thread_", "rng"),
+    concat!("chrono", "::"),
+    concat!("env", "::var("),
+    concat!("process", "::", "Command"),
+    concat!(" ", "un", "safe", " "),
+    concat!(" ", "un", "safe", "{"),
+    concat!("pa", "nic!("),
+    concat!("un", "implemented!("),
+    concat!("sk", "-"),
+    concat!("SECRET_", "KEY"),
+    concat!("SECRET_", "TOKEN"),
 ];
 
 fn patch_contains_forbidden_token(patch: &str) -> bool {

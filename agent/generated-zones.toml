@@ -1,3 +1,8 @@
+# Generated zone manifest for Jekko control-plane outputs.
+# DO NOT EDIT BY HAND.
+# Source: scripts/bootstrap-split-family.sh
+# Regenerate: `bash scripts/bootstrap-split-family.sh`
+
 [[zone]]
 command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/sandbox-lanes.zyal --out agent/sandbox-lanes.toml"
 path = "agent/sandbox-lanes.toml"

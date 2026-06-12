@@ -1,5 +1,6 @@
 # zyal: declarative target=toml schema=jankurai/sandbox-lanes@1
 # zyalc: emits agent/sandbox-lanes.toml
+<<<ZYAL v1:daemon id=sandbox-lanes-template>>>
 schema_version: "1.0.0"
 sandbox_root: "~/.local/share/agent-sandboxes"
 lanes:
@@ -191,3 +192,4 @@ lanes:
       exit_code_expected: 0
       changed_files_max: 200
       required_patch_present: false
+<<<END_ZYAL id=sandbox-lanes-template>>>

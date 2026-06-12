@@ -9,6 +9,8 @@ multi-provider coding agent: a Ratatui TUI, an Axum HTTP/OpenAPI server, an
 embedded SQLite store, and a streaming provider runtime, all shipped as a
 single static binary.
 
+See [AGENTS.md](AGENTS.md) for the repository entrypoint and operating rules.
+
 <p align="center">
   <img src="docs/assets/jekko-tui-zyal-demo.gif" alt="Animated Jekko TUIwright demo" width="960">
 </p>

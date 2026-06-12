@@ -13,376 +13,376 @@ job:
   objective: Drive a many-hour or many-day MiniRedis-class port from contract
     capture through parity, performance, hardening, release, and durable
     memory archive without scope sprawl.
-  superworkflow:
-    stage_count: 12
+superworkflow:
+  stage_count: 12
+  target: redis
+  replacement: candidate
+  risk:
+    - agent swarm sprawl
+    - partial parity mistaken for completion
+    - lost context across long runs
+    - performance regressions masked by functionality wins
+    - unreviewed sandbox artifacts leaking into primary checkout
+  strategy: macro_plan_then_parallel_phases_then_fusion_hardening
+  controller:
+    mode: supervisor_dag
+    max_parallel_phases: 3
+    max_parallel_tasks_per_phase: 16
+    require_phase_signoff: true
+    retry_until_exit_gates_pass: true
+    park_unresolved_tasks_with_summary: true
+    prevent_scope_sprawl: true
+  memory:
+    run_wal: target/zyal/superworkflow/run.wal.jsonl
+    phase_summaries: target/zyal/superworkflow/phases/*.summary.md
+    knowledge_store: target/zyal/superworkflow/memory.sqlite
+    negative_memory: true
+    inject_at_phase_start:
+      - invariants
+      - open_gaps
+      - recent_failures
+      - repo_graph_hotspots
+    compact_every_tasks: 8
+  sandbox:
+    mode: persistent_project_sandbox
+    workspace_root: .zyal/sandboxes/{run_id}
+    isolation: git_worktree
+    preserve_between_phases: true
+    export_patch_per_task: true
+    destroy_unmerged_worktrees_after_archive: true
+  repo_graph:
+    backend: sqlite
+    path: target/zyal/superworkflow/repo-graph.sqlite
+    indexes:
+      - symbols
+      - calls
+      - imports
+      - tests
+      - fixtures
+      - public_api
+      - performance_hotspots
+    refresh_on:
+      - phase_start
+      - merge
+      - test_failure_cluster
+  parity:
+    enabled: true
     target: redis
     replacement: candidate
-    risk:
-      - agent swarm sprawl
-      - partial parity mistaken for completion
-      - lost context across long runs
-      - performance regressions masked by functionality wins
-      - unreviewed sandbox artifacts leaking into primary checkout
-    strategy: macro_plan_then_parallel_phases_then_fusion_hardening
-    controller:
-      mode: supervisor_dag
-      max_parallel_phases: 3
-      max_parallel_tasks_per_phase: 16
-      require_phase_signoff: true
-      retry_until_exit_gates_pass: true
-      park_unresolved_tasks_with_summary: true
-      prevent_scope_sprawl: true
-    memory:
-      run_wal: target/zyal/superworkflow/run.wal.jsonl
-      phase_summaries: target/zyal/superworkflow/phases/*.summary.md
-      knowledge_store: target/zyal/superworkflow/memory.sqlite
-      negative_memory: true
-      inject_at_phase_start:
-        - invariants
-        - open_gaps
-        - recent_failures
-        - repo_graph_hotspots
-      compact_every_tasks: 8
-    sandbox:
-      mode: persistent_project_sandbox
-      workspace_root: .zyal/sandboxes/{run_id}
-      isolation: git_worktree
-      preserve_between_phases: true
-      export_patch_per_task: true
-      destroy_unmerged_worktrees_after_archive: true
-    repo_graph:
-      backend: sqlite
-      path: target/zyal/superworkflow/repo-graph.sqlite
-      indexes:
-        - symbols
-        - calls
-        - imports
-        - tests
-        - fixtures
-        - public_api
-        - performance_hotspots
-      refresh_on:
-        - phase_start
-        - merge
-        - test_failure_cluster
-    parity:
-      enabled: true
-      target: redis
-      replacement: candidate
-      reference_adapter: target/zyal/parity/reference-adapter
-      candidate_adapter: target/zyal/parity/candidate-adapter
-      evidence_jsonl: target/zyal/parity/evidence.jsonl
-      tmp_mode: ramdisk_or_memory
-      cluster_failures: true
-      promote_fixed_gap_to_regression: true
-    phases:
-      - id: source_of_truth
-        name: Source of truth
-        objective: Build the non-negotiable behavior, API, compatibility, and
-          evidence ledger for the target (redis) so every later phase can prove
-          against it.
-        depends_on: []
-        parallel_group: planning
-        agents:
-          reference_mapper: 4
-          critic: 2
-          memory_curator: 1
-        exit:
-          required_artifacts:
-            - target/zyal/superworkflow/source-of-truth.md
-            - target/zyal/superworkflow/invariants.json
-            - target/zyal/superworkflow/acceptance-matrix.json
-          gates:
-            - kind: artifact_exists
-              path: target/zyal/superworkflow/invariants.json
-            - kind: review_quorum
-              reviewers: [critic, reference_mapper]
-              min_approvals: 2
-          signoff:
-            - supervisor
-            - critic
+    reference_adapter: target/zyal/parity/reference-adapter
+    candidate_adapter: target/zyal/parity/candidate-adapter
+    evidence_jsonl: target/zyal/parity/evidence.jsonl
+    tmp_mode: ramdisk_or_memory
+    cluster_failures: true
+    promote_fixed_gap_to_regression: true
+  phases:
+    - id: source_of_truth
+      name: Source of truth
+      objective: Build the non-negotiable behavior, API, compatibility, and
+        evidence ledger for the target (redis) so every later phase can prove
+        against it.
+      depends_on: []
+      parallel_group: planning
+      agents:
+        reference_mapper: 4
+        critic: 2
+        memory_curator: 1
+      exit:
+        required_artifacts:
+          - target/zyal/superworkflow/source-of-truth.md
+          - target/zyal/superworkflow/invariants.json
+          - target/zyal/superworkflow/acceptance-matrix.json
+        gates:
+          - kind: artifact_exists
+            path: target/zyal/superworkflow/invariants.json
+          - kind: review_quorum
+            reviewers: [critic, reference_mapper]
+            min_approvals: 2
+        signoff:
+          - supervisor
+          - critic
 
-      - id: architecture_blueprint
-        name: Architecture blueprint
-        objective: Convert requirements into module boundaries, invariants, risk
-          register, and implementation slices for the candidate.
-        depends_on:
-          - source_of_truth
-        parallel_group: planning
-        agents:
-          architect: 3
-          critic: 2
-          memory_curator: 1
-        exit:
-          required_artifacts:
-            - target/zyal/superworkflow/architecture.md
-            - target/zyal/superworkflow/risk-register.json
-          gates:
-            - kind: artifact_exists
-              path: target/zyal/superworkflow/architecture.md
-            - kind: review_quorum
-              reviewers: [architect, critic]
-              min_approvals: 2
-          signoff:
-            - supervisor
-            - architect
+    - id: architecture_blueprint
+      name: Architecture blueprint
+      objective: Convert requirements into module boundaries, invariants, risk
+        register, and implementation slices for the candidate.
+      depends_on:
+        - source_of_truth
+      parallel_group: planning
+      agents:
+        architect: 3
+        critic: 2
+        memory_curator: 1
+      exit:
+        required_artifacts:
+          - target/zyal/superworkflow/architecture.md
+          - target/zyal/superworkflow/risk-register.json
+        gates:
+          - kind: artifact_exists
+            path: target/zyal/superworkflow/architecture.md
+          - kind: review_quorum
+            reviewers: [architect, critic]
+            min_approvals: 2
+        signoff:
+          - supervisor
+          - architect
 
-      - id: repo_graph_bootstrap
-        name: Repo graph bootstrap
-        objective: Index functions, symbols, tests, call edges, dataflow hints,
-          ownership, and blast radius so later phases edit with full context.
-        depends_on:
-          - source_of_truth
-        parallel_group: planning
-        agents:
-          graph_indexer: 2
-          architect: 1
-          critic: 1
-        exit:
-          required_artifacts:
-            - target/zyal/superworkflow/repo-graph.sqlite
-            - target/zyal/superworkflow/graph-stats.json
-          gates:
-            - kind: repo_graph_min_symbols
-              gte: 50
-            - kind: artifact_exists
-              path: target/zyal/superworkflow/repo-graph.sqlite
-          signoff:
-            - supervisor
-            - graph_indexer
+    - id: repo_graph_bootstrap
+      name: Repo graph bootstrap
+      objective: Index functions, symbols, tests, call edges, dataflow hints,
+        ownership, and blast radius so later phases edit with full context.
+      depends_on:
+        - source_of_truth
+      parallel_group: planning
+      agents:
+        graph_indexer: 2
+        architect: 1
+        critic: 1
+      exit:
+        required_artifacts:
+          - target/zyal/superworkflow/repo-graph.sqlite
+          - target/zyal/superworkflow/graph-stats.json
+        gates:
+          - kind: repo_graph_min_symbols
+            gte: 50
+          - kind: artifact_exists
+            path: target/zyal/superworkflow/repo-graph.sqlite
+        signoff:
+          - supervisor
+          - graph_indexer
 
-      - id: contracts_and_slices
-        name: Contracts and slices
-        objective: Produce task contracts, proof commands, fixture strategy, and
-          independent slices that can be claimed in parallel.
-        depends_on:
-          - architecture_blueprint
-          - repo_graph_bootstrap
-        parallel_group: planning
-        agents:
-          planner: 2
-          reference_mapper: 3
-          memory_curator: 1
-        exit:
-          required_artifacts:
-            - target/zyal/superworkflow/task-bank.jsonl
-            - target/zyal/superworkflow/contracts.json
-          gates:
-            - kind: task_bank_min_items
-              gte: 50
-            - kind: task_bank_has_tests
-              gte: 0.7
-          signoff:
-            - supervisor
-            - planner
+    - id: contracts_and_slices
+      name: Contracts and slices
+      objective: Produce task contracts, proof commands, fixture strategy, and
+        independent slices that can be claimed in parallel.
+      depends_on:
+        - architecture_blueprint
+        - repo_graph_bootstrap
+      parallel_group: planning
+      agents:
+        planner: 2
+        reference_mapper: 3
+        memory_curator: 1
+      exit:
+        required_artifacts:
+          - target/zyal/superworkflow/task-bank.jsonl
+          - target/zyal/superworkflow/contracts.json
+        gates:
+          - kind: task_bank_min_items
+            gte: 50
+          - kind: task_bank_has_tests
+            gte: 0.7
+        signoff:
+          - supervisor
+          - planner
 
-      - id: parallel_subsystems
-        name: Parallel subsystems
-        objective: Implement independent verified slices in isolated worktrees
-          with critic lanes, against the canonical contracts.
-        depends_on:
-          - contracts_and_slices
-        parallel_group: implementation
-        agents:
-          implementer: 12
-          reviewer: 4
-          tester: 4
-          critic: 2
-        exit:
-          required_artifacts:
-            - target/zyal/superworkflow/subsystem-receipts.jsonl
-          gates:
-            - kind: shell
-              command: cargo test --workspace
-              timeout: 45m
-            - kind: task_completion_floor
-              gte: 0.65
-          signoff:
-            - supervisor
-            - reviewer
-            - tester
+    - id: parallel_subsystems
+      name: Parallel subsystems
+      objective: Implement independent verified slices in isolated worktrees
+        with critic lanes, against the canonical contracts.
+      depends_on:
+        - contracts_and_slices
+      parallel_group: implementation
+      agents:
+        implementer: 12
+        reviewer: 4
+        tester: 4
+        critic: 2
+      exit:
+        required_artifacts:
+          - target/zyal/superworkflow/subsystem-receipts.jsonl
+        gates:
+          - kind: shell
+            command: cargo test --workspace
+            timeout: 45m
+          - kind: task_completion_floor
+            gte: 0.65
+        signoff:
+          - supervisor
+          - reviewer
+          - tester
 
-      - id: integration_fusion
-        name: Integration fusion
-        objective: Fuse verified subsystem work, resolve interface drift, and
-          run integration proof lanes on the integration branch.
-        depends_on:
-          - parallel_subsystems
-        parallel_group: implementation
-        agents:
-          implementer: 6
-          reviewer: 2
-          tester: 2
-        exit:
-          required_artifacts:
-            - target/zyal/superworkflow/integration-report.md
-            - target/zyal/superworkflow/integration-receipt.json
-          gates:
-            - kind: shell
-              command: cargo test --workspace --features integration
-              timeout: 45m
-            - kind: no_unmerged_high_value_worktrees
-          signoff:
-            - supervisor
-            - reviewer
+    - id: integration_fusion
+      name: Integration fusion
+      objective: Fuse verified subsystem work, resolve interface drift, and
+        run integration proof lanes on the integration branch.
+      depends_on:
+        - parallel_subsystems
+      parallel_group: implementation
+      agents:
+        implementer: 6
+        reviewer: 2
+        tester: 2
+      exit:
+        required_artifacts:
+          - target/zyal/superworkflow/integration-report.md
+          - target/zyal/superworkflow/integration-receipt.json
+        gates:
+          - kind: shell
+            command: cargo test --workspace --features integration
+            timeout: 45m
+          - kind: no_unmerged_high_value_worktrees
+        signoff:
+          - supervisor
+          - reviewer
 
-      - id: parity_lab
-        name: Parity lab
-        objective: Create differential, golden, metamorphic, and fuzz parity
-          harnesses comparing the candidate against the redis target.
-        depends_on:
-          - source_of_truth
-          - contracts_and_slices
-        parallel_group: testing
-        agents:
-          tester: 5
-          parity_judge: 3
-          performance_lead: 1
-        exit:
-          required_artifacts:
-            - target/zyal/parity/corpus-manifest.json
-            - target/zyal/parity/evidence.jsonl
-            - target/zyal/parity/report.md
-          gates:
-            - kind: parity_case_floor
-              gte: 500
-            - kind: reference_target_diff_harness
-              must_exist: true
-          signoff:
-            - supervisor
-            - parity_judge
+    - id: parity_lab
+      name: Parity lab
+      objective: Create differential, golden, metamorphic, and fuzz parity
+        harnesses comparing the candidate against the redis target.
+      depends_on:
+        - source_of_truth
+        - contracts_and_slices
+      parallel_group: testing
+      agents:
+        tester: 5
+        parity_judge: 3
+        performance_lead: 1
+      exit:
+        required_artifacts:
+          - target/zyal/parity/corpus-manifest.json
+          - target/zyal/parity/evidence.jsonl
+          - target/zyal/parity/report.md
+        gates:
+          - kind: parity_case_floor
+            gte: 500
+          - kind: reference_target_diff_harness
+            must_exist: true
+        signoff:
+          - supervisor
+          - parity_judge
 
-      - id: parity_gap_closure
-        name: Parity gap closure
-        objective: Close blocking parity gaps using the gap ledger and regression
-          proofs so the candidate matches the target on the acceptance matrix.
-        depends_on:
-          - integration_fusion
-          - parity_lab
-        parallel_group: hardening
-        agents:
-          implementer: 10
-          tester: 5
-          parity_judge: 3
-          memory_curator: 1
-        exit:
-          required_artifacts:
-            - target/zyal/parity/gap-ledger.json
-            - target/zyal/parity/closure-report.md
-          gates:
-            - kind: parity_pass_rate
-              gte: 0.98
-            - kind: unexplained_gap_count
-              lte: 0
-          signoff:
-            - supervisor
-            - parity_judge
-            - tester
+    - id: parity_gap_closure
+      name: Parity gap closure
+      objective: Close blocking parity gaps using the gap ledger and regression
+        proofs so the candidate matches the target on the acceptance matrix.
+      depends_on:
+        - integration_fusion
+        - parity_lab
+      parallel_group: hardening
+      agents:
+        implementer: 10
+        tester: 5
+        parity_judge: 3
+        memory_curator: 1
+      exit:
+        required_artifacts:
+          - target/zyal/parity/gap-ledger.json
+          - target/zyal/parity/closure-report.md
+        gates:
+          - kind: parity_pass_rate
+            gte: 0.98
+          - kind: unexplained_gap_count
+            lte: 0
+        signoff:
+          - supervisor
+          - parity_judge
+          - tester
 
-      - id: performance_closure
-        name: Performance closure
-        objective: Benchmark redis (reference) versus the candidate and close
-          hot-path gaps without weakening parity.
-        depends_on:
-          - parity_gap_closure
-        parallel_group: hardening
-        agents:
-          performance_lead: 3
-          implementer: 6
-          tester: 2
-          critic: 1
-        exit:
-          required_artifacts:
-            - target/zyal/perf/baseline.json
-            - target/zyal/perf/report.md
-          gates:
-            - kind: perf_regression_ceiling
-              metric: p95_latency_ratio
-              lte: 1.2
-            - kind: parity_pass_rate
-              gte: 0.98
-          signoff:
-            - supervisor
-            - performance_lead
-            - parity_judge
+    - id: performance_closure
+      name: Performance closure
+      objective: Benchmark redis (reference) versus the candidate and close
+        hot-path gaps without weakening parity.
+      depends_on:
+        - parity_gap_closure
+      parallel_group: hardening
+      agents:
+        performance_lead: 3
+        implementer: 6
+        tester: 2
+        critic: 1
+      exit:
+        required_artifacts:
+          - target/zyal/perf/baseline.json
+          - target/zyal/perf/report.md
+        gates:
+          - kind: perf_regression_ceiling
+            metric: p95_latency_ratio
+            lte: 1.2
+          - kind: parity_pass_rate
+            gte: 0.98
+        signoff:
+          - supervisor
+          - performance_lead
+          - parity_judge
 
-      - id: hardening_security
-        name: Hardening and security
-        objective: Run fuzzing, stress, recovery, race, security, and
-          fault-injection proof lanes against the candidate.
-        depends_on:
-          - parity_gap_closure
-        parallel_group: hardening
-        agents:
-          security_reviewer: 2
-          tester: 4
-          critic: 2
-        exit:
-          required_artifacts:
-            - target/zyal/security/review.md
-            - target/zyal/reliability/failure-injection.json
-          gates:
-            - kind: no_critical_security_findings
-            - kind: shell
-              command: cargo test --workspace --features stress
-              timeout: 60m
-          signoff:
-            - supervisor
-            - security_reviewer
+    - id: hardening_security
+      name: Hardening and security
+      objective: Run fuzzing, stress, recovery, race, security, and
+        fault-injection proof lanes against the candidate.
+      depends_on:
+        - parity_gap_closure
+      parallel_group: hardening
+      agents:
+        security_reviewer: 2
+        tester: 4
+        critic: 2
+      exit:
+        required_artifacts:
+          - target/zyal/security/review.md
+          - target/zyal/reliability/failure-injection.json
+        gates:
+          - kind: no_critical_security_findings
+          - kind: shell
+            command: cargo test --workspace --features stress
+            timeout: 60m
+        signoff:
+          - supervisor
+          - security_reviewer
 
-      - id: docs_release_ops
-        name: Docs, release, and operations
-        objective: Produce docs, CI gates, migration notes, release checklist,
-          and operational runbooks for shipping the candidate.
-        depends_on:
-          - performance_closure
-          - hardening_security
-        parallel_group: release
-        agents:
-          writer: 2
-          release_captain: 1
-          critic: 1
-        exit:
-          required_artifacts:
-            - target/zyal/docs/release-notes.md
-            - target/zyal/docs/migration.md
-            - target/zyal/docs/operations.md
-          gates:
-            - kind: docs_cover_acceptance_matrix
-              gte: 0.9
-            - kind: artifact_exists
-              path: target/zyal/docs/release-notes.md
-          signoff:
-            - supervisor
-            - writer
+    - id: docs_release_ops
+      name: Docs, release, and operations
+      objective: Produce docs, CI gates, migration notes, release checklist,
+        and operational runbooks for shipping the candidate.
+      depends_on:
+        - performance_closure
+        - hardening_security
+      parallel_group: release
+      agents:
+        writer: 2
+        release_captain: 1
+        critic: 1
+      exit:
+        required_artifacts:
+          - target/zyal/docs/release-notes.md
+          - target/zyal/docs/migration.md
+          - target/zyal/docs/operations.md
+        gates:
+          - kind: docs_cover_acceptance_matrix
+            gte: 0.9
+          - kind: artifact_exists
+            path: target/zyal/docs/release-notes.md
+        signoff:
+          - supervisor
+          - writer
 
-      - id: final_signoff
-        name: Final signoff
-        objective: Aggregate receipts, rerun full proofs, ensure clean tree, and
-          require final human approval before promotion.
-        depends_on:
-          - docs_release_ops
-        parallel_group: release
-        agents:
-          release_captain: 2
-          tester: 4
-          memory_curator: 2
-          critic: 2
-        exit:
-          required_artifacts:
-            - target/zyal/release/final-proof.json
-            - target/zyal/release/memory-archive.jsonl
-            - target/zyal/release/known-gaps.md
-          gates:
-            - kind: shell
-              command: cargo test --workspace
-              timeout: 60m
-            - kind: final_parity_report_approved
-            - kind: memory_archive_written
-          signoff:
-            - supervisor
-            - release_captain
-            - critic
+    - id: final_signoff
+      name: Final signoff
+      objective: Aggregate receipts, rerun full proofs, ensure clean tree, and
+        require final human approval before promotion.
+      depends_on:
+        - docs_release_ops
+      parallel_group: release
+      agents:
+        release_captain: 2
+        tester: 4
+        memory_curator: 2
+        critic: 2
+      exit:
+        required_artifacts:
+          - target/zyal/release/final-proof.json
+          - target/zyal/release/memory-archive.jsonl
+          - target/zyal/release/known-gaps.md
+        gates:
+          - kind: shell
+            command: cargo test --workspace
+            timeout: 60m
+          - kind: final_parity_report_approved
+          - kind: memory_archive_written
+        signoff:
+          - supervisor
+          - release_captain
+          - critic
 
 stop:
   all:

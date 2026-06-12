@@ -417,6 +417,23 @@ EOF
 EOF
 
   cat > agent/generated-zones.toml <<EOF
+# Generated zone manifest for Jekko control-plane outputs.
+# DO NOT EDIT BY HAND.
+# Source: scripts/bootstrap-split-family.sh
+# Regenerate: \`bash scripts/bootstrap-split-family.sh\`
+
+[[zone]]
+command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/sandbox-lanes.zyal --out agent/sandbox-lanes.toml"
+path = "agent/sandbox-lanes.toml"
+read_only = true
+source = "zyalc"
+
+[[zone]]
+command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/ambitious-superworkflow.zyal --out agent/superworkflows/ambitious-superworkflow.superworkflow.json"
+path = "agent/superworkflows/ambitious-superworkflow.superworkflow.json"
+read_only = true
+source = "zyalc"
+
 [[zone]]
 command = "bash ops/ci/jankurai.sh"
 path = "agent/repo-score.json"
