@@ -50,9 +50,9 @@ pub(super) fn validate_superworkflow_profile(source: &Path, raw: &str) -> Result
 /// * `version`, `intent`, `confirm`, and `id` must be present with the
 ///   canonical SuperWorkflow literals.
 /// * `job` must be a mapping; `job.name` and `job.objective` are required.
-/// * `superworkflow` must be a mapping either at the root or nested under
-///   `job` for detector-compatible daemon envelopes.
-/// * `superworkflow.phases` must be a sequence of 9-12 mappings.
+/// * `workflow` (or legacy `superworkflow`) must be a mapping either at the
+///   root or nested under `job` for detector-compatible daemon envelopes.
+/// * `workflow.phases` must be a sequence of 9-12 mappings.
 /// * Each phase must have a unique non-empty `id`, an `objective`, and an
 ///   `exit` block with non-empty `required_artifacts` and `gates`.
 /// * No phase may declare itself as a dependency, and every dependency must
@@ -74,9 +74,17 @@ pub(super) fn validate_superworkflow_value(source: &Path, value: &serde_yaml::Va
     require_present(job, "name")?;
     require_present(job, "objective")?;
 
-    let sw = match lookup(root, "superworkflow") {
-        Some(_) => require_map(root, "superworkflow")?,
-        None => require_map(job, "superworkflow")?,
+    let sw = match (
+        lookup(root, "workflow"),
+        lookup(root, "superworkflow"),
+        lookup(job, "workflow"),
+        lookup(job, "superworkflow"),
+    ) {
+        (Some(_), _, _, _) => require_map(root, "workflow")?,
+        (None, Some(_), _, _) => require_map(root, "superworkflow")?,
+        (None, None, Some(_), _) => require_map(job, "workflow")?,
+        (None, None, None, Some(_)) => require_map(job, "superworkflow")?,
+        _ => return Err(anyhow!("missing required key `workflow`")),
     };
     let phases = require_seq(sw, "phases")?;
     if !(9..=12).contains(&phases.len()) {

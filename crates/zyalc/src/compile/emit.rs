@@ -63,6 +63,10 @@ fn normalize_superworkflow_shape(mut value: serde_json::Value) -> serde_json::Va
     if root.contains_key("superworkflow") {
         return value;
     }
+    if let Some(workflow) = root.remove("workflow") {
+        root.insert("superworkflow".to_string(), workflow);
+        return value;
+    }
     let superworkflow = {
         let Some(job) = root
             .get_mut("job")
@@ -70,7 +74,8 @@ fn normalize_superworkflow_shape(mut value: serde_json::Value) -> serde_json::Va
         else {
             return value;
         };
-        job.remove("superworkflow")
+        job.remove("workflow")
+            .or_else(|| job.remove("superworkflow"))
     };
     if let Some(superworkflow) = superworkflow {
         root.insert("superworkflow".to_string(), superworkflow);

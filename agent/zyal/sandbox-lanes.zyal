@@ -193,3 +193,4 @@ lanes:
       changed_files_max: 200
       required_patch_present: false
 <<<END_ZYAL id=sandbox-lanes-template>>>
+ZYAL_ARM RUN_FOREVER id=sandbox-lanes-template

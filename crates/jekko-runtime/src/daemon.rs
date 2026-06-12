@@ -225,12 +225,27 @@ impl DaemonRegistry {
 
     async fn publish_status(&self, record: &DaemonRecord) {
         if let Some(bus) = &self.bus {
-            let _ = bus
-                .publish(
-                    "daemon.status",
-                    serde_json::to_value(record).unwrap_or_else(|_| serde_json::json!({})),
-                )
-                .await;
+            let payload = match serde_json::to_value(record) {
+                Ok(value) => value,
+                Err(err) => {
+                    tracing::warn!(
+                        target: "daemon",
+                        daemon_id = %record.id,
+                        error = %err,
+                        "failed to serialize daemon status; publishing typed fallback"
+                    );
+                    serde_json::json!({
+                        "id": record.id,
+                        "session_id": record.session_id,
+                        "name": record.name,
+                        "status": record.status,
+                        "time_created": record.time_created,
+                        "time_updated": record.time_updated,
+                        "metadata": record.metadata,
+                    })
+                }
+            };
+            let _ = bus.publish("daemon.status", payload).await;
         }
     }
 }
