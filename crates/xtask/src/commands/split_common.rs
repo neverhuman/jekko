@@ -30,6 +30,7 @@ const EXPECTED_PORTAL_FILES: &[&str] = &[
     "ops/ci/jankurai.sh",
     "scripts/split-sync.sh",
 ];
+const TRANSIENT_STATUS_PREFIXES: &[&str] = &["?? apps/", "?? artifacts/", "?? node_modules/"];
 const EXPECTED_SUPPORTING_FILES: &[&str] = &[
     "AGENTS.md",
     "Cargo.toml",
@@ -100,7 +101,7 @@ pub(crate) fn validate_local_checkouts(split_root: &Path, manifest: &SplitManife
             repo.remotes.github.as_str(),
         )?;
         ensure_remote_main_ref(repo.remotes.jeryu.as_str())?;
-        ensure_git_eq(&repo_path, &["status", "--short"], "")?;
+        ensure_clean_checkout(&repo_path)?;
         for rel in expected_local_files(repo) {
             let path = repo_path.join(rel);
             if !path.exists() {
@@ -291,4 +292,59 @@ fn ensure_git_eq(repo_path: &Path, args: &[&str], expected: &str) -> Result<()> 
     let actual = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     ensure_eq(&format!("git {:?}", args), actual.as_str(), expected)?;
     Ok(())
+}
+
+fn ensure_clean_checkout(repo_path: &Path) -> Result<()> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_path)
+        .args(["status", "--short"])
+        .output()
+        .with_context(|| format!("run git status --short in {}", repo_path.display()))?;
+    if !output.status.success() {
+        bail!(
+            "git status --short failed in {}: {}",
+            repo_path.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+
+    let actual = String::from_utf8_lossy(&output.stdout);
+    let unexpected: Vec<&str> = actual
+        .lines()
+        .map(str::trim_end)
+        .filter(|line| {
+            !line.is_empty()
+                && !TRANSIENT_STATUS_PREFIXES
+                    .iter()
+                    .any(|prefix| line.starts_with(prefix))
+        })
+        .collect();
+    if !unexpected.is_empty() {
+        bail!(
+            "git [\"status\", \"--short\"] mismatch: expected clean checkout, found {}",
+            unexpected.join("\\n")
+        );
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clean_checkout_filter_keeps_real_dirty_entries() {
+        let unexpected: Vec<&str> = "?? apps/\n?? artifacts/\n?? node_modules/\n M Cargo.toml\n"
+            .lines()
+            .map(str::trim_end)
+            .filter(|line| {
+                !line.is_empty()
+                    && !TRANSIENT_STATUS_PREFIXES
+                        .iter()
+                        .any(|prefix| line.starts_with(prefix))
+            })
+            .collect();
+        assert_eq!(unexpected, vec![" M Cargo.toml"]);
+    }
 }

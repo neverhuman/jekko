@@ -45,6 +45,8 @@ logs/
 .jekko-loop-runs/
 *.bun-build
 tsconfig.tsbuildinfo
+artifacts/
+apps/dashboard/
 
 # Claude Code runtime state
 .claude/scheduled_tasks.lock
