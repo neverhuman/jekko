@@ -116,6 +116,13 @@ enum Command {
         profile: commands::security_lane::SecurityProfile,
     },
     SplitFamilyCheck,
+    SplitOwnershipCheck {
+        #[arg(
+            long,
+            help = "Fail if any owned crate has not yet landed in its child repo"
+        )]
+        require_landed: bool,
+    },
     GitHook {
         hook: String,
     },
@@ -247,6 +254,9 @@ fn main() -> Result<()> {
         }
         Command::SecurityLane { out, profile } => commands::security_lane::run(&out, profile),
         Command::SplitFamilyCheck => commands::split_family::run(&repo_root()?),
+        Command::SplitOwnershipCheck { require_landed } => {
+            commands::split_ownership::run(&repo_root()?, require_landed)
+        }
         Command::GitHook { hook } => commands::git_hook::run(&hook),
         Command::Release { command } => match command {
             ReleaseCommand::Package { target, dry_run } => {

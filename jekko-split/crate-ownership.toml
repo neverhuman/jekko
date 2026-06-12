@@ -1,0 +1,144 @@
+# Jekko split-family crate ownership.
+#
+# Authoritative, machine-checkable map of which umbrella crate lands in which
+# split-family child repo. Consumed by `xtask split-family-check` (ownership +
+# build-green gates) and the `xtask split-export` / `split-bump` movers.
+#
+# Field semantics:
+#   owns[].crate         Cargo package name (matches [package].name).
+#   owns[].src           current path in the umbrella workspace.
+#   owns[].dest          path inside the child checkout after the move.
+#   owns[].planned       true => crate does not exist in the umbrella yet
+#                        (it will be created by a refactor before its wave);
+#                        existence checks skip it until landed.
+#   owns[].extracted_from documents the source of a `planned` extraction.
+#   exports              crates this repo publishes for siblings to git-dep.
+#   git_deps             owner-repos this repo depends on across the boundary
+#                        (reverse edges drive `split-bump` lockstep tag fan-out).
+#
+# Universe invariant (validator): the set of owned non-planned `crate` values
+# equals the umbrella workspace member set (minus doc-only placeholders
+# adapters/application/domain/workers) plus {agent-search, cogcore}, with no
+# crate owned by two repos.
+
+schema_version = "1.0.0"
+family = "jekko-split"
+umbrella_repo = "jekko"
+
+# --- wave 0: portal (lands last; aggregates every child) ----------------------
+[[repo]]
+name = "jekko"
+role = "portal"
+wave = 0
+owns = [
+  { crate = "jekko-cli",              src = "crates/jekko-cli",              dest = "crates/jekko-cli" },
+  { crate = "jekko-tui",              src = "crates/jekko-tui",              dest = "crates/jekko-tui" },
+  { crate = "tuiwright-jekko-unlock", src = "crates/tuiwright-jekko-unlock", dest = "crates/tuiwright-jekko-unlock" },
+  { crate = "xtask",                  src = "crates/xtask",                  dest = "crates/xtask" },
+  { crate = "mini-fleet-smoke",       src = "mini-fleet-smoke",              dest = "mini-fleet-smoke" },
+]
+exports = []
+git_deps = ["jekko-core", "jekko-mcp", "jekko-jnoccio", "jekko-jailgun", "jekko-zyal", "jekko-agent"]
+
+# --- wave 1: core kernels + mcp + deploy --------------------------------------
+[[repo]]
+name = "jekko-core"
+role = "core"
+wave = 1
+owns = [
+  { crate = "jekko-core",       src = "crates/jekko-core",       dest = "crates/jekko-core" },
+  { crate = "jekko-store",      src = "crates/jekko-store",      dest = "crates/jekko-store" },
+  { crate = "jekko-plugin-api", src = "crates/jekko-plugin-api", dest = "crates/jekko-plugin-api" },
+]
+exports = ["jekko-core", "jekko-store", "jekko-plugin-api"]
+git_deps = []
+
+[[repo]]
+name = "jekko-mcp"
+role = "mcp"
+wave = 1
+owns = [
+  { crate = "jekko-provider", src = "crates/jekko-provider", dest = "crates/jekko-provider" },
+  { crate = "jekko-mcp",      src = "crates/jekko-mcp",      dest = "crates/jekko-mcp", planned = true, extracted_from = "crates/jekko-runtime/src/mcp.rs" },
+]
+exports = ["jekko-provider", "jekko-mcp"]
+git_deps = ["jekko-core"]
+
+[[repo]]
+name = "jekko-deploy"
+role = "deploy"
+wave = 1
+owns = [
+  { crate = "sandboxctl", src = "crates/sandboxctl", dest = "crates/sandboxctl" },
+  { crate = "jankurai",   src = "crates/jankurai",   dest = "crates/jankurai" },
+]
+exports = ["sandboxctl", "jankurai"]
+git_deps = []
+
+# --- wave 2: router + web + domain --------------------------------------------
+[[repo]]
+name = "jekko-jnoccio"
+role = "router"
+wave = 2
+owns = [
+  { crate = "jekko-jnoccio-boot", src = "crates/jekko-jnoccio-boot", dest = "crates/jekko-jnoccio-boot" },
+]
+exports = ["jekko-jnoccio-boot"]
+git_deps = []
+
+[[repo]]
+name = "jekko-jailgun"
+role = "web"
+wave = 2
+owns = [
+  { crate = "jekko-runtime", src = "crates/jekko-runtime", dest = "crates/jekko-runtime" },
+  { crate = "jekko-server",  src = "crates/jekko-server",  dest = "crates/jekko-server" },
+]
+exports = ["jekko-runtime", "jekko-server"]
+git_deps = ["jekko-core", "jekko-mcp", "jekko-jnoccio", "jekko-zyal"]
+
+[[repo]]
+name = "jekko-zyal"
+role = "domain"
+wave = 2
+owns = [
+  { crate = "zyal-core",       src = "crates/zyal-core",       dest = "crates/zyal-core" },
+  { crate = "zyal-key-pool",   src = "crates/zyal-key-pool",   dest = "crates/zyal-key-pool" },
+  { crate = "zyalc",           src = "crates/zyalc",           dest = "crates/zyalc" },
+  { crate = "zyal-supervisor", src = "crates/zyal-supervisor", dest = "crates/zyal-supervisor" },
+]
+exports = ["zyal-core", "zyalc", "zyal-supervisor"]
+git_deps = []
+
+# --- wave 3: shared + data + agent --------------------------------------------
+[[repo]]
+name = "jekko-search"
+role = "shared"
+wave = 3
+owns = [
+  { crate = "agent-search",  src = "crates/agent-search",  dest = "crates/agent-search" },
+  { crate = "qbank-builder", src = "crates/qbank-builder", dest = "crates/qbank-builder" },
+]
+exports = ["agent-search"]
+git_deps = []
+
+[[repo]]
+name = "jekko-memory"
+role = "data"
+wave = 3
+owns = [
+  { crate = "cogcore",          src = "crates/cogcore",          dest = "crates/cogcore" },
+  { crate = "memory_benchmark", src = "crates/memory-benchmark", dest = "crates/memory-benchmark" },
+]
+exports = ["cogcore"]
+git_deps = []
+
+[[repo]]
+name = "jekko-agent"
+role = "agent"
+wave = 3
+owns = [
+  { crate = "jankurai-runner", src = "crates/jankurai-runner", dest = "crates/jankurai-runner" },
+]
+exports = ["jankurai-runner"]
+git_deps = ["jekko-search", "jekko-core", "jekko-zyal"]
