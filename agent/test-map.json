@@ -272,9 +272,21 @@
       "command": "jankurai audit . --json .jankurai/repo-score.json --md .jankurai/repo-score.md --no-score-history",
       "purpose": "verify README badge SVG stays generated from the score lane"
     },
-    "agent/sandbox-lanes.toml": {
+    "generated/": {
+      "command": "just sandbox-validate && just zyalc-compile-check",
+      "purpose": "verify generated control-plane outputs stay parseable and in sync"
+    },
+    "generated/AGENTS.md": {
+      "command": "just score",
+      "purpose": "verify generated-cell routing and docs stay visible"
+    },
+    "generated/sandbox-lanes.toml": {
       "command": "just sandbox-validate",
       "purpose": "verify sandbox-lane TOML schema parses and every lane validates"
+    },
+    "generated/superworkflows/ambitious-superworkflow.superworkflow.json": {
+      "command": "just zyalc-compile-check",
+      "purpose": "verify the generated superworkflow JSON stays in sync with the ZYAL source"
     },
     "agent/workflows/": {
       "command": "just zyalc-compile-check",

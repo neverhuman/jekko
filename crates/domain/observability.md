@@ -2,36 +2,26 @@
 
 This file defines a typed, local-first repair surface for domain failures.
 
-## Exception surface
-
-```yaml
-repair_ticket:
-  domain: observability
-  code: OBS-001
-  boundary: repair
-  retryable: true
-  purpose: typed agent-friendly exception surface
-  reason: opaque failures slow local debugging and reruns
-  common_fixes:
-    - rerun `just score`
-    - inspect `docs/testing.md`
-    - keep the repair scoped to `crates/domain`
-  docs_url: docs/testing.md
-  repair_hint: rerun `just score` after the scoped domain change
-  timestamp_utc: 2026-05-07T10:42:25Z
-```
-
-## Trace contract
+## Repair receipt
 
 ```json
 {
-  "task_id": "JK-0086",
-  "lane": "observability",
+  "rule_id": "OBS-001",
+  "docs_url": "docs/testing.md#observability-and-repair-receipts",
+  "repair_hint": "rerun `just score` after the scoped domain change",
+  "rerun_command": "just score",
+  "artifact_paths": [
+    "target/jankurai/repo-score.json",
+    "target/jankurai/repo-score.md",
+    "target/jankurai/repair-queue.jsonl",
+    "target/jankurai/score-history.jsonl",
+    "target/jankurai/jankurai.sarif",
+    "target/jankurai/summary.md"
+  ],
   "result_code": "pass",
-  "proof_command": "just score",
+  "purpose": "typed agent-friendly exception surface",
+  "reason": "opaque failures slow local debugging and reruns",
   "evidence_path": "crates/domain/observability.md",
-  "purpose": "keep reruns local",
-  "reason": "provide a typed repair hint for the next agent",
-  "repair_hint": "rerun just score after the scoped domain change"
+  "timestamp_utc": "2026-05-07T10:42:25Z"
 }
 ```

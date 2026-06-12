@@ -94,7 +94,7 @@ pub struct Expected {
 
 /// The 100 fixtures. Populated by `fixture_data::FIXTURES`.
 pub fn all() -> &'static [Fixture] {
-    crate::fixture::data::FIXTURES
+    crate::fixture::data::FIXTURES.as_slice()
 }
 
 // Submodule holding the actual 100-entry static array.

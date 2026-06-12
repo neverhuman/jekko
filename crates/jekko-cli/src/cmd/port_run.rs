@@ -32,7 +32,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::Args;
-use zyal_supervisor::{validate_manifest, PhaseStatus, SuperWorkflow, SupervisorStore};
+use zyal_supervisor::{validate_manifest, SuperWorkflow, SupervisorStore};
 
 use crate::cli::GlobalOpts;
 
@@ -199,66 +199,14 @@ fn init_or_use_run_id(
 
 fn run_resume(args: &PortRunArgs, run_id: &str) -> Result<()> {
     let store = open_store(args, false)?;
-    let conn = store.connection();
-    let manifest_json: String = conn
-        .query_row(
-            "SELECT manifest_json FROM zyal_super_runs WHERE run_id = ?1",
-            [run_id],
-            |row| row.get::<_, String>(0),
-        )
-        .with_context(|| format!("look up run `{run_id}`"))?;
-    let manifest: SuperWorkflow = serde_json::from_str(&manifest_json)
-        .with_context(|| format!("decode persisted manifest for run `{run_id}`"))?;
+    let manifest = store
+        .manifest_for_run(run_id)
+        .with_context(|| format!("look up run `{run_id}`"))?
+        .ok_or_else(|| anyhow!("run `{run_id}` not found"))?;
 
-    // Demote in-flight phases so they re-enter the ready set on the next pass.
-    let now = chrono_now_rfc3339();
-    conn.execute(
-        "UPDATE zyal_super_phases \
-         SET status = ?1, updated_at = ?2 \
-         WHERE run_id = ?3 AND status = ?4",
-        rusqlite::params![
-            PhaseStatus::Pending.as_str(),
-            now,
-            run_id,
-            PhaseStatus::Running.as_str(),
-        ],
-    )
-    .context("reset Running phases to Pending on resume")?;
+    store
+        .reset_running_phases(run_id)
+        .context("reset Running phases to Pending on resume")?;
 
     walk_waves(&store, &manifest, run_id, args)
-}
-
-/// Walk the manifest's execution layers serially. Within each layer, mark
-/// every phase `Running` then either:
-///
-/// - **stub mode** (default): immediately `Complete` with a synthetic
-///   summary. Useful for exercising the schema + dependency walk.
-/// - **live mode** (`args.live == true`): drive a single
-///   `jekko run --ephemeral --json --agent plan` subprocess for the phase
-///   and store its stdout as the phase summary.
-///
-/// `args.max_stages` caps the total number of phases that may complete in
-/// this invocation; anything past the cap is recorded `Blocked` with the
-/// summary `"stopped at max_stages"`. `args.time_budget_hours` enforces a
-/// wall-clock ceiling: when the elapsed time exceeds the budget the
-/// remaining phases are recorded `Blocked` with the summary
-/// `"stopped at time_budget"`. A `Failed` phase halts advancement; the
-/// Local RFC3339 timestamp without pulling chrono into this crate's public
-/// surface — uses the supervisor's chrono via a tiny local helper so we
-/// keep dep churn out of `jekko-cli`. The supervisor already re-exports
-/// nothing public; we just rely on the supervisor's chrono dep being in
-/// the tree and use a freestanding format string.
-fn chrono_now_rfc3339() -> String {
-    // SystemTime -> seconds since epoch -> rough RFC3339-ish UTC string.
-    // We intentionally avoid a chrono dep on jekko-cli; the value here is
-    // only used as the `updated_at` for the demotion sweep on resume and
-    // is replaced by every subsequent `record_phase_status` write.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    // 1970-01-01T00:00:00+00:00 baseline; this is a best-effort label, not
-    // a parsed timestamp.
-    format!("epoch:{secs}")
 }

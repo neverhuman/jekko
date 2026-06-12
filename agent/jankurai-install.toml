@@ -209,6 +209,11 @@ hash = "4577181f3423f6ca05f1a893a6447a5fa08a7127f5669ef00b5978862d08e61e"
 merge_policy = "merge-marker"
 
 [[templates]]
+path = "generated/AGENTS.md"
+hash = "1508703842ffcfd90959d5a49a09ae9d58223103abd1949796b94a2ffb9ab623"
+merge_policy = "merge-marker"
+
+[[templates]]
 path = "crates/workers/AGENTS.md"
 hash = "c00a036b6b3f2cfa635d01bea235e3d552aba9bdb186bd238ac57dcd330d717d"
 merge_policy = "merge-marker"

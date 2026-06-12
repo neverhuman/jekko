@@ -336,7 +336,9 @@ auditor (`jankurai`) writes structured repair receipts under
 ```json
 {
   "rule_id": "HLT-017-OPAQUE-OBSERVABILITY",
-  "doc_url": "agent/JANKURAI_STANDARD.md",
+  "docs_url": "docs/testing.md#observability-and-repair-receipts",
+  "repair_hint": "rerun `just score` after the scoped change, then inspect `target/jankurai/repo-score.json`",
+  "rerun_command": "just score",
   "structured_errors": {
     "pattern": "thiserror per-crate enums with typed variants and constructors",
     "result_alias": "<Crate>Result<T> = Result<T, <Crate>Error>",
@@ -372,6 +374,17 @@ auditor (`jankurai`) writes structured repair receipts under
     "score_history": "target/jankurai/score-history.jsonl",
     "sarif": "target/jankurai/jankurai.sarif",
     "summary": "target/jankurai/summary.md",
+    "artifact_paths": [
+      "target/jankurai/repo-score.json",
+      "target/jankurai/repo-score.md",
+      "target/jankurai/repair-queue.jsonl",
+      "target/jankurai/score-history.jsonl",
+      "target/jankurai/jankurai.sarif",
+      "target/jankurai/summary.md"
+    ],
+    "docs_url": "docs/testing.md#observability-and-repair-receipts",
+    "repair_hint": "rerun `just score` after the scoped change, then inspect `target/jankurai/repo-score.json`",
+    "rerun_command": "just score",
     "finding_fields": [
       "rule_id",
       "rerun_command",
@@ -435,6 +448,7 @@ an agent to act without re-running discovery:
 - `evidence` — the structured evidence the rule collected.
 - `rerun_command` — the exact command that re-evaluates the rule.
 - `docs_url` — the standard section that documents the rule.
+- `repair_hint` — the short local action the next agent should take.
 - `fingerprint` — sha256 of the finding, stable across runs while the
   finding is unresolved (use it to dedupe across history).
 

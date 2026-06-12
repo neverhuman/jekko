@@ -1,0 +1,391 @@
+{
+  "_generated": {
+    "by": "zyalc",
+    "do_not_edit_by_hand": true,
+    "regenerate": "cargo run -p zyalc -- compile <source.zyal>",
+    "schema": "zyal/superworkflow@1"
+  },
+  "confirm": "RUN_FOREVER",
+  "id": "ambitious-superworkflow-template",
+  "intent": "daemon",
+  "job": {
+    "name": "Ambitious challenge superworkflow template (MiniRedis port)",
+    "objective": "Drive a many-hour or many-day MiniRedis-class port from contract capture through parity, performance, hardening, release, and durable memory archive without scope sprawl."
+  },
+  "stop": {
+    "all": [
+      {
+        "shell": {
+          "command": "git status --short"
+        }
+      }
+    ]
+  },
+  "superworkflow": {
+    "id": "ambitious-superworkflow-template",
+    "name": "Ambitious challenge superworkflow template (MiniRedis port)",
+    "objective": "Drive a many-hour or many-day MiniRedis-class port from contract capture through parity, performance, hardening, release, and durable memory archive without scope sprawl.",
+    "phases": [
+      {
+        "depends_on": [
+          "source_of_truth"
+        ],
+        "gates": [],
+        "id": "architecture_blueprint",
+        "name": "architecture blueprint",
+        "objective": "architecture_blueprint",
+        "signoff": "none",
+        "write_scope": "scratch_only"
+      },
+      {
+        "depends_on": [
+          "repo_graph_bootstrap"
+        ],
+        "gates": [],
+        "id": "contracts_and_slices",
+        "name": "contracts and slices",
+        "objective": "contracts_and_slices",
+        "signoff": "none",
+        "write_scope": "scratch_only"
+      },
+      {
+        "depends_on": [
+          "hardening_security"
+        ],
+        "gates": [],
+        "id": "docs_release_ops",
+        "name": "docs release ops",
+        "objective": "docs_release_ops",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "docs_release_ops"
+        ],
+        "gates": [],
+        "id": "final_signoff",
+        "name": "final signoff",
+        "objective": "final_signoff",
+        "signoff": "single",
+        "write_scope": "primary_repo"
+      },
+      {
+        "depends_on": [
+          "performance_closure"
+        ],
+        "gates": [],
+        "id": "hardening_security",
+        "name": "hardening security",
+        "objective": "hardening_security",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "parallel_subsystems"
+        ],
+        "gates": [],
+        "id": "integration_fusion",
+        "name": "integration fusion",
+        "objective": "integration_fusion",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "contracts_and_slices"
+        ],
+        "gates": [],
+        "id": "parallel_subsystems",
+        "name": "parallel subsystems",
+        "objective": "parallel_subsystems",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "parity_lab"
+        ],
+        "gates": [],
+        "id": "parity_gap_closure",
+        "name": "parity gap closure",
+        "objective": "parity_gap_closure",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "integration_fusion"
+        ],
+        "gates": [],
+        "id": "parity_lab",
+        "name": "parity lab",
+        "objective": "parity_lab",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "parity_gap_closure"
+        ],
+        "gates": [],
+        "id": "performance_closure",
+        "name": "performance closure",
+        "objective": "performance_closure",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "architecture_blueprint"
+        ],
+        "gates": [],
+        "id": "repo_graph_bootstrap",
+        "name": "repo graph bootstrap",
+        "objective": "repo_graph_bootstrap",
+        "signoff": "none",
+        "write_scope": "scratch_only"
+      },
+      {
+        "depends_on": [],
+        "gates": [],
+        "id": "source_of_truth",
+        "name": "source of truth",
+        "objective": "source_of_truth",
+        "signoff": "none",
+        "write_scope": "scratch_only"
+      }
+    ]
+  },
+  "version": "v1",
+  "workflow": {
+    "initial": "source_of_truth",
+    "max_total_time": "168h",
+    "on_stuck": "incubate",
+    "states": {
+      "architecture_blueprint": {
+        "agent": "architect",
+        "produces": [
+          "target/zyal/superworkflow/architecture.md",
+          "target/zyal/superworkflow/risk-register.json"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/invariants.json"
+        ],
+        "transitions": [
+          {
+            "to": "repo_graph_bootstrap",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/architecture.md"
+            }
+          }
+        ],
+        "writes": "scratch_only"
+      },
+      "contracts_and_slices": {
+        "agent": "planner",
+        "produces": [
+          "target/zyal/superworkflow/task-bank.jsonl",
+          "target/zyal/superworkflow/contracts.json"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/architecture.md",
+          "target/zyal/superworkflow/repo-graph.sqlite"
+        ],
+        "transitions": [
+          {
+            "to": "parallel_subsystems",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/contracts.json"
+            }
+          }
+        ],
+        "writes": "scratch_only"
+      },
+      "docs_release_ops": {
+        "agent": "writer",
+        "produces": [
+          "target/zyal/docs/release-notes.md",
+          "target/zyal/docs/migration.md",
+          "target/zyal/docs/operations.md"
+        ],
+        "requires": [
+          "target/zyal/security/review.md"
+        ],
+        "transitions": [
+          {
+            "to": "final_signoff",
+            "when": {
+              "evidence_exists": "target/zyal/docs/release-notes.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "final_signoff": {
+        "agent": "release_captain",
+        "approval": "final_signoff_approval",
+        "produces": [
+          "target/zyal/release/final-proof.json",
+          "target/zyal/release/memory-archive.jsonl",
+          "target/zyal/release/known-gaps.md"
+        ],
+        "requires": [
+          "target/zyal/docs/operations.md"
+        ],
+        "terminal": true,
+        "writes": "main_worktree"
+      },
+      "hardening_security": {
+        "agent": "security_reviewer",
+        "produces": [
+          "target/zyal/security/review.md",
+          "target/zyal/reliability/failure-injection.json"
+        ],
+        "requires": [
+          "target/zyal/perf/report.md"
+        ],
+        "transitions": [
+          {
+            "to": "docs_release_ops",
+            "when": {
+              "evidence_exists": "target/zyal/security/review.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "integration_fusion": {
+        "agent": "reviewer",
+        "produces": [
+          "target/zyal/superworkflow/integration-report.md",
+          "target/zyal/superworkflow/integration-receipt.json"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/subsystem-receipts.jsonl"
+        ],
+        "transitions": [
+          {
+            "to": "parity_lab",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/integration-receipt.json"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "parallel_subsystems": {
+        "agent": "implementer",
+        "produces": [
+          "target/zyal/superworkflow/subsystem-receipts.jsonl"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/task-bank.jsonl",
+          "target/zyal/superworkflow/contracts.json"
+        ],
+        "transitions": [
+          {
+            "to": "integration_fusion",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/subsystem-receipts.jsonl"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "parity_gap_closure": {
+        "agent": "parity_judge",
+        "produces": [
+          "target/zyal/parity/gap-ledger.json",
+          "target/zyal/parity/closure-report.md"
+        ],
+        "requires": [
+          "target/zyal/parity/report.md"
+        ],
+        "transitions": [
+          {
+            "to": "performance_closure",
+            "when": {
+              "evidence_exists": "target/zyal/parity/closure-report.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "parity_lab": {
+        "agent": "tester",
+        "produces": [
+          "target/zyal/parity/corpus-manifest.json",
+          "target/zyal/parity/evidence.jsonl",
+          "target/zyal/parity/report.md"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/integration-receipt.json"
+        ],
+        "transitions": [
+          {
+            "to": "parity_gap_closure",
+            "when": {
+              "evidence_exists": "target/zyal/parity/report.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "performance_closure": {
+        "agent": "performance_lead",
+        "produces": [
+          "target/zyal/perf/baseline.json",
+          "target/zyal/perf/report.md"
+        ],
+        "requires": [
+          "target/zyal/parity/closure-report.md"
+        ],
+        "transitions": [
+          {
+            "to": "hardening_security",
+            "when": {
+              "evidence_exists": "target/zyal/perf/report.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "repo_graph_bootstrap": {
+        "agent": "graph_indexer",
+        "produces": [
+          "target/zyal/superworkflow/repo-graph.sqlite",
+          "target/zyal/superworkflow/graph-stats.json"
+        ],
+        "transitions": [
+          {
+            "to": "contracts_and_slices",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/repo-graph.sqlite"
+            }
+          }
+        ],
+        "writes": "scratch_only"
+      },
+      "source_of_truth": {
+        "agent": "reference_mapper",
+        "produces": [
+          "target/zyal/superworkflow/source-of-truth.md",
+          "target/zyal/superworkflow/invariants.json",
+          "target/zyal/superworkflow/acceptance-matrix.json"
+        ],
+        "transitions": [
+          {
+            "to": "architecture_blueprint",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/invariants.json"
+            }
+          }
+        ],
+        "writes": "scratch_only"
+      }
+    },
+    "type": "state_machine"
+  }
+}

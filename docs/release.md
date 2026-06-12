@@ -1,25 +1,24 @@
 # Release
 
-Jekko releases produce a tagged Rust binary, a GitHub Release entry with
-per-platform artifacts, and updated documentation. The flow is end-to-end
-Rust; there is no JS publish step.
+Jekko releases are Rust-native. The release flow produces a tagged binary,
+published package artifacts, release notes, and proof receipts. There is no
+JS publish step in the shipping path.
 
 ## Version source
 
-The release version comes from the Git tag (for example `v2.0.0`). The tag
-is the source of record for published artifacts. CI and release workflows
-consume this tag as the canonical version input. The workspace
-`Cargo.toml` `[workspace.package].version` must match the tag.
+The version comes from the Git tag, for example `v2.0.0`. That tag is the
+source of record for the published release, and the workspace
+`Cargo.toml` `[workspace.package].version` must match it.
 
-## Cutting a release
+## Release staging
 
-1. **Tag the version.** Pick the next semver, create a signed annotated tag:
+1. Create the signed annotated tag:
 
    ```sh
    git tag -s vX.Y.Z -m "vX.Y.Z"
    ```
 
-2. **Build the release binary.** The host build is via `cargo`:
+2. Build the host release binary:
 
    ```sh
    cargo build -p jekko-cli --release --locked
@@ -27,62 +26,61 @@ consume this tag as the canonical version input. The workspace
 
    The binary lands at `target/release/jekko`.
 
-3. **Smoke the binary.** Both checks must exit `0`:
+3. Smoke the binary:
 
    ```sh
    target/release/jekko --version
    target/release/jekko --help
    ```
 
-4. **Run release proof lanes.** At a minimum, the comprehensive lanes:
+4. Run the release proof lanes before publishing:
 
-   - `cargo test --workspace --locked --no-fail-fast`
+   - `ops/ci/parity.sh`
+   - `just security`
    - `just tui-ci`
-   - `cargo run -p xtask -- baseline-diff` (with the threshold the release
-     targets)
+   - `cargo test --workspace --locked --no-fail-fast`
+   - `cargo run -p xtask -- baseline-diff --threshold 80`
    - `cargo run -p xtask -- guard-forbidden-runtime --mode advisory`
 
-   Record the exit status of each in the release notes.
+   Capture the output for each lane in the release notes.
 
-5. **Cross-compile per-platform artifacts.** Currently **TBD**: the
-   cross-compile lane will land via either `cross` or the Nix flake once the
-   Rust port finishes. Document the chosen path here before the first
-   Rust-cut release.
+5. Stage the publication flow through the existing scripts:
 
-6. **Create the GitHub Release.** Attach one archive per supported target
-   tuple plus a `SHA256SUMS` file. Link the release notes to the proof
-   command output for each lane in step 4.
+   - `ops/ci/publish-version.sh` cuts the release tag and finalizes the GitHub release metadata.
+   - `ops/ci/publish.sh` publishes the package bundle to `dist/` and, for `latest`, emits the release artifacts.
+   - `cargo run -p xtask -- publish-release-packages --dist-root ./dist --tag <channel>` is the package publication command the script invokes.
+   - `cargo run -p xtask -- publish-release-artifacts --version vX.Y.Z --channel latest` attaches the versioned release artifacts when the channel is `latest`.
 
-7. **Publish docs.** Update any version-bound docs and confirm
-   `docs/install.md` reflects the new tag.
+   The `xtask release package` and `xtask release attach` subcommands are
+   still dry-run stubs; the shell scripts above are the executable release
+   entrypoints today.
 
-## Changelog and evidence
+6. Assemble the release bundle:
 
-- Each release entry includes noteworthy behavior changes, migration notes,
-  and verification status.
-- Each lane in the proof section links to the captured `cargo` or `xtask`
-  output for that lane.
-- Migration notes covering the Rust port stay attached to the release that
-  introduces the cut-over, then drop out of subsequent releases.
+   - `target/release/jekko`
+   - `SHA256SUMS`
+   - release notes
+   - proof receipts under `target/jankurai/`:
+     - `repo-score.json`
+     - `repo-score.md`
+     - `repair-queue.jsonl`
+     - `score-history.jsonl`
+     - `jankurai.sarif`
+     - `summary.md`
 
-## Integrity and provenance
+7. Publish the release and then update any version-bound docs, including
+   `docs/install.md`.
 
-- Artifacts are produced only from CI pipeline runs that match the release
-  workflow configuration and the tagged commit SHA.
-- Integrity is preserved by immutable tags and pinned workflow versions.
-- The `SHA256SUMS` file is signed alongside the tag.
+## Integrity and rollback
 
-## Rollback guidance
+- Release artifacts are produced from the tagged commit SHA and the
+  configured CI workflow.
+- The checksum file is signed with the tag.
+- If a release is bad, cut a patch release for the fix and mark the broken
+  version accordingly in the notes.
 
-- If a release is found faulty, cut a patch release for the corrected
-  change and deprecate the affected version in the release notes.
-- For urgent rollback, stop deployment, publish a replacement release, and
-  post a postmortem with remediation evidence linked from the affected
-  release entry.
+## Future work
 
-## TBD
-
-- Cross-compile path (`cross` vs Nix flake) is not yet finalized.
-- `cargo install --git ... --tag v2.0.0` becomes the canonical user
-  install path for Rust releases. See `docs/install.md` for the current
-  source and `cargo install --git` paths.
+- Cross-build packaging stays out of this doc until a concrete lane exists.
+- If `cross` or the Nix flake becomes the supported multi-target path,
+  document the exact staging script here before relying on it for a ship.

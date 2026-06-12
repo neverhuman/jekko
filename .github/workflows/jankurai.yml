@@ -25,26 +25,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-      - name: Jankurai adoption command receipts
-        run: |
-          : "jankurai security run . --out .jankurai/security/evidence.json"
-          : "cargo run -p xtask --locked -- security-lane --profile ci --out .jankurai/security"
-          : "cargo run -p xtask --locked -- pr-workflow-contract"
-          : "bash ops/ci/pr-policy.sh standards"
-          : "bash ops/ci/pr-policy.sh compliance"
-          : "gitleaks detect --source . --redact --report-format json --report-path .jankurai/security/gitleaks.json"
-          : "cargo audit --json"
-          : "cargo audit --json > .jankurai/security/cargo-audit.json"
-          : "zizmor --offline --no-exit-codes --format json .github/workflows > .jankurai/security/zizmor.json"
-          : "syft . -o spdx-json=.jankurai/security/sbom.spdx.json"
-          : "jankurai proof . --changed-from origin/main --out .jankurai/proof-plan.json --md .jankurai/proof-plan.md"
-          : "jankurai proofbind verify . --changed-from origin/main"
-          : "jankurai proofbind verify . --changed-from origin/main --proof-receipts .jankurai/proof-receipts --out .jankurai/proofbind/surface-witness.json --obligations-out .jankurai/proofbind/obligations.json --md .jankurai/proofbind/proofbind.md"
-          : "jankurai proofmark rust . --obligations .jankurai/proofbind/obligations.json"
-          : "cargo run -p jankurai -- copy-code . --json .jankurai/copy-code.json --md .jankurai/copy-code.md"
-          : "jankurai copy-code . --json .jankurai/copy-code.json --md .jankurai/copy-code.md"
-          : "cargo test -p jankurai --test language_bad_behavior"
-          : "jankurai rust witness build ."
+      - name: Jankurai security lane
+        run: bash ops/ci/security.sh
       - name: Run jankurai audit
         run: bash ops/ci/jankurai.sh
       - name: jankurai audit gate

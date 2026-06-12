@@ -73,6 +73,25 @@ impl SupervisorStore {
         Ok(run_id)
     }
 
+    /// Reset in-flight running phases to pending during resume.
+    pub fn reset_running_phases(&self, run_id: &str) -> rusqlite::Result<usize> {
+        let now = Utc::now().to_rfc3339();
+        self.conn.execute(
+            r#"
+            UPDATE zyal_super_phases
+            SET status = ?1,
+                updated_at = ?2
+            WHERE run_id = ?3 AND status = ?4
+            "#,
+            params![
+                PhaseStatus::Pending.as_str(),
+                now,
+                run_id,
+                PhaseStatus::Running.as_str(),
+            ],
+        )
+    }
+
     /// Update a phase status. Pass an empty `summary` to leave the existing
     /// summary unchanged.
     pub fn record_phase_status(
