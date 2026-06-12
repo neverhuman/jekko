@@ -529,5 +529,234 @@
     "strategy": "macro_plan_then_parallel_phases_then_fusion_hardening",
     "target": "redis"
   },
-  "version": "v1"
+  "version": "v1",
+  "workflow": {
+    "initial": "source_of_truth",
+    "max_total_time": "168h",
+    "on_stuck": "incubate",
+    "states": {
+      "architecture_blueprint": {
+        "agent": "architect",
+        "produces": [
+          "target/zyal/superworkflow/architecture.md",
+          "target/zyal/superworkflow/risk-register.json"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/invariants.json"
+        ],
+        "transitions": [
+          {
+            "to": "repo_graph_bootstrap",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/architecture.md"
+            }
+          }
+        ],
+        "writes": "scratch_only"
+      },
+      "contracts_and_slices": {
+        "agent": "planner",
+        "produces": [
+          "target/zyal/superworkflow/task-bank.jsonl",
+          "target/zyal/superworkflow/contracts.json"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/architecture.md",
+          "target/zyal/superworkflow/repo-graph.sqlite"
+        ],
+        "transitions": [
+          {
+            "to": "parallel_subsystems",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/contracts.json"
+            }
+          }
+        ],
+        "writes": "scratch_only"
+      },
+      "docs_release_ops": {
+        "agent": "writer",
+        "produces": [
+          "target/zyal/docs/release-notes.md",
+          "target/zyal/docs/migration.md",
+          "target/zyal/docs/operations.md"
+        ],
+        "requires": [
+          "target/zyal/security/review.md"
+        ],
+        "transitions": [
+          {
+            "to": "final_signoff",
+            "when": {
+              "evidence_exists": "target/zyal/docs/release-notes.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "final_signoff": {
+        "agent": "release_captain",
+        "approval": "final_signoff_approval",
+        "produces": [
+          "target/zyal/release/final-proof.json",
+          "target/zyal/release/memory-archive.jsonl",
+          "target/zyal/release/known-gaps.md"
+        ],
+        "requires": [
+          "target/zyal/docs/operations.md"
+        ],
+        "terminal": true,
+        "writes": "main_worktree"
+      },
+      "hardening_security": {
+        "agent": "security_reviewer",
+        "produces": [
+          "target/zyal/security/review.md",
+          "target/zyal/reliability/failure-injection.json"
+        ],
+        "requires": [
+          "target/zyal/perf/report.md"
+        ],
+        "transitions": [
+          {
+            "to": "docs_release_ops",
+            "when": {
+              "evidence_exists": "target/zyal/security/review.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "integration_fusion": {
+        "agent": "reviewer",
+        "produces": [
+          "target/zyal/superworkflow/integration-report.md",
+          "target/zyal/superworkflow/integration-receipt.json"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/subsystem-receipts.jsonl"
+        ],
+        "transitions": [
+          {
+            "to": "parity_lab",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/integration-receipt.json"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "parallel_subsystems": {
+        "agent": "implementer",
+        "produces": [
+          "target/zyal/superworkflow/subsystem-receipts.jsonl"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/task-bank.jsonl",
+          "target/zyal/superworkflow/contracts.json"
+        ],
+        "transitions": [
+          {
+            "to": "integration_fusion",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/subsystem-receipts.jsonl"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "parity_gap_closure": {
+        "agent": "parity_judge",
+        "produces": [
+          "target/zyal/parity/gap-ledger.json",
+          "target/zyal/parity/closure-report.md"
+        ],
+        "requires": [
+          "target/zyal/parity/report.md"
+        ],
+        "transitions": [
+          {
+            "to": "performance_closure",
+            "when": {
+              "evidence_exists": "target/zyal/parity/closure-report.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "parity_lab": {
+        "agent": "tester",
+        "produces": [
+          "target/zyal/parity/corpus-manifest.json",
+          "target/zyal/parity/evidence.jsonl",
+          "target/zyal/parity/report.md"
+        ],
+        "requires": [
+          "target/zyal/superworkflow/integration-receipt.json"
+        ],
+        "transitions": [
+          {
+            "to": "parity_gap_closure",
+            "when": {
+              "evidence_exists": "target/zyal/parity/report.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "performance_closure": {
+        "agent": "performance_lead",
+        "produces": [
+          "target/zyal/perf/baseline.json",
+          "target/zyal/perf/report.md"
+        ],
+        "requires": [
+          "target/zyal/parity/closure-report.md"
+        ],
+        "transitions": [
+          {
+            "to": "hardening_security",
+            "when": {
+              "evidence_exists": "target/zyal/perf/report.md"
+            }
+          }
+        ],
+        "writes": "isolated_worktree"
+      },
+      "repo_graph_bootstrap": {
+        "agent": "graph_indexer",
+        "produces": [
+          "target/zyal/superworkflow/repo-graph.sqlite",
+          "target/zyal/superworkflow/graph-stats.json"
+        ],
+        "transitions": [
+          {
+            "to": "contracts_and_slices",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/repo-graph.sqlite"
+            }
+          }
+        ],
+        "writes": "scratch_only"
+      },
+      "source_of_truth": {
+        "agent": "reference_mapper",
+        "produces": [
+          "target/zyal/superworkflow/source-of-truth.md",
+          "target/zyal/superworkflow/invariants.json",
+          "target/zyal/superworkflow/acceptance-matrix.json"
+        ],
+        "transitions": [
+          {
+            "to": "architecture_blueprint",
+            "when": {
+              "evidence_exists": "target/zyal/superworkflow/invariants.json"
+            }
+          }
+        ],
+        "writes": "scratch_only"
+      }
+    },
+    "type": "state_machine"
+  }
 }

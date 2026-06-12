@@ -14,6 +14,155 @@ job:
     capture through parity, performance, hardening, release, and durable
     memory archive without scope sprawl.
 workflow:
+  type: state_machine
+  initial: source_of_truth
+  on_stuck: incubate
+  max_total_time: 168h
+  states:
+    source_of_truth:
+      agent: reference_mapper
+      writes: scratch_only
+      produces:
+        - target/zyal/superworkflow/source-of-truth.md
+        - target/zyal/superworkflow/invariants.json
+        - target/zyal/superworkflow/acceptance-matrix.json
+      transitions:
+        - to: architecture_blueprint
+          when:
+            evidence_exists: target/zyal/superworkflow/invariants.json
+    architecture_blueprint:
+      agent: architect
+      writes: scratch_only
+      requires:
+        - target/zyal/superworkflow/invariants.json
+      produces:
+        - target/zyal/superworkflow/architecture.md
+        - target/zyal/superworkflow/risk-register.json
+      transitions:
+        - to: repo_graph_bootstrap
+          when:
+            evidence_exists: target/zyal/superworkflow/architecture.md
+    repo_graph_bootstrap:
+      agent: graph_indexer
+      writes: scratch_only
+      produces:
+        - target/zyal/superworkflow/repo-graph.sqlite
+        - target/zyal/superworkflow/graph-stats.json
+      transitions:
+        - to: contracts_and_slices
+          when:
+            evidence_exists: target/zyal/superworkflow/repo-graph.sqlite
+    contracts_and_slices:
+      agent: planner
+      writes: scratch_only
+      requires:
+        - target/zyal/superworkflow/architecture.md
+        - target/zyal/superworkflow/repo-graph.sqlite
+      produces:
+        - target/zyal/superworkflow/task-bank.jsonl
+        - target/zyal/superworkflow/contracts.json
+      transitions:
+        - to: parallel_subsystems
+          when:
+            evidence_exists: target/zyal/superworkflow/contracts.json
+    parallel_subsystems:
+      agent: implementer
+      writes: isolated_worktree
+      requires:
+        - target/zyal/superworkflow/task-bank.jsonl
+        - target/zyal/superworkflow/contracts.json
+      produces:
+        - target/zyal/superworkflow/subsystem-receipts.jsonl
+      transitions:
+        - to: integration_fusion
+          when:
+            evidence_exists: target/zyal/superworkflow/subsystem-receipts.jsonl
+    integration_fusion:
+      agent: reviewer
+      writes: isolated_worktree
+      requires:
+        - target/zyal/superworkflow/subsystem-receipts.jsonl
+      produces:
+        - target/zyal/superworkflow/integration-report.md
+        - target/zyal/superworkflow/integration-receipt.json
+      transitions:
+        - to: parity_lab
+          when:
+            evidence_exists: target/zyal/superworkflow/integration-receipt.json
+    parity_lab:
+      agent: tester
+      writes: isolated_worktree
+      requires:
+        - target/zyal/superworkflow/integration-receipt.json
+      produces:
+        - target/zyal/parity/corpus-manifest.json
+        - target/zyal/parity/evidence.jsonl
+        - target/zyal/parity/report.md
+      transitions:
+        - to: parity_gap_closure
+          when:
+            evidence_exists: target/zyal/parity/report.md
+    parity_gap_closure:
+      agent: parity_judge
+      writes: isolated_worktree
+      requires:
+        - target/zyal/parity/report.md
+      produces:
+        - target/zyal/parity/gap-ledger.json
+        - target/zyal/parity/closure-report.md
+      transitions:
+        - to: performance_closure
+          when:
+            evidence_exists: target/zyal/parity/closure-report.md
+    performance_closure:
+      agent: performance_lead
+      writes: isolated_worktree
+      requires:
+        - target/zyal/parity/closure-report.md
+      produces:
+        - target/zyal/perf/baseline.json
+        - target/zyal/perf/report.md
+      transitions:
+        - to: hardening_security
+          when:
+            evidence_exists: target/zyal/perf/report.md
+    hardening_security:
+      agent: security_reviewer
+      writes: isolated_worktree
+      requires:
+        - target/zyal/perf/report.md
+      produces:
+        - target/zyal/security/review.md
+        - target/zyal/reliability/failure-injection.json
+      transitions:
+        - to: docs_release_ops
+          when:
+            evidence_exists: target/zyal/security/review.md
+    docs_release_ops:
+      agent: writer
+      writes: isolated_worktree
+      requires:
+        - target/zyal/security/review.md
+      produces:
+        - target/zyal/docs/release-notes.md
+        - target/zyal/docs/migration.md
+        - target/zyal/docs/operations.md
+      transitions:
+        - to: final_signoff
+          when:
+            evidence_exists: target/zyal/docs/release-notes.md
+    final_signoff:
+      agent: release_captain
+      writes: main_worktree
+      requires:
+        - target/zyal/docs/operations.md
+      produces:
+        - target/zyal/release/final-proof.json
+        - target/zyal/release/memory-archive.jsonl
+        - target/zyal/release/known-gaps.md
+      approval: final_signoff_approval
+      terminal: true
+superworkflow:
   stage_count: 12
   target: redis
   replacement: candidate

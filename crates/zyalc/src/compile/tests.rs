@@ -49,6 +49,24 @@ fn toml_emit_accepts_runbook_wrapped_sandbox_block() {
 }
 
 #[test]
+fn toml_emit_accepts_top_level_lanes_block() {
+    let raw = "# zyal: declarative target=toml schema=jankurai/sandbox-lanes@1\n\
+         <<<ZYAL v1:daemon id=sandbox-lanes-template>>>\n\
+         version: v1\nintent: daemon\nconfirm: RUN_FOREVER\nid: sandbox-lanes-template\n\
+         job:\n  name: sandbox lanes\n  objective: keep sandbox lanes in sync\n\
+         stop:\n  all:\n    - git_clean:\n        allow_untracked: false\n\
+         sandbox:\n  schema_version: \"1.0.0\"\n  sandbox_root: \"~/.local/share/agent-sandboxes\"\n\
+         lanes:\n    - name: a\n      cost: 1\n\
+         <<<END_ZYAL id=sandbox-lanes-template>>>\n";
+    let out = emit_toml(raw).expect("emit top-level sandbox lanes");
+    assert!(out.contains("schema_version"));
+    assert!(out.contains("[[lane]]"));
+    assert!(out.contains("name = \"a\""));
+    assert!(!out.contains("job ="));
+    assert!(!out.contains("stop ="));
+}
+
+#[test]
 fn idempotent_emit() {
     let raw = "# zyal: declarative target=toml schema=t@1\nschema_version: \"1.0.0\"\nlanes:\n  - name: a\n    cost: 1\n";
     let a = emit_toml(raw).unwrap();
@@ -103,6 +121,24 @@ fn superworkflow_with_phases(n: usize) -> String {
     raw
 }
 
+fn workflow_state_machine_with_linear_states(n: usize) -> String {
+    let mut raw = String::from("workflow:\n  type: state_machine\n  initial: p0\n  states:\n");
+    for idx in 0..n {
+        raw.push_str(&format!(
+            "    p{idx}:\n      agent: build\n      writes: scratch_only\n      produces: [target/p{idx}.json]\n"
+        ));
+        if idx + 1 < n {
+            raw.push_str(&format!(
+                "      transitions:\n        - to: p{}\n          when: {{ evidence_exists: target/p{idx}.json }}\n",
+                idx + 1
+            ));
+        } else {
+            raw.push_str("      terminal: true\n");
+        }
+    }
+    raw
+}
+
 #[test]
 fn superworkflow_emit_requires_nine_to_twelve_phases() {
     let raw = superworkflow_with_phases(9);
@@ -116,7 +152,12 @@ fn superworkflow_emit_requires_nine_to_twelve_phases() {
 
 #[test]
 fn superworkflow_emit_accepts_workflow_root_shape() {
-    let raw = superworkflow_with_phases(9).replace("\nsuperworkflow:\n", "\nworkflow:\n");
+    let workflow = workflow_state_machine_with_linear_states(9);
+    let raw = superworkflow_with_phases(9).replacen(
+        "\nsuperworkflow:\n",
+        &format!("\n{workflow}superworkflow:\n"),
+        1,
+    );
     let out = emit_superworkflow(&raw).expect("workflow-root superworkflow json");
     assert!(out.contains("\"superworkflow\""));
     assert!(out.contains("\"phases\""));

@@ -147,9 +147,65 @@ fn yaml_to_toml(value: serde_yaml::Value) -> Result<toml::Value> {
         Y::Mapping(m) => m,
         _ => return Err(anyhow!("declarative body must be a YAML mapping")),
     };
-    let map = match map.get(Y::String("sandbox".to_string())) {
-        Some(Y::Mapping(sandbox)) => sandbox.clone(),
+    let sandbox = match map.get(Y::String("sandbox".to_string())) {
+        Some(Y::Mapping(sandbox)) => Some(sandbox.clone()),
         Some(_) => return Err(anyhow!("sandbox must be a mapping")),
+        None => None,
+    };
+    let has_lane_contract = map.contains_key(Y::String("lanes".to_string()))
+        || map.contains_key(Y::String("schema_version".to_string()))
+        || map.contains_key(Y::String("sandbox_root".to_string()))
+        || sandbox
+            .as_ref()
+            .is_some_and(|nested| nested.contains_key(Y::String("lanes".to_string())));
+    if has_lane_contract {
+        let mut tbl = toml::value::Table::new();
+        let schema_version = match map.get(Y::String("schema_version".to_string())) {
+            Some(value) => yaml_value_to_toml(value.clone())?,
+            None => match sandbox
+                .as_ref()
+                .and_then(|nested| nested.get(Y::String("schema_version".to_string())))
+            {
+                Some(value) => yaml_value_to_toml(value.clone())?,
+                None => return Err(anyhow!("schema_version is required")),
+            },
+        };
+        tbl.insert("schema_version".into(), schema_version);
+        if let Some(sandbox_root) = map.get(Y::String("sandbox_root".to_string())) {
+            tbl.insert(
+                "sandbox_root".into(),
+                yaml_value_to_toml(sandbox_root.clone())?,
+            );
+        } else if let Some(sandbox_root) = sandbox
+            .as_ref()
+            .and_then(|nested| nested.get(Y::String("sandbox_root".to_string())))
+        {
+            tbl.insert(
+                "sandbox_root".into(),
+                yaml_value_to_toml(sandbox_root.clone())?,
+            );
+        }
+        let lanes = match map.get(Y::String("lanes".to_string())) {
+            Some(Y::Sequence(arr)) => arr.clone(),
+            Some(_) => return Err(anyhow!("lanes must be a sequence")),
+            None => match sandbox
+                .as_ref()
+                .and_then(|nested| nested.get(Y::String("lanes".to_string())))
+            {
+                Some(Y::Sequence(arr)) => arr.clone(),
+                Some(_) => return Err(anyhow!("lanes must be a sequence")),
+                None => return Err(anyhow!("lanes are required")),
+            },
+        };
+        let mut arr = Vec::with_capacity(lanes.len());
+        for item in lanes {
+            arr.push(yaml_value_to_toml(item)?);
+        }
+        tbl.insert("lane".into(), toml::Value::Array(arr));
+        return Ok(toml::Value::Table(tbl));
+    }
+    let map = match sandbox {
+        Some(sandbox) => sandbox,
         None => map,
     };
     let mut tbl = toml::value::Table::new();

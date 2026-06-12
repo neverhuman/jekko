@@ -74,17 +74,37 @@ pub(super) fn validate_superworkflow_value(source: &Path, value: &serde_yaml::Va
     require_present(job, "name")?;
     require_present(job, "objective")?;
 
-    let sw = match (
-        lookup(root, "workflow"),
-        lookup(root, "superworkflow"),
-        lookup(job, "workflow"),
-        lookup(job, "superworkflow"),
-    ) {
-        (Some(_), _, _, _) => require_map(root, "workflow")?,
-        (None, Some(_), _, _) => require_map(root, "superworkflow")?,
-        (None, None, Some(_), _) => require_map(job, "workflow")?,
-        (None, None, None, Some(_)) => require_map(job, "superworkflow")?,
-        _ => return Err(anyhow!("missing required key `workflow`")),
+    let workflow = lookup(root, "workflow");
+    let workflow_is_state_machine = workflow
+        .and_then(|value| value.as_mapping())
+        .is_some_and(is_state_machine_workflow);
+    if workflow_is_state_machine {
+        validate_workflow_state_machine(source, require_map(root, "workflow")?)?;
+    }
+    let sw = if workflow_is_state_machine {
+        match (
+            lookup(root, "superworkflow"),
+            lookup(job, "workflow"),
+            lookup(job, "superworkflow"),
+        ) {
+            (Some(_), _, _) => require_map(root, "superworkflow")?,
+            (None, Some(_), _) => require_map(job, "workflow")?,
+            (None, None, Some(_)) => require_map(job, "superworkflow")?,
+            _ => return Err(anyhow!("missing required key `superworkflow`")),
+        }
+    } else {
+        match (
+            lookup(root, "workflow"),
+            lookup(root, "superworkflow"),
+            lookup(job, "workflow"),
+            lookup(job, "superworkflow"),
+        ) {
+            (Some(_), _, _, _) => require_map(root, "workflow")?,
+            (None, Some(_), _, _) => require_map(root, "superworkflow")?,
+            (None, None, Some(_), _) => require_map(job, "workflow")?,
+            (None, None, None, Some(_)) => require_map(job, "superworkflow")?,
+            _ => return Err(anyhow!("missing required key `workflow`")),
+        }
     };
     let phases = require_seq(sw, "phases")?;
     if !(9..=12).contains(&phases.len()) {
@@ -240,4 +260,130 @@ fn require_scalar(map: &serde_yaml::Mapping, key: &str, expected: &str) -> Resul
         Some(actual) if actual == expected => Ok(()),
         _ => Err(anyhow!("`{key}` must be `{expected}`")),
     }
+}
+
+fn is_state_machine_workflow(workflow: &serde_yaml::Mapping) -> bool {
+    matches!(
+        lookup(workflow, "type").and_then(|v| v.as_str()),
+        Some("state_machine")
+    ) && lookup(workflow, "initial").is_some()
+        && lookup(workflow, "states").is_some()
+}
+
+fn validate_workflow_state_machine(source: &Path, workflow: &serde_yaml::Mapping) -> Result<()> {
+    require_scalar(workflow, "type", "state_machine")?;
+    let initial = require_present(workflow, "initial")?
+        .as_str()
+        .ok_or_else(|| anyhow!("workflow.initial must be a string"))?;
+    let states = require_map(workflow, "states")?;
+    if !(9..=12).contains(&states.len()) {
+        return Err(anyhow!(
+            "workflow in {} requires 9-12 states, got {}",
+            source.display(),
+            states.len()
+        ));
+    }
+    if !states.contains_key(serde_yaml::Value::String(initial.to_string())) {
+        return Err(anyhow!(
+            "workflow.initial `{initial}` must name a declared state in {}",
+            source.display()
+        ));
+    }
+
+    let mut ids = std::collections::BTreeSet::new();
+    let mut outgoing: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+    let mut indegree: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    for (state_name, state_value) in states {
+        let state_id = state_name
+            .as_str()
+            .ok_or_else(|| anyhow!("workflow state keys must be strings"))?;
+        if !ids.insert(state_id.to_string()) {
+            return Err(anyhow!("duplicate workflow state id {state_id}"));
+        }
+        let state = state_value
+            .as_mapping()
+            .ok_or_else(|| anyhow!("workflow state `{state_id}` must be a mapping"))?;
+        if let Some(writes) = lookup(state, "writes").and_then(|v| v.as_str()) {
+            match writes {
+                "scratch_only" | "isolated_worktree" | "main_worktree" => {}
+                other => {
+                    return Err(anyhow!(
+                        "workflow state `{state_id}` has unsupported writes value `{other}`"
+                    ));
+                }
+            }
+        }
+        if let Some(requires) = lookup(state, "requires") {
+            requires.as_sequence().ok_or_else(|| {
+                anyhow!("workflow state `{state_id}` requires must be a sequence")
+            })?;
+        }
+        if let Some(produces) = lookup(state, "produces") {
+            produces.as_sequence().ok_or_else(|| {
+                anyhow!("workflow state `{state_id}` produces must be a sequence")
+            })?;
+        }
+        indegree.entry(state_id.to_string()).or_insert(0);
+        if let Some(transitions) = lookup(state, "transitions") {
+            let transitions = transitions.as_sequence().ok_or_else(|| {
+                anyhow!("workflow state `{state_id}` transitions must be a sequence")
+            })?;
+            let mut seen_targets = std::collections::BTreeSet::new();
+            for transition in transitions {
+                let transition = transition.as_mapping().ok_or_else(|| {
+                    anyhow!("workflow transition in `{state_id}` must be a mapping")
+                })?;
+                let to = lookup(transition, "to")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow!("workflow transition in `{state_id}` missing `to`"))?;
+                if to == state_id {
+                    return Err(anyhow!("workflow state `{state_id}` depends on itself"));
+                }
+                if seen_targets.insert(to.to_string()) {
+                    outgoing
+                        .entry(state_id.to_string())
+                        .or_default()
+                        .push(to.to_string());
+                    *indegree.entry(to.to_string()).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    for (state_id, targets) in &outgoing {
+        for target in targets {
+            if !ids.contains(target) {
+                return Err(anyhow!(
+                    "workflow state `{state_id}` transitions to unknown state `{target}`"
+                ));
+            }
+        }
+    }
+
+    let mut ready: std::collections::VecDeque<String> = indegree
+        .iter()
+        .filter_map(|(id, degree)| if *degree == 0 { Some(id.clone()) } else { None })
+        .collect();
+    let mut visited = 0usize;
+    while let Some(id) = ready.pop_front() {
+        visited += 1;
+        if let Some(children) = outgoing.get(&id) {
+            for next in children {
+                let degree = indegree.get_mut(next).expect("known workflow state");
+                *degree -= 1;
+                if *degree == 0 {
+                    ready.push_back(next.clone());
+                }
+            }
+        }
+    }
+    if visited != ids.len() {
+        return Err(anyhow!(
+            "workflow state machine contains a cycle in {}",
+            source.display()
+        ));
+    }
+
+    Ok(())
 }

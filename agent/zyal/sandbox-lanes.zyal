@@ -16,7 +16,8 @@ stop:
 sandbox:
   schema_version: "1.0.0"
   sandbox_root: "~/.local/share/agent-sandboxes"
-  lanes:
+
+lanes:
     - name: experiment-worktree
       command_id: sandbox.experiment-worktree
       kind: sandbox

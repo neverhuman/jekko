@@ -761,11 +761,23 @@ fn select_best_candidate(mut candidates: Vec<CandidateSnapshot>) -> Option<Candi
 
 fn snapshot_from_state_wrapper(path: &Path, value: &Json) -> Result<CandidateSnapshot, String> {
     let obj = json_object(value).ok_or_else(|| "invalid_lane_report".to_string())?;
-    if let Some(inner) = obj
-        .get("winner")
-        .or_else(|| obj.get("selected"))
-        .or_else(|| obj.get("current"))
-    {
+    if let Some(inner) = obj.get("winner") {
+        let source = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("current-best")
+            .to_string();
+        return snapshot_from_candidate_like(path, source, inner);
+    }
+    if let Some(inner) = obj.get("selected") {
+        let source = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("current-best")
+            .to_string();
+        return snapshot_from_candidate_like(path, source, inner);
+    }
+    if let Some(inner) = obj.get("current") {
         let source = path
             .file_stem()
             .and_then(|stem| stem.to_str())
@@ -784,24 +796,26 @@ fn snapshot_from_score_json(
     let json = value?;
     let obj = json_object(json)?;
     let source_name = json_string(obj, "source").unwrap_or_else(|| source.to_string());
-    let name = json_string(obj, "name")
-        .or_else(|| json_string(obj, "lane"))
-        .or_else(|| json_string(obj, "id"))
-        .unwrap_or_else(|| default_name.to_string());
+    let name =
+        first_json_string(obj, &["name", "lane", "id"]).unwrap_or_else(|| default_name.to_string());
     let total = json_number(obj, "total").unwrap_or(0.0);
     let ci95_low = json_number_in(obj, &["bootstrap_ci", "ci95_low"]).unwrap_or(total);
     let ci95_high = json_number_in(obj, &["bootstrap_ci", "ci95_high"]).unwrap_or(total);
-    let stress_total = json_number(obj, "stress_total")
-        .or_else(|| json_number(obj, "stress_score"))
-        .or_else(|| json_number_in(obj, &["stress", "total"]))
-        .unwrap_or(total);
+    let stress_total =
+        if let Some(value) = first_json_number(obj, &["stress_total", "stress_score"]) {
+            value
+        } else if let Some(value) = json_number_in(obj, &["stress", "total"]) {
+            value
+        } else {
+            total
+        };
     let gates = gate_vector_from_value(json);
-    let cost_usd = json_number(obj, "cost_usd")
-        .or_else(|| json_number_in(obj, &["observability", "cost", "budget"]))
-        .unwrap_or(0.0);
+    let cost_usd = json_number(obj, "cost_usd").unwrap_or_else(|| {
+        json_number_in(obj, &["observability", "cost", "budget"]).unwrap_or(0.0)
+    });
     let hypothesis = json_string(obj, "hypothesis");
     let observed_at_run = json_string(obj, "observed_at_run");
-    let patch = json_string(obj, "patch").or_else(|| json_string(obj, "best_patch"));
+    let patch = first_json_string(obj, &["patch", "best_patch"]);
     let dev_only = json_bool(obj, "dev_only").unwrap_or(false);
 
     Some(CandidateSnapshot {
@@ -833,10 +847,8 @@ fn snapshot_from_candidate_like(
     let source = source.into();
     let obj = json_object(json).ok_or_else(|| "invalid_lane_report".to_string())?;
     let source_name = json_string(obj, "source").unwrap_or_else(|| source.clone());
-    let name = json_string(obj, "name")
-        .or_else(|| json_string(obj, "lane"))
-        .or_else(|| json_string(obj, "id"))
-        .unwrap_or_else(|| source_name.clone());
+    let name =
+        first_json_string(obj, &["name", "lane", "id"]).unwrap_or_else(|| source_name.clone());
     let total = json_number(obj, "total").unwrap_or(0.0);
     let ci95_low_raw = json_number_in(obj, &["bootstrap_ci", "ci95_low"]);
     let ci95_low = if let Some(v) = ci95_low_raw {
@@ -849,23 +861,27 @@ fn snapshot_from_candidate_like(
         total
     };
     let ci95_high = json_number_in(obj, &["bootstrap_ci", "ci95_high"]).unwrap_or(total);
-    let stress_total = json_number(obj, "stress_total")
-        .or_else(|| json_number(obj, "stress_score"))
-        .or_else(|| json_number_in(obj, &["stress", "total"]))
-        .unwrap_or(total);
+    let stress_total =
+        if let Some(value) = first_json_number(obj, &["stress_total", "stress_score"]) {
+            value
+        } else if let Some(value) = json_number_in(obj, &["stress", "total"]) {
+            value
+        } else {
+            total
+        };
     let gates = gate_vector_from_value(json);
-    let cost_usd = json_number(obj, "cost_usd")
-        .or_else(|| json_number_in(obj, &["observability", "cost", "budget"]))
-        .unwrap_or(0.0);
+    let cost_usd = json_number(obj, "cost_usd").unwrap_or_else(|| {
+        json_number_in(obj, &["observability", "cost", "budget"]).unwrap_or(0.0)
+    });
     let hypothesis = json_string(obj, "hypothesis");
     let observed_at_run = json_string(obj, "observed_at_run");
     let dev_only = json_bool(obj, "dev_only").unwrap_or(false);
-    let patch = json_string(obj, "patch")
-        .or_else(|| json_string(obj, "best_patch"))
-        .or_else(|| {
-            json_string(obj, "patch_path")
-                .and_then(|patch_path| read_patch_content(report_path, &patch_path).ok())
-        });
+    let patch = if let Some(value) = first_json_string(obj, &["patch", "best_patch"]) {
+        Some(value)
+    } else {
+        json_string(obj, "patch_path")
+            .and_then(|patch_path| read_patch_content(report_path, &patch_path).ok())
+    };
     if patch.is_none() && json_string(obj, "patch_path").is_some() {
         return Err("invalid_lane_report".to_string());
     }
@@ -985,12 +1001,30 @@ fn json_string(obj: &BTreeMap<String, Json>, key: &str) -> Option<String> {
     }
 }
 
+fn first_json_string(obj: &BTreeMap<String, Json>, keys: &[&str]) -> Option<String> {
+    for key in keys {
+        if let Some(value) = json_string(obj, key) {
+            return Some(value);
+        }
+    }
+    None
+}
+
 fn json_number(obj: &BTreeMap<String, Json>, key: &str) -> Option<f64> {
     match obj.get(key) {
         Some(Json::Float(value)) => Some(*value),
         Some(Json::Int(value)) => Some(*value as f64),
         _ => None,
     }
+}
+
+fn first_json_number(obj: &BTreeMap<String, Json>, keys: &[&str]) -> Option<f64> {
+    for key in keys {
+        if let Some(value) = json_number(obj, key) {
+            return Some(value);
+        }
+    }
+    None
 }
 
 fn json_bool(obj: &BTreeMap<String, Json>, key: &str) -> Option<bool> {
@@ -1394,10 +1428,11 @@ fn patch_touches_forbidden_path(patch: &str) -> bool {
     for line in patch.lines() {
         // Unified diff path lines: `+++ b/<path>` and `--- a/<path>`.
         let trimmed = line.trim_start();
-        let Some(rest) = trimmed
-            .strip_prefix("+++ ")
-            .or_else(|| trimmed.strip_prefix("--- "))
-        else {
+        let rest = if let Some(rest) = trimmed.strip_prefix("+++ ") {
+            rest
+        } else if let Some(rest) = trimmed.strip_prefix("--- ") {
+            rest
+        } else {
             continue;
         };
         let path = rest.trim_start_matches("a/").trim_start_matches("b/");
