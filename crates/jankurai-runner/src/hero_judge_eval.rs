@@ -1,5 +1,7 @@
 //! Deterministic Hero/Judge scoring, artifact, and parser helpers.
 
+use std::collections::HashSet;
+
 use anyhow::Result;
 use jekko_store::db::Db;
 use serde::{Deserialize, Serialize};
@@ -45,6 +47,7 @@ pub struct OracleVerdict {
     pub score: f64,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn reduce_generation(
     run_id: &str,
     generation: usize,
@@ -53,6 +56,7 @@ pub(crate) fn reduce_generation(
     red_team: &[HeroJudgeLaneArtifact],
     config: &HeroJudgeConfig,
     oracle: Option<OracleVerdict>,
+    rejected_shas: &HashSet<String>,
 ) -> PromotionDecision {
     let red_team_penalty = red_team_penalty(red_team);
     let oracle_failed = matches!(oracle, Some(v) if !v.passed);
@@ -71,6 +75,11 @@ pub(crate) fn reduce_generation(
             Some(_) => 0.0,
             None => (hero.score * 0.70 + verifier_score * 0.25 - red_team_penalty).clamp(0.0, 1.0),
         };
+        // Negative-memory dedup: an exact repeat of a previously rejected
+        // dead-end candidate cannot be re-promoted (U3).
+        if rejected_shas.contains(&hero.content_sha256) {
+            score = 0.0;
+        }
         if config.promotion.canary_replay && leak != "clean" {
             score = 0.0;
         }
@@ -350,7 +359,7 @@ fn metric_value(artifact: &HeroJudgeLaneArtifact, key: &str, default_score: f64)
 #[cfg(test)]
 mod oracle_tests {
     use super::*;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashSet};
 
     fn hero(id: &str, score: f64) -> HeroJudgeLaneArtifact {
         HeroJudgeLaneArtifact {
@@ -384,6 +393,7 @@ mod oracle_tests {
                 passed: false,
                 score: 0.0,
             }),
+            &HashSet::new(),
         );
         assert!(!decision.promoted);
         assert_eq!(decision.score, 0.0);
@@ -405,6 +415,7 @@ mod oracle_tests {
                 passed: true,
                 score: 1.0,
             }),
+            &HashSet::new(),
         );
         // blend = 1.0*0.55 + 0.9*0.25 + 0.9*0.20 = 0.955 >= 0.75 min_score
         assert!(decision.promoted);
@@ -416,9 +427,23 @@ mod oracle_tests {
     fn absent_oracle_preserves_self_graded_behavior() {
         let cfg = HeroJudgeConfig::default();
         let heroes = vec![hero("h1", 0.9)];
-        let decision = reduce_generation("run", 0, &heroes, 0.9, &[], &cfg, None);
+        let decision =
+            reduce_generation("run", 0, &heroes, 0.9, &[], &cfg, None, &HashSet::new());
         // self-graded: 0.9*0.70 + 0.9*0.25 = 0.855 >= 0.75
         assert!(decision.promoted);
         assert!(decision.reason.contains("deterministic host score"));
+    }
+
+    #[test]
+    fn rejected_sha_blocks_repromotion_of_dead_end() {
+        // A candidate identical to a previously rejected dead end cannot be
+        // re-promoted, even with a high self-score (U3 dedup).
+        let cfg = HeroJudgeConfig::default();
+        let h = hero("h1", 0.95);
+        let mut rejected = HashSet::new();
+        rejected.insert(h.content_sha256.clone());
+        let decision = reduce_generation("run", 1, &[h], 0.95, &[], &cfg, None, &rejected);
+        assert!(!decision.promoted);
+        assert_eq!(decision.score, 0.0);
     }
 }

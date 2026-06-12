@@ -1,11 +1,13 @@
 mod prompted;
 mod types;
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result};
+use serde::Serialize;
 use serde_json::json;
 
 use crate::daemon_store;
@@ -24,6 +26,39 @@ use crate::model_policy::ModelTaskKind;
 
 use self::prompted::run_prompted_group;
 pub(super) use self::types::{GenerationInputs, GenerationState};
+
+/// One rejected dead-end approach, accumulated across generations so later
+/// generations neither re-walk it (prompt feed-forward) nor re-promote it
+/// (exact-sha dedup in `reduce_generation`).
+#[derive(Debug, Clone, Serialize)]
+struct NegativeApproach {
+    generation: usize,
+    content_sha256: String,
+    summary: String,
+    reason: String,
+}
+
+/// Append the accumulated negative memory to a generation's evolution context
+/// as explicit "do not repeat" constraints. No-op when empty (behavior
+/// unchanged for the first generation / runs that never reject).
+fn append_negative_context(mut context: String, negatives: &[NegativeApproach]) -> String {
+    if negatives.is_empty() {
+        return context;
+    }
+    context.push_str("\nPreviously rejected approaches — do NOT repeat these dead ends: ");
+    for (idx, entry) in negatives.iter().rev().take(8).enumerate() {
+        if idx > 0 {
+            context.push_str("; ");
+        }
+        let summary: String = entry.summary.chars().take(160).collect();
+        context.push_str(&format!(
+            "[gen {} rejected ({})] {}",
+            entry.generation, entry.reason, summary
+        ));
+    }
+    context.push_str(". Propose a materially different approach.");
+    context
+}
 
 /// Run the operator-supplied objective oracle command (if any) in the run repo
 /// and convert its exit status into an [`OracleVerdict`]. Returns `Ok(None)`
@@ -72,6 +107,10 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
         reason: "no generation completed".to_string(),
     };
     let mut frontier_parent = Some("hero-seed".to_string());
+    // Negative memory accumulated across generations (U3): rejected dead ends
+    // feed forward into prompts and block exact re-promotion.
+    let mut negative_memory: Vec<NegativeApproach> = Vec::new();
+    let mut rejected_shas: HashSet<String> = HashSet::new();
 
     for generation in 1..=input.generations {
         daemon_store::mark_daemon_run(
@@ -89,6 +128,7 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
         fs::create_dir_all(&gen_dir).with_context(|| format!("mkdir {}", gen_dir.display()))?;
         let evolution_context =
             evolution_context(generation, &last_decision, quality_metrics.last());
+        let evolution_context = append_negative_context(evolution_context, &negative_memory);
 
         let literature = run_prompted_group(
             &input,
@@ -213,6 +253,7 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
             &red_team,
             input.config,
             oracle,
+            &rejected_shas,
         );
         input.sink.emit(
             EventKind::PromotionDecision,
@@ -220,6 +261,28 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
         )?;
         if let Some(winner) = decision.winner_candidate_id.as_deref() {
             frontier_parent = Some(format!("prompt-{winner}"));
+        }
+        // Record the best-but-rejected approach as negative memory so later
+        // generations avoid it (prompt feed-forward) and cannot re-promote it.
+        if !decision.promoted {
+            if let Some(winner) = decision
+                .winner_candidate_id
+                .as_deref()
+                .and_then(|id| heroes.iter().find(|hero| hero.id == id))
+            {
+                if rejected_shas.insert(winner.content_sha256.clone()) {
+                    negative_memory.push(NegativeApproach {
+                        generation,
+                        content_sha256: winner.content_sha256.clone(),
+                        summary: winner.summary.clone(),
+                        reason: decision.reason.clone(),
+                    });
+                    write_jsonl(
+                        &input.output_dir.join("negative-memory.jsonl"),
+                        &negative_memory,
+                    )?;
+                }
+            }
         }
         scoreboard.extend(scoreboard_for_generation(
             generation,
