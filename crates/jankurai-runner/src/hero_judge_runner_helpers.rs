@@ -59,7 +59,7 @@ pub(crate) async fn run_lane_group(
                     require_parsed_live_json,
                 };
                 let (receipt, value) =
-                    complete_hero_json(completion, kind, generation, &prompt).await?;
+                    complete_hero_json(completion, kind, generation, lane, &prompt).await?;
                 let summary = summary_from_value(kind, generation, lane, &value);
                 let score = score_from_value(kind, generation, &value);
                 let metrics = lane_quality_metrics(kind, &value, &summary, score, known_keys);

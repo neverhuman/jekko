@@ -136,4 +136,18 @@ pub trait ModelClient: Send + Sync {
         prompt: &str,
         cwd: &Path,
     ) -> Result<ModelCallReceipt>;
+
+    /// Lane-aware completion. The default ignores the lane and delegates to
+    /// [`complete`](Self::complete); the runtime gateway overrides this to
+    /// diversify provider/model routing across lanes (U5), and wrapper clients
+    /// forward the lane so the diversity reaches the gateway.
+    async fn complete_lane(
+        &self,
+        kind: ModelTaskKind,
+        prompt: &str,
+        cwd: &Path,
+        _lane: usize,
+    ) -> Result<ModelCallReceipt> {
+        self.complete(kind, prompt, cwd).await
+    }
 }

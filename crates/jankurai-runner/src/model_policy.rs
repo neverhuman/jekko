@@ -155,6 +155,26 @@ pub struct ModelPolicy {
     /// Allow power routing for routine roles.
     #[serde(default)]
     pub allow_power_for_routine_roles: bool,
+    /// Diversity pool for generative roles. When non-empty, generative lanes
+    /// (hero / literature / brainstorm) round-robin across these routes by lane
+    /// index so the tournament samples diverse models, while critic / verifier /
+    /// meta roles keep their dedicated independent routes. Empty => no pooling
+    /// (every lane of a role shares one route, as before).
+    #[serde(default)]
+    pub lane_diversity: Vec<ModelRoute>,
+}
+
+/// Whether a task kind is a generative role that should diversify across the
+/// `lane_diversity` pool. Evaluative roles (critic / verifier / judge / meta /
+/// red-team) deliberately do NOT diversify so they stay independent of the
+/// generator pool.
+fn kind_is_generative(kind: ModelTaskKind) -> bool {
+    matches!(
+        kind,
+        ModelTaskKind::HeroGenerate
+            | ModelTaskKind::LiteratureSynthesis
+            | ModelTaskKind::StageBrainstorm
+    )
 }
 
 impl ModelPolicy {
@@ -186,6 +206,18 @@ impl ModelPolicy {
                 }
             }
         }
+    }
+
+    /// Select a route for a specific lane index. Generative roles round-robin
+    /// across the `lane_diversity` pool (when configured) for ensemble
+    /// diversity; non-generative roles keep their dedicated route via
+    /// [`select`](Self::select). Falls back to `select(kind)` when the pool is
+    /// empty, so existing single-route behavior is unchanged.
+    pub fn select_for_lane(&self, kind: ModelTaskKind, lane: usize) -> ModelRouteRecord {
+        if self.lane_diversity.is_empty() || !kind_is_generative(kind) {
+            return self.select(kind);
+        }
+        self.lane_diversity[lane % self.lane_diversity.len()].normalized()
     }
 }
 
@@ -304,5 +336,41 @@ mod tests {
             quality_band: Some("top10".to_string()),
         };
         assert!(!band_only.is_empty());
+    }
+
+    #[test]
+    fn select_for_lane_diversifies_generative_roles_only() {
+        let policy = ModelPolicy {
+            lane_diversity: vec![
+                ModelRoute::Compact("provA/m1".to_string()),
+                ModelRoute::Compact("provB/m2".to_string()),
+            ],
+            ..Default::default()
+        };
+        // Generative role (hero) round-robins the pool by lane index.
+        let hero0 = policy.select_for_lane(ModelTaskKind::HeroGenerate, 0);
+        let hero1 = policy.select_for_lane(ModelTaskKind::HeroGenerate, 1);
+        let hero2 = policy.select_for_lane(ModelTaskKind::HeroGenerate, 2);
+        assert_eq!(hero0.provider.as_deref(), Some("provA"));
+        assert_eq!(hero1.provider.as_deref(), Some("provB"));
+        assert_eq!(hero2.provider.as_deref(), Some("provA")); // wraps
+        assert_ne!(hero0, hero1);
+        // Evaluative role (verifier) ignores the pool and stays on its dedicated
+        // route, independent of the generator pool.
+        let verifier0 = policy.select_for_lane(ModelTaskKind::Verifier, 0);
+        let verifier1 = policy.select_for_lane(ModelTaskKind::Verifier, 1);
+        assert_eq!(verifier0, verifier1);
+        assert_eq!(verifier0, policy.select(ModelTaskKind::Verifier));
+    }
+
+    #[test]
+    fn select_for_lane_falls_back_to_select_when_pool_empty() {
+        let policy = ModelPolicy::default();
+        for lane in 0..4 {
+            assert_eq!(
+                policy.select_for_lane(ModelTaskKind::HeroGenerate, lane),
+                policy.select(ModelTaskKind::HeroGenerate),
+            );
+        }
     }
 }

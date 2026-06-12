@@ -54,6 +54,16 @@ where
         prompt: &str,
         cwd: &Path,
     ) -> Result<ModelCallReceipt> {
+        self.complete_lane(kind, prompt, cwd, 0).await
+    }
+
+    async fn complete_lane(
+        &self,
+        kind: ModelTaskKind,
+        prompt: &str,
+        cwd: &Path,
+        lane: usize,
+    ) -> Result<ModelCallReceipt> {
         let Ok(_permit) = self.semaphore.clone().acquire_owned().await else {
             return Ok(ModelCallReceipt::failure(
                 kind,
@@ -77,7 +87,7 @@ where
         }
         let used = previous + 1;
         let remaining = self.max_calls.saturating_sub(used);
-        let mut receipt = self.inner.complete(kind, prompt, cwd).await?;
+        let mut receipt = self.inner.complete_lane(kind, prompt, cwd, lane).await?;
         receipt.budget_used = Some(used);
         receipt.budget_remaining = Some(remaining);
         if self.require_live && receipt.provider == "fake" {
