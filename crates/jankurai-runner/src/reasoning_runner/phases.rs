@@ -65,6 +65,9 @@ pub(super) async fn run_early_phases(
         context_phase(repo, run_id, db, sink, &frame, runtime, config, &mut edges).await?;
     artifacts.push(context.clone());
 
+    // Feed a repo blast-radius slice into the brainstorm lanes so workers reason
+    // about change-impact and test coverage (U8).
+    let graph_slice = graph.blast_radius_slice(20);
     brainstorm_phase(
         repo,
         run_id,
@@ -74,6 +77,7 @@ pub(super) async fn run_early_phases(
         config,
         &evidence,
         &context,
+        &graph_slice,
         &mut artifacts,
         &mut edges,
         &mut lanes,

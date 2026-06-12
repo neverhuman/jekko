@@ -35,3 +35,40 @@ fn builds_file_test_and_import_edges() {
     assert!(graph.nodes.iter().any(|node| node.kind == "method"));
     assert!(graph.edges.iter().any(|edge| edge.kind == "calls"));
 }
+
+#[test]
+fn blast_radius_slice_ranks_by_degree_and_is_deterministic() {
+    let node = |id: &str, kind: &str, key: &str, label: &str| GraphNode {
+        id: id.into(),
+        kind: kind.into(),
+        key: key.into(),
+        label: label.into(),
+        payload_json: None,
+    };
+    let edge = |from: &str, to: &str| GraphEdge {
+        from: from.into(),
+        to: to.into(),
+        kind: "calls".into(),
+        payload_json: None,
+    };
+    let graph = RepoGraph {
+        nodes: vec![
+            node("n1", "file", "src/a.rs", "src/a.rs"),
+            node("n2", "function", "fn_b", "b()"),
+            node("n3", "file", "src/c.rs", "src/c.rs"),
+        ],
+        // n2 is the most-connected node (degree 3).
+        edges: vec![edge("n1", "n2"), edge("n3", "n2"), edge("n2", "n1")],
+    };
+    let slice = graph.blast_radius_slice(2);
+    let lines: Vec<&str> = slice.lines().collect();
+    assert_eq!(lines.len(), 2, "max_items bound respected: {slice}");
+    assert!(
+        lines[0].contains("b()"),
+        "highest-blast-radius node ranks first: {slice}"
+    );
+    // Deterministic across calls.
+    assert_eq!(graph.blast_radius_slice(2), slice);
+    // Empty graph yields an empty slice.
+    assert!(RepoGraph::default().blast_radius_slice(5).is_empty());
+}
