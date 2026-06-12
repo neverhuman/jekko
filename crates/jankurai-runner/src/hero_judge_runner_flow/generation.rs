@@ -2,6 +2,8 @@ mod prompted;
 mod types;
 
 use std::fs;
+use std::path::Path;
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use serde_json::json;
@@ -9,12 +11,12 @@ use serde_json::json;
 use crate::daemon_store;
 use crate::events::EventKind;
 use crate::hero_judge::{
-    HeroJudgeLaneMetric, HeroJudgeQualityMetric, PromotionDecision, PromptVariant,
+    HeroJudgeConfig, HeroJudgeLaneMetric, HeroJudgeQualityMetric, PromotionDecision, PromptVariant,
 };
 use crate::hero_judge_eval::{
     average_score, generation_quality_metric, knowledge_entry, lane_metric_records,
     persist_knowledge_capsule, reduce_generation, review_cards, rounded, scoreboard_for_generation,
-    seed_prompt_lineage, write_json_pretty, write_jsonl, GenerationMetricInputs,
+    seed_prompt_lineage, write_json_pretty, write_jsonl, GenerationMetricInputs, OracleVerdict,
 };
 use crate::hero_judge_runner_helpers::evolution_context;
 use crate::model_client::kind_label;
@@ -22,6 +24,34 @@ use crate::model_policy::ModelTaskKind;
 
 use self::prompted::run_prompted_group;
 pub(super) use self::types::{GenerationInputs, GenerationState};
+
+/// Run the operator-supplied objective oracle command (if any) in the run repo
+/// and convert its exit status into an [`OracleVerdict`]. Returns `Ok(None)`
+/// when no command is configured, preserving the self-graded behavior. The
+/// command comes from trusted run config (`promotion.objective_command`), not
+/// model output, so it is equivalent to a CI check.
+fn compute_objective_oracle(
+    repo: &Path,
+    config: &HeroJudgeConfig,
+) -> Result<Option<OracleVerdict>> {
+    let Some(command) = config.promotion.objective_command.as_deref() else {
+        return Ok(None);
+    };
+    if command.trim().is_empty() {
+        return Ok(None);
+    }
+    let status = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .current_dir(repo)
+        .status()
+        .with_context(|| format!("run objective oracle command `{command}`"))?;
+    let passed = status.success();
+    Ok(Some(OracleVerdict {
+        passed,
+        score: if passed { 1.0 } else { 0.0 },
+    }))
+}
 
 pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<GenerationState> {
     let mut prompt_lineage = seed_prompt_lineage(input.objective, input.config);
@@ -169,6 +199,12 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
         model_calls_used += meta.len();
         write_json_pretty(&gen_dir.join("meta-judge.json"), &meta)?;
 
+        // Ground the promotion in an objective oracle when configured: a failing
+        // oracle hard-rejects regardless of model self-scores.
+        let oracle = compute_objective_oracle(input.repo, input.config)?;
+        if let Some(verdict) = oracle.as_ref() {
+            write_json_pretty(&gen_dir.join("objective-oracle.json"), verdict)?;
+        }
         let decision = reduce_generation(
             input.run_id,
             generation,
@@ -176,6 +212,7 @@ pub(super) async fn run_generations(input: GenerationInputs<'_>) -> Result<Gener
             verifier_score,
             &red_team,
             input.config,
+            oracle,
         );
         input.sink.emit(
             EventKind::PromotionDecision,
