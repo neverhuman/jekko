@@ -75,6 +75,10 @@ fn compute_objective_oracle(
     if command.trim().is_empty() {
         return Ok(None);
     }
+    // Command floor: refuse to spawn a catastrophic objective oracle command.
+    if let Some(reason) = crate::command_floor::blocked_reason(command) {
+        anyhow::bail!("command floor blocked objective oracle command ({reason}): {command}");
+    }
     let status = Command::new("sh")
         .arg("-c")
         .arg(command)

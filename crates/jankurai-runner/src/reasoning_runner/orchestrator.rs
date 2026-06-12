@@ -219,6 +219,23 @@ pub async fn run_advanced_reasoning_tick_with_db(
     // reference-vs-candidate execution; otherwise fall back to the
     // deterministic fake adapter (behavior unchanged for runs without commands).
     let parity_report = if runtime.parity_exec.is_active() {
+        let reference_command = runtime
+            .parity_exec
+            .reference_command
+            .clone()
+            .unwrap_or_default();
+        let candidate_command = runtime
+            .parity_exec
+            .candidate_command
+            .clone()
+            .unwrap_or_default();
+        // Command floor: refuse to spawn catastrophic parity commands even
+        // though they come from trusted config (defense in depth).
+        for command in [&reference_command, &candidate_command] {
+            if let Some(reason) = crate::command_floor::blocked_reason(command) {
+                anyhow::bail!("command floor blocked parity command ({reason}): {command}");
+            }
+        }
         let ref_cwd = runtime
             .parity_exec
             .reference_cwd
@@ -231,24 +248,8 @@ pub async fn run_advanced_reasoning_tick_with_db(
             .as_deref()
             .map(Path::new)
             .unwrap_or(repo);
-        let mut reference = CommandTargetAdapter::new(
-            "reference",
-            runtime
-                .parity_exec
-                .reference_command
-                .clone()
-                .unwrap_or_default(),
-            ref_cwd,
-        );
-        let mut candidate = CommandTargetAdapter::new(
-            "candidate",
-            runtime
-                .parity_exec
-                .candidate_command
-                .clone()
-                .unwrap_or_default(),
-            cand_cwd,
-        );
+        let mut reference = CommandTargetAdapter::new("reference", reference_command, ref_cwd);
+        let mut candidate = CommandTargetAdapter::new("candidate", candidate_command, cand_cwd);
         run_target_switched_cases(&mut reference, &mut candidate, &cases)?
     } else {
         let mut reference = FakeTargetAdapter::new("reference");
