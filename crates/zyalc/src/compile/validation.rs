@@ -80,31 +80,19 @@ pub(super) fn validate_superworkflow_value(source: &Path, value: &serde_yaml::Va
         .is_some_and(is_state_machine_workflow);
     if workflow_is_state_machine {
         validate_workflow_state_machine(source, require_map(root, "workflow")?)?;
+        return Ok(());
     }
-    let sw = if workflow_is_state_machine {
-        match (
-            lookup(root, "superworkflow"),
-            lookup(job, "workflow"),
-            lookup(job, "superworkflow"),
-        ) {
-            (Some(_), _, _) => require_map(root, "superworkflow")?,
-            (None, Some(_), _) => require_map(job, "workflow")?,
-            (None, None, Some(_)) => require_map(job, "superworkflow")?,
-            _ => return Err(anyhow!("missing required key `superworkflow`")),
-        }
-    } else {
-        match (
-            lookup(root, "workflow"),
-            lookup(root, "superworkflow"),
-            lookup(job, "workflow"),
-            lookup(job, "superworkflow"),
-        ) {
-            (Some(_), _, _, _) => require_map(root, "workflow")?,
-            (None, Some(_), _, _) => require_map(root, "superworkflow")?,
-            (None, None, Some(_), _) => require_map(job, "workflow")?,
-            (None, None, None, Some(_)) => require_map(job, "superworkflow")?,
-            _ => return Err(anyhow!("missing required key `workflow`")),
-        }
+    let sw = match (
+        lookup(root, "workflow"),
+        lookup(root, "superworkflow"),
+        lookup(job, "workflow"),
+        lookup(job, "superworkflow"),
+    ) {
+        (Some(_), _, _, _) => require_map(root, "workflow")?,
+        (None, Some(_), _, _) => require_map(root, "superworkflow")?,
+        (None, None, Some(_), _) => require_map(job, "workflow")?,
+        (None, None, None, Some(_)) => require_map(job, "superworkflow")?,
+        _ => return Err(anyhow!("missing required key `workflow`")),
     };
     let phases = require_seq(sw, "phases")?;
     if !(9..=12).contains(&phases.len()) {

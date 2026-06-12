@@ -153,12 +153,13 @@ fn superworkflow_emit_requires_nine_to_twelve_phases() {
 #[test]
 fn superworkflow_emit_accepts_workflow_root_shape() {
     let workflow = workflow_state_machine_with_linear_states(9);
-    let raw = superworkflow_with_phases(9).replacen(
-        "\nsuperworkflow:\n",
-        &format!("\n{workflow}superworkflow:\n"),
-        1,
+    let raw = format!(
+        "# zyal: declarative target=superworkflow schema=zyal/superworkflow@1\n\
+         version: v1\nintent: daemon\nconfirm: RUN_FOREVER\nid: smoke\n\
+         job:\n  name: smoke\n  objective: smoke\n{workflow}"
     );
     let out = emit_superworkflow(&raw).expect("workflow-root superworkflow json");
+    assert!(out.contains("\"workflow\""));
     assert!(out.contains("\"superworkflow\""));
     assert!(out.contains("\"phases\""));
 }

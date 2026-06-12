@@ -63,6 +63,10 @@ fn normalize_superworkflow_shape(mut value: serde_json::Value) -> serde_json::Va
     if root.contains_key("superworkflow") {
         return value;
     }
+    if let Some(generated) = superworkflow_from_state_machine(root) {
+        root.insert("superworkflow".to_string(), generated);
+        return value;
+    }
     if let Some(workflow) = root.remove("workflow") {
         root.insert("superworkflow".to_string(), workflow);
         return value;
@@ -81,6 +85,105 @@ fn normalize_superworkflow_shape(mut value: serde_json::Value) -> serde_json::Va
         root.insert("superworkflow".to_string(), superworkflow);
     }
     value
+}
+
+fn superworkflow_from_state_machine(
+    root: &serde_json::Map<String, serde_json::Value>,
+) -> Option<serde_json::Value> {
+    use serde_json::{Map, Value};
+    let workflow = root.get("workflow")?.as_object()?;
+    if workflow.get("type").and_then(Value::as_str) != Some("state_machine") {
+        return None;
+    }
+    let states = workflow.get("states")?.as_object()?;
+    let mut outgoing: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+
+    for (state_id, state_value) in states {
+        let Some(transitions) = state_value
+            .as_object()
+            .and_then(|state| state.get("transitions"))
+            .and_then(Value::as_array)
+        else {
+            continue;
+        };
+        let mut seen = std::collections::BTreeSet::new();
+        for transition in transitions {
+            let Some(to) = transition
+                .as_object()
+                .and_then(|transition| transition.get("to"))
+                .and_then(Value::as_str)
+            else {
+                continue;
+            };
+            if !seen.insert(to.to_string()) {
+                continue;
+            }
+            outgoing
+                .entry(state_id.clone())
+                .or_default()
+                .push(to.to_string());
+        }
+    }
+
+    let job = root.get("job")?.as_object()?;
+    let id = root.get("id")?.as_str()?.to_string();
+    let name = job
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or(id.as_str())
+        .to_string();
+    let objective = job
+        .get("objective")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    let mut phases = Vec::with_capacity(states.len());
+    for (state_id, state_value) in states {
+        let state = state_value.as_object()?;
+        let mut deps = Vec::new();
+        for (candidate, children) in &outgoing {
+            if children.iter().any(|child| child == state_id) {
+                deps.push(candidate.clone());
+            }
+        }
+        deps.sort();
+        deps.dedup();
+        let writes = match state.get("writes").and_then(Value::as_str) {
+            Some("scratch_only") => "scratch_only",
+            Some("main_worktree") => "primary_repo",
+            Some("isolated_worktree") => "isolated_worktree",
+            _ => "isolated_worktree",
+        };
+        let signoff = if state.get("approval").is_some() || state.get("terminal").is_some() {
+            "single"
+        } else {
+            "none"
+        };
+        phases.push(Value::Object(Map::from_iter([
+            ("id".to_string(), Value::String(state_id.clone())),
+            (
+                "name".to_string(),
+                Value::String(state_id.replace('_', " ")),
+            ),
+            ("objective".to_string(), Value::String(state_id.clone())),
+            (
+                "depends_on".to_string(),
+                Value::Array(deps.into_iter().map(Value::String).collect()),
+            ),
+            ("write_scope".to_string(), Value::String(writes.to_string())),
+            ("signoff".to_string(), Value::String(signoff.to_string())),
+            ("gates".to_string(), Value::Array(Vec::new())),
+        ])));
+    }
+
+    Some(Value::Object(Map::from_iter([
+        ("id".to_string(), Value::String(id)),
+        ("name".to_string(), Value::String(name)),
+        ("objective".to_string(), Value::String(objective)),
+        ("phases".to_string(), Value::Array(phases)),
+    ])))
 }
 
 /// Prepend a `_generated` top-level object to the rendered JSON so the
@@ -152,9 +255,17 @@ fn yaml_to_toml(value: serde_yaml::Value) -> Result<toml::Value> {
         Some(_) => return Err(anyhow!("sandbox must be a mapping")),
         None => None,
     };
+    let job = match map.get(Y::String("job".to_string())) {
+        Some(Y::Mapping(job)) => Some(job.clone()),
+        Some(_) => return Err(anyhow!("job must be a mapping")),
+        None => None,
+    };
     let has_lane_contract = map.contains_key(Y::String("lanes".to_string()))
         || map.contains_key(Y::String("schema_version".to_string()))
         || map.contains_key(Y::String("sandbox_root".to_string()))
+        || job
+            .as_ref()
+            .is_some_and(|nested| nested.contains_key(Y::String("lanes".to_string())))
         || sandbox
             .as_ref()
             .is_some_and(|nested| nested.contains_key(Y::String("lanes".to_string())));
@@ -188,13 +299,20 @@ fn yaml_to_toml(value: serde_yaml::Value) -> Result<toml::Value> {
         let lanes = match map.get(Y::String("lanes".to_string())) {
             Some(Y::Sequence(arr)) => arr.clone(),
             Some(_) => return Err(anyhow!("lanes must be a sequence")),
-            None => match sandbox
+            None => match job
                 .as_ref()
                 .and_then(|nested| nested.get(Y::String("lanes".to_string())))
             {
                 Some(Y::Sequence(arr)) => arr.clone(),
                 Some(_) => return Err(anyhow!("lanes must be a sequence")),
-                None => return Err(anyhow!("lanes are required")),
+                None => match sandbox
+                    .as_ref()
+                    .and_then(|nested| nested.get(Y::String("lanes".to_string())))
+                {
+                    Some(Y::Sequence(arr)) => arr.clone(),
+                    Some(_) => return Err(anyhow!("lanes must be a sequence")),
+                    None => return Err(anyhow!("lanes are required")),
+                },
             },
         };
         let mut arr = Vec::with_capacity(lanes.len());

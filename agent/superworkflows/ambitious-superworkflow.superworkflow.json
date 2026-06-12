@@ -22,512 +22,141 @@
     ]
   },
   "superworkflow": {
-    "controller": {
-      "max_parallel_phases": 3,
-      "max_parallel_tasks_per_phase": 16,
-      "mode": "supervisor_dag",
-      "park_unresolved_tasks_with_summary": true,
-      "prevent_scope_sprawl": true,
-      "require_phase_signoff": true,
-      "retry_until_exit_gates_pass": true
-    },
-    "memory": {
-      "compact_every_tasks": 8,
-      "inject_at_phase_start": [
-        "invariants",
-        "open_gaps",
-        "recent_failures",
-        "repo_graph_hotspots"
-      ],
-      "knowledge_store": "target/zyal/superworkflow/memory.sqlite",
-      "negative_memory": true,
-      "phase_summaries": "target/zyal/superworkflow/phases/*.summary.md",
-      "run_wal": "target/zyal/superworkflow/run.wal.jsonl"
-    },
-    "parity": {
-      "candidate_adapter": "target/zyal/parity/candidate-adapter",
-      "cluster_failures": true,
-      "enabled": true,
-      "evidence_jsonl": "target/zyal/parity/evidence.jsonl",
-      "promote_fixed_gap_to_regression": true,
-      "reference_adapter": "target/zyal/parity/reference-adapter",
-      "replacement": "candidate",
-      "target": "redis",
-      "tmp_mode": "ramdisk_or_memory"
-    },
+    "id": "ambitious-superworkflow-template",
+    "name": "Ambitious challenge superworkflow template (MiniRedis port)",
+    "objective": "Drive a many-hour or many-day MiniRedis-class port from contract capture through parity, performance, hardening, release, and durable memory archive without scope sprawl.",
     "phases": [
       {
-        "agents": {
-          "critic": 2,
-          "memory_curator": 1,
-          "reference_mapper": 4
-        },
-        "depends_on": [],
-        "exit": {
-          "gates": [
-            {
-              "kind": "artifact_exists",
-              "path": "target/zyal/superworkflow/invariants.json"
-            },
-            {
-              "kind": "review_quorum",
-              "min_approvals": 2,
-              "reviewers": [
-                "critic",
-                "reference_mapper"
-              ]
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/superworkflow/source-of-truth.md",
-            "target/zyal/superworkflow/invariants.json",
-            "target/zyal/superworkflow/acceptance-matrix.json"
-          ],
-          "signoff": [
-            "supervisor",
-            "critic"
-          ]
-        },
-        "id": "source_of_truth",
-        "name": "Source of truth",
-        "objective": "Build the non-negotiable behavior, API, compatibility, and evidence ledger for the target (redis) so every later phase can prove against it.",
-        "parallel_group": "planning"
-      },
-      {
-        "agents": {
-          "architect": 3,
-          "critic": 2,
-          "memory_curator": 1
-        },
         "depends_on": [
           "source_of_truth"
         ],
-        "exit": {
-          "gates": [
-            {
-              "kind": "artifact_exists",
-              "path": "target/zyal/superworkflow/architecture.md"
-            },
-            {
-              "kind": "review_quorum",
-              "min_approvals": 2,
-              "reviewers": [
-                "architect",
-                "critic"
-              ]
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/superworkflow/architecture.md",
-            "target/zyal/superworkflow/risk-register.json"
-          ],
-          "signoff": [
-            "supervisor",
-            "architect"
-          ]
-        },
+        "gates": [],
         "id": "architecture_blueprint",
-        "name": "Architecture blueprint",
-        "objective": "Convert requirements into module boundaries, invariants, risk register, and implementation slices for the candidate.",
-        "parallel_group": "planning"
+        "name": "architecture blueprint",
+        "objective": "architecture_blueprint",
+        "signoff": "none",
+        "write_scope": "scratch_only"
       },
       {
-        "agents": {
-          "architect": 1,
-          "critic": 1,
-          "graph_indexer": 2
-        },
         "depends_on": [
-          "source_of_truth"
-        ],
-        "exit": {
-          "gates": [
-            {
-              "gte": 50,
-              "kind": "repo_graph_min_symbols"
-            },
-            {
-              "kind": "artifact_exists",
-              "path": "target/zyal/superworkflow/repo-graph.sqlite"
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/superworkflow/repo-graph.sqlite",
-            "target/zyal/superworkflow/graph-stats.json"
-          ],
-          "signoff": [
-            "supervisor",
-            "graph_indexer"
-          ]
-        },
-        "id": "repo_graph_bootstrap",
-        "name": "Repo graph bootstrap",
-        "objective": "Index functions, symbols, tests, call edges, dataflow hints, ownership, and blast radius so later phases edit with full context.",
-        "parallel_group": "planning"
-      },
-      {
-        "agents": {
-          "memory_curator": 1,
-          "planner": 2,
-          "reference_mapper": 3
-        },
-        "depends_on": [
-          "architecture_blueprint",
           "repo_graph_bootstrap"
         ],
-        "exit": {
-          "gates": [
-            {
-              "gte": 50,
-              "kind": "task_bank_min_items"
-            },
-            {
-              "gte": 0.7,
-              "kind": "task_bank_has_tests"
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/superworkflow/task-bank.jsonl",
-            "target/zyal/superworkflow/contracts.json"
-          ],
-          "signoff": [
-            "supervisor",
-            "planner"
-          ]
-        },
+        "gates": [],
         "id": "contracts_and_slices",
-        "name": "Contracts and slices",
-        "objective": "Produce task contracts, proof commands, fixture strategy, and independent slices that can be claimed in parallel.",
-        "parallel_group": "planning"
+        "name": "contracts and slices",
+        "objective": "contracts_and_slices",
+        "signoff": "none",
+        "write_scope": "scratch_only"
       },
       {
-        "agents": {
-          "critic": 2,
-          "implementer": 12,
-          "reviewer": 4,
-          "tester": 4
-        },
         "depends_on": [
-          "contracts_and_slices"
-        ],
-        "exit": {
-          "gates": [
-            {
-              "command": "cargo test --workspace",
-              "kind": "shell",
-              "timeout": "45m"
-            },
-            {
-              "gte": 0.65,
-              "kind": "task_completion_floor"
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/superworkflow/subsystem-receipts.jsonl"
-          ],
-          "signoff": [
-            "supervisor",
-            "reviewer",
-            "tester"
-          ]
-        },
-        "id": "parallel_subsystems",
-        "name": "Parallel subsystems",
-        "objective": "Implement independent verified slices in isolated worktrees with critic lanes, against the canonical contracts.",
-        "parallel_group": "implementation"
-      },
-      {
-        "agents": {
-          "implementer": 6,
-          "reviewer": 2,
-          "tester": 2
-        },
-        "depends_on": [
-          "parallel_subsystems"
-        ],
-        "exit": {
-          "gates": [
-            {
-              "command": "cargo test --workspace --features integration",
-              "kind": "shell",
-              "timeout": "45m"
-            },
-            {
-              "kind": "no_unmerged_high_value_worktrees"
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/superworkflow/integration-report.md",
-            "target/zyal/superworkflow/integration-receipt.json"
-          ],
-          "signoff": [
-            "supervisor",
-            "reviewer"
-          ]
-        },
-        "id": "integration_fusion",
-        "name": "Integration fusion",
-        "objective": "Fuse verified subsystem work, resolve interface drift, and run integration proof lanes on the integration branch.",
-        "parallel_group": "implementation"
-      },
-      {
-        "agents": {
-          "parity_judge": 3,
-          "performance_lead": 1,
-          "tester": 5
-        },
-        "depends_on": [
-          "source_of_truth",
-          "contracts_and_slices"
-        ],
-        "exit": {
-          "gates": [
-            {
-              "gte": 500,
-              "kind": "parity_case_floor"
-            },
-            {
-              "kind": "reference_target_diff_harness",
-              "must_exist": true
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/parity/corpus-manifest.json",
-            "target/zyal/parity/evidence.jsonl",
-            "target/zyal/parity/report.md"
-          ],
-          "signoff": [
-            "supervisor",
-            "parity_judge"
-          ]
-        },
-        "id": "parity_lab",
-        "name": "Parity lab",
-        "objective": "Create differential, golden, metamorphic, and fuzz parity harnesses comparing the candidate against the redis target.",
-        "parallel_group": "testing"
-      },
-      {
-        "agents": {
-          "implementer": 10,
-          "memory_curator": 1,
-          "parity_judge": 3,
-          "tester": 5
-        },
-        "depends_on": [
-          "integration_fusion",
-          "parity_lab"
-        ],
-        "exit": {
-          "gates": [
-            {
-              "gte": 0.98,
-              "kind": "parity_pass_rate"
-            },
-            {
-              "kind": "unexplained_gap_count",
-              "lte": 0
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/parity/gap-ledger.json",
-            "target/zyal/parity/closure-report.md"
-          ],
-          "signoff": [
-            "supervisor",
-            "parity_judge",
-            "tester"
-          ]
-        },
-        "id": "parity_gap_closure",
-        "name": "Parity gap closure",
-        "objective": "Close blocking parity gaps using the gap ledger and regression proofs so the candidate matches the target on the acceptance matrix.",
-        "parallel_group": "hardening"
-      },
-      {
-        "agents": {
-          "critic": 1,
-          "implementer": 6,
-          "performance_lead": 3,
-          "tester": 2
-        },
-        "depends_on": [
-          "parity_gap_closure"
-        ],
-        "exit": {
-          "gates": [
-            {
-              "kind": "perf_regression_ceiling",
-              "lte": 1.2,
-              "metric": "p95_latency_ratio"
-            },
-            {
-              "gte": 0.98,
-              "kind": "parity_pass_rate"
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/perf/baseline.json",
-            "target/zyal/perf/report.md"
-          ],
-          "signoff": [
-            "supervisor",
-            "performance_lead",
-            "parity_judge"
-          ]
-        },
-        "id": "performance_closure",
-        "name": "Performance closure",
-        "objective": "Benchmark redis (reference) versus the candidate and close hot-path gaps without weakening parity.",
-        "parallel_group": "hardening"
-      },
-      {
-        "agents": {
-          "critic": 2,
-          "security_reviewer": 2,
-          "tester": 4
-        },
-        "depends_on": [
-          "parity_gap_closure"
-        ],
-        "exit": {
-          "gates": [
-            {
-              "kind": "no_critical_security_findings"
-            },
-            {
-              "command": "cargo test --workspace --features stress",
-              "kind": "shell",
-              "timeout": "60m"
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/security/review.md",
-            "target/zyal/reliability/failure-injection.json"
-          ],
-          "signoff": [
-            "supervisor",
-            "security_reviewer"
-          ]
-        },
-        "id": "hardening_security",
-        "name": "Hardening and security",
-        "objective": "Run fuzzing, stress, recovery, race, security, and fault-injection proof lanes against the candidate.",
-        "parallel_group": "hardening"
-      },
-      {
-        "agents": {
-          "critic": 1,
-          "release_captain": 1,
-          "writer": 2
-        },
-        "depends_on": [
-          "performance_closure",
           "hardening_security"
         ],
-        "exit": {
-          "gates": [
-            {
-              "gte": 0.9,
-              "kind": "docs_cover_acceptance_matrix"
-            },
-            {
-              "kind": "artifact_exists",
-              "path": "target/zyal/docs/release-notes.md"
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/docs/release-notes.md",
-            "target/zyal/docs/migration.md",
-            "target/zyal/docs/operations.md"
-          ],
-          "signoff": [
-            "supervisor",
-            "writer"
-          ]
-        },
+        "gates": [],
         "id": "docs_release_ops",
-        "name": "Docs, release, and operations",
-        "objective": "Produce docs, CI gates, migration notes, release checklist, and operational runbooks for shipping the candidate.",
-        "parallel_group": "release"
+        "name": "docs release ops",
+        "objective": "docs_release_ops",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
       },
       {
-        "agents": {
-          "critic": 2,
-          "memory_curator": 2,
-          "release_captain": 2,
-          "tester": 4
-        },
         "depends_on": [
           "docs_release_ops"
         ],
-        "exit": {
-          "gates": [
-            {
-              "command": "cargo test --workspace",
-              "kind": "shell",
-              "timeout": "60m"
-            },
-            {
-              "kind": "final_parity_report_approved"
-            },
-            {
-              "kind": "memory_archive_written"
-            }
-          ],
-          "required_artifacts": [
-            "target/zyal/release/final-proof.json",
-            "target/zyal/release/memory-archive.jsonl",
-            "target/zyal/release/known-gaps.md"
-          ],
-          "signoff": [
-            "supervisor",
-            "release_captain",
-            "critic"
-          ]
-        },
+        "gates": [],
         "id": "final_signoff",
-        "name": "Final signoff",
-        "objective": "Aggregate receipts, rerun full proofs, ensure clean tree, and require final human approval before promotion.",
-        "parallel_group": "release"
+        "name": "final signoff",
+        "objective": "final_signoff",
+        "signoff": "single",
+        "write_scope": "primary_repo"
+      },
+      {
+        "depends_on": [
+          "performance_closure"
+        ],
+        "gates": [],
+        "id": "hardening_security",
+        "name": "hardening security",
+        "objective": "hardening_security",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "parallel_subsystems"
+        ],
+        "gates": [],
+        "id": "integration_fusion",
+        "name": "integration fusion",
+        "objective": "integration_fusion",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "contracts_and_slices"
+        ],
+        "gates": [],
+        "id": "parallel_subsystems",
+        "name": "parallel subsystems",
+        "objective": "parallel_subsystems",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "parity_lab"
+        ],
+        "gates": [],
+        "id": "parity_gap_closure",
+        "name": "parity gap closure",
+        "objective": "parity_gap_closure",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "integration_fusion"
+        ],
+        "gates": [],
+        "id": "parity_lab",
+        "name": "parity lab",
+        "objective": "parity_lab",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "parity_gap_closure"
+        ],
+        "gates": [],
+        "id": "performance_closure",
+        "name": "performance closure",
+        "objective": "performance_closure",
+        "signoff": "none",
+        "write_scope": "isolated_worktree"
+      },
+      {
+        "depends_on": [
+          "architecture_blueprint"
+        ],
+        "gates": [],
+        "id": "repo_graph_bootstrap",
+        "name": "repo graph bootstrap",
+        "objective": "repo_graph_bootstrap",
+        "signoff": "none",
+        "write_scope": "scratch_only"
+      },
+      {
+        "depends_on": [],
+        "gates": [],
+        "id": "source_of_truth",
+        "name": "source of truth",
+        "objective": "source_of_truth",
+        "signoff": "none",
+        "write_scope": "scratch_only"
       }
-    ],
-    "replacement": "candidate",
-    "repo_graph": {
-      "backend": "sqlite",
-      "indexes": [
-        "symbols",
-        "calls",
-        "imports",
-        "tests",
-        "fixtures",
-        "public_api",
-        "performance_hotspots"
-      ],
-      "path": "target/zyal/superworkflow/repo-graph.sqlite",
-      "refresh_on": [
-        "phase_start",
-        "merge",
-        "test_failure_cluster"
-      ]
-    },
-    "risk": [
-      "agent swarm sprawl",
-      "partial parity mistaken for completion",
-      "lost context across long runs",
-      "performance regressions masked by functionality wins",
-      "unreviewed sandbox artifacts leaking into primary checkout"
-    ],
-    "sandbox": {
-      "destroy_unmerged_worktrees_after_archive": true,
-      "export_patch_per_task": true,
-      "isolation": "git_worktree",
-      "mode": "persistent_project_sandbox",
-      "preserve_between_phases": true,
-      "workspace_root": ".zyal/sandboxes/{run_id}"
-    },
-    "stage_count": 12,
-    "strategy": "macro_plan_then_parallel_phases_then_fusion_hardening",
-    "target": "redis"
+    ]
   },
   "version": "v1",
   "workflow": {

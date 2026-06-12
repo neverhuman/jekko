@@ -9,6 +9,195 @@ job:
   name: Sandbox loop lane registry
   objective: Keep the sandbox lane contract aligned with the generated TOML
     while constraining disposable-workspace execution.
+  lanes:
+      - name: experiment-worktree
+        command_id: sandbox.experiment-worktree
+        kind: sandbox
+        purpose: default cross-platform R&D sandbox using git worktree + fake-env
+        command: "tools/sandbox-wrap.sh --lane experiment-worktree -- just experiment"
+        cost: 8
+        destructive: false
+        timeout_seconds: 1800
+        requires_network: false
+        rules_covered:
+          - HLT-012-OVERBROAD-AGENCY
+          - HLT-033-UNDECLARED-SANDBOX-LOOP
+        required_artifacts:
+          - "{sandbox_root}/{run_id}/patch.diff"
+          - "{sandbox_root}/{run_id}/workspace/.agent/runs/"
+        workspace:
+          kind: worktree
+          base_branch: main
+          branch_template: "sandbox/{run_id}"
+        runtime:
+          backend: worktree
+          network: none
+          memory_limit: 2GB
+          cpu_limit: "2"
+          timeout_seconds: 1800
+        commands:
+          allowed_patterns:
+            - "just *"
+            - "cargo check*"
+            - "cargo build*"
+            - "cargo test*"
+            - "git status*"
+            - "git diff*"
+            - "git log*"
+            - "git show*"
+            - "git grep*"
+            - "git add*"
+            - "git commit*"
+          denied_patterns:
+            - "git push*"
+            - "rm -rf /*"
+            - "rm -rf ~*"
+            - "curl *"
+            - "wget *"
+            - "ssh *"
+            - "sudo *"
+            - "cargo install*"
+          wrapper: tools/sandbox-wrap.sh
+          allowed_env: []
+        environment:
+          home: "{sandbox_root}/{run_id}/home"
+          tmpdir: "{sandbox_root}/{run_id}/tmp"
+          cache_home: "{sandbox_root}/{run_id}/cache"
+        feedback:
+          capture_stdout: true
+          capture_stderr: true
+          capture_exit_code: true
+          tail_lines: 200
+        export:
+          patch_path: "{sandbox_root}/{run_id}/patch.diff"
+          artifacts:
+            - "{sandbox_root}/{run_id}/workspace/target/"
+        cleanup:
+          auto_remove: true
+          preserve_logs: true
+          preserve_on_failure: true
+        success:
+          exit_code_expected: 0
+          changed_files_max: 50
+          required_patch_present: true
+
+      - name: experiment-bubblewrap
+        command_id: sandbox.experiment-bubblewrap
+        kind: sandbox
+        purpose: Linux-only hardened sandbox via bubblewrap (process + net namespaces)
+        command: "tools/sandbox-wrap.sh --lane experiment-bubblewrap -- just experiment"
+        cost: 10
+        destructive: false
+        timeout_seconds: 1800
+        requires_network: false
+        rules_covered:
+          - HLT-012-OVERBROAD-AGENCY
+          - HLT-033-UNDECLARED-SANDBOX-LOOP
+        required_artifacts:
+          - "{sandbox_root}/{run_id}/patch.diff"
+        workspace:
+          kind: worktree
+          base_branch: main
+          branch_template: "sandbox/{run_id}"
+        runtime:
+          backend: bubblewrap
+          network: none
+          memory_limit: 2GB
+          cpu_limit: "2"
+          timeout_seconds: 1800
+        commands:
+          allowed_patterns:
+            - "just *"
+            - "cargo check*"
+            - "cargo build*"
+            - "cargo test*"
+          denied_patterns:
+            - "git push*"
+            - "*sudo*"
+            - "curl *"
+            - "wget *"
+            - "cargo install*"
+          wrapper: tools/sandbox-wrap.sh
+          allowed_env: []
+        environment:
+          home: "{sandbox_root}/{run_id}/home"
+          tmpdir: "{sandbox_root}/{run_id}/tmp"
+          cache_home: "{sandbox_root}/{run_id}/cache"
+        feedback:
+          capture_stdout: true
+          capture_stderr: true
+          capture_exit_code: true
+          tail_lines: 200
+        export:
+          patch_path: "{sandbox_root}/{run_id}/patch.diff"
+          artifacts: []
+        cleanup:
+          auto_remove: true
+          preserve_logs: true
+          preserve_on_failure: true
+        success:
+          exit_code_expected: 0
+          changed_files_max: 100
+          required_patch_present: false
+
+      - name: experiment-docker
+        command_id: sandbox.experiment-docker
+        kind: sandbox
+        purpose: cross-platform containerised sandbox via docker/podman
+        command: "tools/sandbox-wrap.sh --lane experiment-docker -- just experiment"
+        cost: 12
+        destructive: false
+        timeout_seconds: 2400
+        requires_network: false
+        rules_covered:
+          - HLT-012-OVERBROAD-AGENCY
+          - HLT-033-UNDECLARED-SANDBOX-LOOP
+        required_artifacts:
+          - "{sandbox_root}/{run_id}/patch.diff"
+        workspace:
+          kind: worktree
+          base_branch: main
+          branch_template: "sandbox/{run_id}"
+        runtime:
+          backend: docker
+          network: none
+          memory_limit: 4GB
+          cpu_limit: "4"
+          timeout_seconds: 2400
+          image: rust:1-bookworm
+        commands:
+          allowed_patterns:
+            - "just *"
+            - "cargo *"
+            - "git status*"
+            - "git diff*"
+          denied_patterns:
+            - "git push*"
+            - "cargo install*"
+            - "*sudo*"
+          wrapper: tools/sandbox-wrap.sh
+          allowed_env: []
+        environment:
+          home: "{sandbox_root}/{run_id}/home"
+          tmpdir: "{sandbox_root}/{run_id}/tmp"
+          cache_home: "{sandbox_root}/{run_id}/cache"
+        feedback:
+          capture_stdout: true
+          capture_stderr: true
+          capture_exit_code: true
+          tail_lines: 200
+        export:
+          patch_path: "{sandbox_root}/{run_id}/patch.diff"
+          artifacts:
+            - "{sandbox_root}/{run_id}/workspace/dist/"
+        cleanup:
+          auto_remove: true
+          preserve_logs: true
+          preserve_on_failure: true
+        success:
+          exit_code_expected: 0
+          changed_files_max: 200
+          required_patch_present: false
 stop:
   all:
     - git_clean:
@@ -17,194 +206,5 @@ sandbox:
   schema_version: "1.0.0"
   sandbox_root: "~/.local/share/agent-sandboxes"
 
-lanes:
-    - name: experiment-worktree
-      command_id: sandbox.experiment-worktree
-      kind: sandbox
-      purpose: default cross-platform R&D sandbox using git worktree + fake-env
-      command: "tools/sandbox-wrap.sh --lane experiment-worktree -- just experiment"
-      cost: 8
-      destructive: false
-      timeout_seconds: 1800
-      requires_network: false
-      rules_covered:
-        - HLT-012-OVERBROAD-AGENCY
-        - HLT-033-UNDECLARED-SANDBOX-LOOP
-      required_artifacts:
-        - "{sandbox_root}/{run_id}/patch.diff"
-        - "{sandbox_root}/{run_id}/workspace/.agent/runs/"
-      workspace:
-        kind: worktree
-        base_branch: main
-        branch_template: "sandbox/{run_id}"
-      runtime:
-        backend: worktree
-        network: none
-        memory_limit: 2GB
-        cpu_limit: "2"
-        timeout_seconds: 1800
-      commands:
-        allowed_patterns:
-          - "just *"
-          - "cargo check*"
-          - "cargo build*"
-          - "cargo test*"
-          - "git status*"
-          - "git diff*"
-          - "git log*"
-          - "git show*"
-          - "git grep*"
-          - "git add*"
-          - "git commit*"
-        denied_patterns:
-          - "git push*"
-          - "rm -rf /*"
-          - "rm -rf ~*"
-          - "curl *"
-          - "wget *"
-          - "ssh *"
-          - "sudo *"
-          - "cargo install*"
-        wrapper: tools/sandbox-wrap.sh
-        allowed_env: []
-      environment:
-        home: "{sandbox_root}/{run_id}/home"
-        tmpdir: "{sandbox_root}/{run_id}/tmp"
-        cache_home: "{sandbox_root}/{run_id}/cache"
-      feedback:
-        capture_stdout: true
-        capture_stderr: true
-        capture_exit_code: true
-        tail_lines: 200
-      export:
-        patch_path: "{sandbox_root}/{run_id}/patch.diff"
-        artifacts:
-          - "{sandbox_root}/{run_id}/workspace/target/"
-      cleanup:
-        auto_remove: true
-        preserve_logs: true
-        preserve_on_failure: true
-      success:
-        exit_code_expected: 0
-        changed_files_max: 50
-        required_patch_present: true
-
-    - name: experiment-bubblewrap
-      command_id: sandbox.experiment-bubblewrap
-      kind: sandbox
-      purpose: Linux-only hardened sandbox via bubblewrap (process + net namespaces)
-      command: "tools/sandbox-wrap.sh --lane experiment-bubblewrap -- just experiment"
-      cost: 10
-      destructive: false
-      timeout_seconds: 1800
-      requires_network: false
-      rules_covered:
-        - HLT-012-OVERBROAD-AGENCY
-        - HLT-033-UNDECLARED-SANDBOX-LOOP
-      required_artifacts:
-        - "{sandbox_root}/{run_id}/patch.diff"
-      workspace:
-        kind: worktree
-        base_branch: main
-        branch_template: "sandbox/{run_id}"
-      runtime:
-        backend: bubblewrap
-        network: none
-        memory_limit: 2GB
-        cpu_limit: "2"
-        timeout_seconds: 1800
-      commands:
-        allowed_patterns:
-          - "just *"
-          - "cargo check*"
-          - "cargo build*"
-          - "cargo test*"
-        denied_patterns:
-          - "git push*"
-          - "*sudo*"
-          - "curl *"
-          - "wget *"
-          - "cargo install*"
-        wrapper: tools/sandbox-wrap.sh
-        allowed_env: []
-      environment:
-        home: "{sandbox_root}/{run_id}/home"
-        tmpdir: "{sandbox_root}/{run_id}/tmp"
-        cache_home: "{sandbox_root}/{run_id}/cache"
-      feedback:
-        capture_stdout: true
-        capture_stderr: true
-        capture_exit_code: true
-        tail_lines: 200
-      export:
-        patch_path: "{sandbox_root}/{run_id}/patch.diff"
-        artifacts: []
-      cleanup:
-        auto_remove: true
-        preserve_logs: true
-        preserve_on_failure: true
-      success:
-        exit_code_expected: 0
-        changed_files_max: 100
-        required_patch_present: false
-
-    - name: experiment-docker
-      command_id: sandbox.experiment-docker
-      kind: sandbox
-      purpose: cross-platform containerised sandbox via docker/podman
-      command: "tools/sandbox-wrap.sh --lane experiment-docker -- just experiment"
-      cost: 12
-      destructive: false
-      timeout_seconds: 2400
-      requires_network: false
-      rules_covered:
-        - HLT-012-OVERBROAD-AGENCY
-        - HLT-033-UNDECLARED-SANDBOX-LOOP
-      required_artifacts:
-        - "{sandbox_root}/{run_id}/patch.diff"
-      workspace:
-        kind: worktree
-        base_branch: main
-        branch_template: "sandbox/{run_id}"
-      runtime:
-        backend: docker
-        network: none
-        memory_limit: 4GB
-        cpu_limit: "4"
-        timeout_seconds: 2400
-        image: rust:1-bookworm
-      commands:
-        allowed_patterns:
-          - "just *"
-          - "cargo *"
-          - "git status*"
-          - "git diff*"
-        denied_patterns:
-          - "git push*"
-          - "cargo install*"
-          - "*sudo*"
-        wrapper: tools/sandbox-wrap.sh
-        allowed_env: []
-      environment:
-        home: "{sandbox_root}/{run_id}/home"
-        tmpdir: "{sandbox_root}/{run_id}/tmp"
-        cache_home: "{sandbox_root}/{run_id}/cache"
-      feedback:
-        capture_stdout: true
-        capture_stderr: true
-        capture_exit_code: true
-        tail_lines: 200
-      export:
-        patch_path: "{sandbox_root}/{run_id}/patch.diff"
-        artifacts:
-          - "{sandbox_root}/{run_id}/workspace/dist/"
-      cleanup:
-        auto_remove: true
-        preserve_logs: true
-        preserve_on_failure: true
-      success:
-        exit_code_expected: 0
-        changed_files_max: 200
-        required_patch_present: false
-<<<END_ZYAL id=sandbox-lanes-template>>>
-ZYAL_ARM RUN_FOREVER id=sandbox-lanes-template
+  <<<END_ZYAL id=sandbox-lanes-template>>>
+  ZYAL_ARM RUN_FOREVER id=sandbox-lanes-template
