@@ -191,7 +191,7 @@ impl Default for RepoGraphPolicy {
 /// Graph store implementation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum GraphStore {
+pub enum RepoGraphStore {
     /// SQLite adjacency tables.
     Sqlite,
     /// Kuzu graph database.
@@ -201,6 +201,8 @@ pub enum GraphStore {
     /// Tantivy/vector hybrid index with explicit edges.
     TantivyHybrid,
 }
+
+pub use RepoGraphStore as GraphStore;
 
 /// When to refresh the repo graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

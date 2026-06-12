@@ -5,7 +5,7 @@ use super::PortTargetRequest;
 /// Phase state persisted for crash-safe resume.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum PhaseStatus {
+pub enum PortPhaseStatus {
     /// Stage or phase is being drafted.
     Drafting,
     /// Ordered plan exists.
@@ -26,7 +26,9 @@ pub enum PhaseStatus {
     Quarantined,
 }
 
-impl PhaseStatus {
+pub use PortPhaseStatus as PhaseStatus;
+
+impl PortPhaseStatus {
     /// Whether this status is terminal for autonomous progression.
     pub fn is_terminal(self) -> bool {
         matches!(self, Self::Complete | Self::Blocked | Self::Quarantined)

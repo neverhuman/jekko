@@ -28,7 +28,7 @@ pub struct Args {
 pub fn run(args: &Args, default_lanes: Option<&Path>, json: bool) -> Result<i32> {
     let path = match default_lanes {
         Some(p) => p.to_path_buf(),
-        None => PathBuf::from("agent/sandbox-lanes.toml"),
+        None => PathBuf::from("generated/sandbox-lanes.toml"),
     };
     let doc = spec::load(&path).context("load lanes file")?;
     let sandbox_root = crate::cli::create::expand_root(&doc.sandbox_root);

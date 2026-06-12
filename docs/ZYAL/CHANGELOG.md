@@ -78,7 +78,7 @@ across every commit.
 - `zyalc compile` Profile D — SuperWorkflow: new `target=superworkflow`
   pragma compiles a 9-12 phase manifest to canonical JSON. Reference
   manifest at `agent/zyal/ambitious-superworkflow.zyal` emits
-  `agent/superworkflows/ambitious-superworkflow.superworkflow.json`.
+  `generated/superworkflows/ambitious-superworkflow.superworkflow.json`.
 - New crates landed under `crates/`:
   - `zyal-core` — canonical types shared across the backbone.
   - `zyal-key-pool` — multi-user credential scan + `PolicyHook` trait
@@ -123,12 +123,12 @@ across every commit.
 - Introduced two new declarative profiles disambiguated by top-of-file
   pragma:
   - Profile B (`target=toml`) — compiles to TOML, first user is
-    `agent/sandbox-lanes.zyal` → `agent/sandbox-lanes.toml`.
+    `agent/sandbox-lanes.zyal` → `generated/sandbox-lanes.toml`.
   - Profile C (`target=github-workflow`) — compiles to
     `.github/workflows/*.yml` so GitHub Actions can still find them.
 - Shipped the `zyalc` compiler (`crates/zyalc/`) with idempotent
   `compile --all --check` drift detection.
-- Added the sandbox-loop declarative function (`agent/sandbox-lanes.toml`)
+- Added the sandbox-loop declarative function (`generated/sandbox-lanes.toml`)
   with three backends (worktree / bubblewrap / docker) and the
   `sandboxctl` runtime (`crates/sandboxctl/`).
 - New jankurai rules: `HLT-032-ZYAL-COMPILE-DRIFT`,

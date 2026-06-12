@@ -483,7 +483,7 @@ sandboxctl-build:
 # jankurai:proof HLT-012-OVERBROAD-AGENCY parallel=1 cache=cargo-build narrow-targets=true
 sandboxctl-fast: sandboxctl-check sandboxctl-build sandboxctl-test
 
-# Schema-validate agent/sandbox-lanes.toml.
+# Schema-validate generated/sandbox-lanes.toml.
 sandbox-validate:
 	cargo run --manifest-path crates/sandboxctl/Cargo.toml --locked --quiet -- validate
 

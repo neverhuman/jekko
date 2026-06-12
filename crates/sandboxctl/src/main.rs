@@ -30,10 +30,10 @@ pub mod exit {
     name = "sandboxctl",
     version,
     about = "Declarative sandbox-loop runtime",
-    long_about = "Read agent/sandbox-lanes.toml, set up disposable workspaces with permission allowlists, and execute commands through a wrapper that captures stdout/stderr/exit for agent feedback."
+    long_about = "Read generated/sandbox-lanes.toml, set up disposable workspaces with permission allowlists, and execute commands through a wrapper that captures stdout/stderr/exit for agent feedback."
 )]
 struct Cli {
-    /// Path to the sandbox-lanes file (default: agent/sandbox-lanes.toml).
+    /// Path to the sandbox-lanes file (default: generated/sandbox-lanes.toml).
     #[arg(long, global = true, env = "SANDBOXCTL_LANES")]
     lanes: Option<PathBuf>,
 

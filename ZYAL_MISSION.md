@@ -531,7 +531,7 @@ A **sandbox loop** is a declarative ZYAL surface (Profile B, target=toml)
 that lets agents execute experimental code in disposable workspaces with
 permission allowlists, captured logs, and reviewable patch exports.
 
-- Canonical spec: [`agent/sandbox-lanes.toml`](agent/sandbox-lanes.toml)
+- Canonical spec: [`generated/sandbox-lanes.toml`](generated/sandbox-lanes.toml)
   (generated from `agent/sandbox-lanes.zyal` via `zyalc`).
 - Runtime: [`crates/sandboxctl/`](crates/sandboxctl/) — three backends
   (`worktree` cross-platform, `bubblewrap` Linux-only, `docker`/`podman`

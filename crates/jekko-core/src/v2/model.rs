@@ -158,7 +158,7 @@ pub struct Variant {
 /// Model lifecycle status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Status {
+pub enum ModelLifecycleStatus {
     /// Alpha-quality.
     Alpha,
     /// Beta-quality.
@@ -170,6 +170,8 @@ pub enum Status {
     /// Provider key missing.
     Locked,
 }
+
+pub use ModelLifecycleStatus as Status;
 
 /// Context/output limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

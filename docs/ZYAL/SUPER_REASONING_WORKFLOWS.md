@@ -22,7 +22,7 @@ JSON manifest, then executed by the `zyal-supervisor` planner under
 which validates the DAG (no cycles, all `requires` references resolve)
 and emits the canonical manifest JSON. The example at
 `agent/zyal/ambitious-superworkflow.zyal` compiles to
-`agent/superworkflows/ambitious-superworkflow.superworkflow.json`.
+`generated/superworkflows/ambitious-superworkflow.superworkflow.json`.
 
 ## Canonical 12-stage plan
 

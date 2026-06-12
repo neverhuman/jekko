@@ -18,7 +18,7 @@ pub(super) fn emit(profile: &Profile, raw: &str) -> Result<(String, String)> {
 }
 
 pub(super) fn emit_toml(raw: &str) -> Result<String> {
-    let body = strip_pragmas(raw);
+    let body = toml_source_body(raw);
     let parsed: serde_yaml::Value =
         serde_yaml::from_str(&body).context("parse declarative YAML body")?;
     let toml_value = yaml_to_toml(parsed)?;
@@ -214,8 +214,25 @@ fn stamp_generated_header(value: serde_json::Value) -> serde_json::Value {
 }
 
 pub(super) fn strip_pragmas(raw: &str) -> String {
-    strip_zyal_envelope(raw)
-        .lines()
+    strip_pragma_lines(&strip_zyal_envelope(raw))
+}
+
+fn toml_source_body(raw: &str) -> String {
+    let before_end = strip_pragma_lines(&strip_zyal_envelope(raw));
+    if let Some(after_end) = body_after_zyal_envelope(raw) {
+        let after_end = strip_pragma_lines(&after_end);
+        if !after_end.trim().is_empty() {
+            if before_end.trim().is_empty() {
+                return after_end;
+            }
+            return format!("{before_end}\n{after_end}");
+        }
+    }
+    strip_pragmas(raw)
+}
+
+fn strip_pragma_lines(body: &str) -> String {
+    body.lines()
         .filter(|line| !line.trim_start().starts_with("# zyal:"))
         .filter(|line| !line.trim_start().starts_with("# zyalc:"))
         .collect::<Vec<_>>()
@@ -241,6 +258,29 @@ fn strip_zyal_envelope(raw: &str) -> String {
     raw.to_string()
 }
 
+fn body_after_zyal_envelope(raw: &str) -> Option<String> {
+    let mut after_end = false;
+    let mut body = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim_start();
+        if !after_end {
+            if trimmed.starts_with("<<<END_ZYAL ") {
+                after_end = true;
+            }
+            continue;
+        }
+        if trimmed.starts_with("ZYAL_ARM ") {
+            break;
+        }
+        body.push(line);
+    }
+    if after_end {
+        Some(body.join("\n"))
+    } else {
+        None
+    }
+}
+
 /// Convert a YAML mapping into a TOML value. The declarative schema uses
 /// `lanes: [...]` at the top level; TOML's natural array-of-tables form is
 /// `[[lane]]`, so we rename the key during translation.
@@ -260,10 +300,26 @@ fn yaml_to_toml(value: serde_yaml::Value) -> Result<toml::Value> {
         Some(_) => return Err(anyhow!("job must be a mapping")),
         None => None,
     };
+    let dispatch = match map.get(Y::String("dispatch".to_string())) {
+        Some(Y::Mapping(dispatch)) => Some(dispatch.clone()),
+        Some(_) => return Err(anyhow!("dispatch must be a mapping")),
+        None => None,
+    };
+    let sandbox_workers = match sandbox
+        .as_ref()
+        .and_then(|nested| nested.get(Y::String("workers".to_string())))
+    {
+        Some(Y::Mapping(workers)) => Some(workers.clone()),
+        Some(_) => return Err(anyhow!("sandbox.workers must be a mapping")),
+        None => None,
+    };
     let has_lane_contract = map.contains_key(Y::String("lanes".to_string()))
         || map.contains_key(Y::String("schema_version".to_string()))
         || map.contains_key(Y::String("sandbox_root".to_string()))
         || job
+            .as_ref()
+            .is_some_and(|nested| nested.contains_key(Y::String("lanes".to_string())))
+        || dispatch
             .as_ref()
             .is_some_and(|nested| nested.contains_key(Y::String("lanes".to_string())))
         || sandbox
@@ -295,25 +351,46 @@ fn yaml_to_toml(value: serde_yaml::Value) -> Result<toml::Value> {
                 "sandbox_root".into(),
                 yaml_value_to_toml(sandbox_root.clone())?,
             );
+        } else if let Some(sandbox_root) = sandbox_workers
+            .as_ref()
+            .and_then(|nested| nested.get(Y::String("root".to_string())))
+        {
+            tbl.insert(
+                "sandbox_root".into(),
+                yaml_value_to_toml(sandbox_root.clone())?,
+            );
         }
-        let lanes = match map.get(Y::String("lanes".to_string())) {
-            Some(Y::Sequence(arr)) => arr.clone(),
-            Some(_) => return Err(anyhow!("lanes must be a sequence")),
-            None => match job
-                .as_ref()
-                .and_then(|nested| nested.get(Y::String("lanes".to_string())))
-            {
-                Some(Y::Sequence(arr)) => arr.clone(),
-                Some(_) => return Err(anyhow!("lanes must be a sequence")),
-                None => match sandbox
-                    .as_ref()
-                    .and_then(|nested| nested.get(Y::String("lanes".to_string())))
-                {
-                    Some(Y::Sequence(arr)) => arr.clone(),
-                    Some(_) => return Err(anyhow!("lanes must be a sequence")),
-                    None => return Err(anyhow!("lanes are required")),
-                },
-            },
+        let lanes = if let Some(value) = map.get(Y::String("lanes".to_string())) {
+            match value {
+                Y::Sequence(arr) => arr.clone(),
+                _ => return Err(anyhow!("lanes must be a sequence")),
+            }
+        } else if let Some(value) = job
+            .as_ref()
+            .and_then(|nested| nested.get(Y::String("lanes".to_string())))
+        {
+            match value {
+                Y::Sequence(arr) => arr.clone(),
+                _ => return Err(anyhow!("lanes must be a sequence")),
+            }
+        } else if let Some(value) = dispatch
+            .as_ref()
+            .and_then(|nested| nested.get(Y::String("lanes".to_string())))
+        {
+            match value {
+                Y::Sequence(arr) => arr.clone(),
+                _ => return Err(anyhow!("lanes must be a sequence")),
+            }
+        } else if let Some(value) = sandbox
+            .as_ref()
+            .and_then(|nested| nested.get(Y::String("lanes".to_string())))
+        {
+            match value {
+                Y::Sequence(arr) => arr.clone(),
+                _ => return Err(anyhow!("lanes must be a sequence")),
+            }
+        } else {
+            return Err(anyhow!("lanes are required"));
         };
         let mut arr = Vec::with_capacity(lanes.len());
         for item in lanes {

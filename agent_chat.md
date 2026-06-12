@@ -953,7 +953,7 @@ Swept every gap surface, not just advisory.
 - release (with `--proof-evidence target/jankurai/evidence-index.json`): `score=91 raw=91 caps=0 findings=0`
 
 **Fixes this pass:**
-1. `agent/sandbox-lanes.toml` regenerated via `cargo run -p zyalc -- compile --all`. `zyalc-compile-check` was failing with `drift detected in 1 target` because the compiled TOML lagged the `.zyal` source. Now `zyalc-fast` runs clean: 9 tests pass, compiler reports `1 unchanged`.
+1. `generated/sandbox-lanes.toml` regenerated via `cargo run -p zyalc -- compile --all`. `zyalc-compile-check` was failing with `drift detected in 1 target` because the compiled TOML lagged the `.zyal` source. Now `zyalc-fast` runs clean: 9 tests pass, compiler reports `1 unchanged`.
 2. Refreshed `agent/security-evidence/*` via `bash tools/security-lane.sh`. `jankurai doctor` was reporting `low: security-evidence-stale-head` because the recorded git head (a929b0b93) lagged current (b50b4f570). Now `jankurai doctor --fail-on low` exits 0 with no findings.
 3. Ran `jankurai prove --changed-from origin/main` to regenerate `target/jankurai/evidence-index.json`. Before fix 1, prove was erroring `proof command 'just zyalc-fast' failed`; after fix 1 it completes clean and release-mode audit accepts the evidence.
 

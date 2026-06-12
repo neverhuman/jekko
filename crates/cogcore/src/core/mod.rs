@@ -45,7 +45,7 @@ pub enum ClaimModality {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Warning {
+pub enum CoreWarning {
     Superseded,
     Contradicted,
     Redacted,
@@ -55,6 +55,8 @@ pub enum Warning {
     Abstained,
     UnsafeToolRefused,
 }
+
+pub use CoreWarning as Warning;
 
 #[derive(Debug, Clone)]
 pub struct StoredEvent {
@@ -104,13 +106,15 @@ pub struct FeedbackSignal {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Outcome {
+pub enum CoreOutcome {
     TaskSuccess,
     TaskFailure,
     Verified,
     Falsified,
     Ignored,
 }
+
+pub use CoreOutcome as Outcome;
 
 #[derive(Debug, Clone)]
 pub struct CitedSource {

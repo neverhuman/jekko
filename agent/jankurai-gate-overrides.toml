@@ -99,6 +99,6 @@ expires = "2027-05-30"
 
 [[allow]]
 rule = "HLT-002-GENERATED-MUTATION"
-evidence = "agent/sandbox-lanes.toml"
-reason = "Contract/detector mismatch. `agent/generated-zones.toml` correctly declares `agent/sandbox-lanes.toml` as a generated, read-only zone (compiled from agent/zyal/sandbox-lanes.zyal by zyalc). The HLT-002 detector additionally classifies any agent/*.toml as protected control-plane source and flags the overlap as a mutation risk — but the zone declaration IS the protection (read_only=true + source contract + regenerate command). The two contracts are mutually consistent; the detector lacks a 'generated-and-in-agent/' state. Re-review when jankurai recognizes generated outputs under agent/."
+evidence = "generated/sandbox-lanes.toml"
+reason = "Contract/detector mismatch. `agent/generated-zones.toml` correctly declares `generated/sandbox-lanes.toml` as a generated, read-only zone (compiled from agent/zyal/sandbox-lanes.zyal by zyalc). The HLT-002 detector additionally classifies any agent/*.toml as protected control-plane source and flags the overlap as a mutation risk — but the zone declaration IS the protection (read_only=true + source contract + regenerate command). The two contracts are mutually consistent; the detector lacks a 'generated-and-in-agent/' state. Re-review when jankurai recognizes generated outputs under agent/."
 expires = "2027-05-30"

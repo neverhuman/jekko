@@ -423,14 +423,14 @@ EOF
 # Regenerate: \`bash scripts/bootstrap-split-family.sh\`
 
 [[zone]]
-command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/sandbox-lanes.zyal --out agent/sandbox-lanes.toml"
-path = "agent/sandbox-lanes.toml"
+command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/sandbox-lanes.zyal --out generated/sandbox-lanes.toml"
+path = "generated/sandbox-lanes.toml"
 read_only = true
 source = "zyalc"
 
 [[zone]]
-command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/ambitious-superworkflow.zyal --out agent/superworkflows/ambitious-superworkflow.superworkflow.json"
-path = "agent/superworkflows/ambitious-superworkflow.superworkflow.json"
+command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- compile agent/zyal/ambitious-superworkflow.zyal --out generated/superworkflows/ambitious-superworkflow.superworkflow.json"
+path = "generated/superworkflows/ambitious-superworkflow.superworkflow.json"
 read_only = true
 source = "zyalc"
 

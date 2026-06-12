@@ -8,7 +8,7 @@ use crate::spec;
 
 #[derive(Debug, ClapArgs)]
 pub struct Args {
-    /// Path to the lanes file (defaults to --lanes / agent/sandbox-lanes.toml).
+    /// Path to the lanes file (defaults to --lanes / generated/sandbox-lanes.toml).
     pub path: Option<PathBuf>,
     /// Reject any warning that would normally be advisory.
     #[arg(long)]
@@ -65,12 +65,12 @@ fn pick_path(arg: Option<&Path>, default_lanes: Option<&Path>) -> Result<PathBuf
     if let Some(p) = default_lanes {
         return Ok(p.to_path_buf());
     }
-    let default_path = PathBuf::from("agent/sandbox-lanes.toml");
+    let default_path = PathBuf::from("generated/sandbox-lanes.toml");
     if default_path.exists() {
         Ok(default_path)
     } else {
         Err(anyhow::anyhow!(
-            "no lanes file specified and agent/sandbox-lanes.toml not found"
+            "no lanes file specified and generated/sandbox-lanes.toml not found"
         ))
         .context("validate")
     }

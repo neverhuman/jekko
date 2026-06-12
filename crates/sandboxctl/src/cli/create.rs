@@ -11,7 +11,7 @@ use crate::spec;
 
 #[derive(Debug, ClapArgs)]
 pub struct Args {
-    /// Lane name from agent/sandbox-lanes.toml.
+    /// Lane name from generated/sandbox-lanes.toml.
     pub lane: String,
     /// Optional run-id override; default is generated.
     #[arg(long)]
@@ -24,7 +24,7 @@ pub struct Args {
 pub fn run(args: &Args, default_lanes: Option<&Path>, json: bool) -> Result<i32> {
     let path = match default_lanes {
         Some(p) => p.to_path_buf(),
-        None => PathBuf::from("agent/sandbox-lanes.toml"),
+        None => PathBuf::from("generated/sandbox-lanes.toml"),
     };
 
     let doc = spec::load(&path).context("load lanes file")?;

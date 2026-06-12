@@ -109,7 +109,7 @@ pub struct GlobalOpts {
 /// The set of subcommands `jekko` understands. Module-level docs on each
 /// branch live in the corresponding [`crate::cmd`] file.
 #[derive(Subcommand, Debug)]
-pub enum Command {
+pub enum JekkoCommand {
     /// Launch the interactive TUI explicitly. Same as running `jekko` with no
     /// arguments.
     Tui(cmd::tui::TuiArgs),
@@ -192,3 +192,5 @@ pub enum Command {
     #[command(name = "port-run")]
     PortRun(cmd::port_run::PortRunArgs),
 }
+
+pub use JekkoCommand as Command;

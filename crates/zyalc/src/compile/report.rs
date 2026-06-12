@@ -2,11 +2,13 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
-pub enum Outcome {
+pub enum CompileOutcome {
     Wrote(PathBuf),
     Unchanged(PathBuf),
     Drift(PathBuf),
 }
+
+pub use CompileOutcome as Outcome;
 
 #[derive(Debug, Serialize)]
 pub struct CompileReport {

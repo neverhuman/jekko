@@ -20,7 +20,7 @@ pub const MAX_LINE_BYTES: usize = 512;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum EventKind {
+pub enum RunnerEventKind {
     RunStarted,
     BrainstormStarted,
     ReasoningState,
@@ -81,6 +81,8 @@ pub enum EventKind {
     /// declare a stronger `quality_band` on the affected stage.
     EmptyResponseStreak,
 }
+
+pub use RunnerEventKind as EventKind;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {

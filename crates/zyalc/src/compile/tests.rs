@@ -32,20 +32,23 @@ fn toml_emit_basic() {
 }
 
 #[test]
-fn toml_emit_accepts_runbook_wrapped_sandbox_block() {
+fn toml_emit_accepts_split_runbook_and_lane_tail() {
     let raw = "# zyal: declarative target=toml schema=jankurai/sandbox-lanes@1\n\
          <<<ZYAL v1:daemon id=sandbox-lanes-template>>>\n\
          version: v1\nintent: daemon\nconfirm: RUN_FOREVER\nid: sandbox-lanes-template\n\
          job:\n  name: sandbox lanes\n  objective: keep sandbox lanes in sync\n\
          stop:\n  all:\n    - git_clean:\n        allow_untracked: false\n\
-         sandbox:\n  schema_version: \"1.0.0\"\n  sandbox_root: \"~/.local/share/agent-sandboxes\"\n  lanes:\n    - name: a\n      cost: 1\n\
          <<<END_ZYAL id=sandbox-lanes-template>>>\n";
-    let out = emit_toml(raw).expect("emit wrapped sandbox lanes");
+    let raw = format!(
+        "{raw}schema_version: \"1.0.0\"\nsandbox_root: \"~/.local/share/agent-sandboxes\"\nlanes:\n  - name: a\n    cost: 1\n"
+    );
+    let out = emit_toml(&raw).expect("emit split runbook and lane tail");
     assert!(out.contains("schema_version"));
     assert!(out.contains("[[lane]]"));
     assert!(out.contains("name = \"a\""));
     assert!(!out.contains("job ="));
     assert!(!out.contains("stop ="));
+    assert!(!out.contains("dispatch ="));
 }
 
 #[test]

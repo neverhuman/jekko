@@ -1,4 +1,4 @@
-//! Data structures describing `agent/sandbox-lanes.toml`.
+//! Data structures describing `generated/sandbox-lanes.toml`.
 //!
 //! Pulled into a dedicated module so the validator + facade can stay focused
 //! on logic rather than type definitions. Re-exported through
@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Top-level document mirroring `agent/sandbox-lanes.toml`.
+/// Top-level document mirroring `generated/sandbox-lanes.toml`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanesDoc {
     pub schema_version: String,
@@ -120,11 +120,13 @@ pub enum Backend {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum NetworkPolicy {
+pub enum SandboxNetworkPolicy {
     None,
     Bridge,
     Host,
 }
+
+pub use SandboxNetworkPolicy as NetworkPolicy;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandsCfg {

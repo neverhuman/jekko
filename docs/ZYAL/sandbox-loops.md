@@ -5,7 +5,7 @@ lets agents execute experimental code in a disposable workspace, completely
 outside the main git tree, with permission allowlists, captured logs, and a
 patch-export step at the end.
 
-Canonical spec: [`agent/sandbox-lanes.toml`](../../agent/sandbox-lanes.toml)
+Canonical spec: [`generated/sandbox-lanes.toml`](../../generated/sandbox-lanes.toml)
 (generated from `agent/zyal/sandbox-lanes.zyal` via `zyalc`).
 
 Runtime: [`crates/sandboxctl/`](../../crates/sandboxctl/).
@@ -78,7 +78,7 @@ can audit attempted but blocked commands.
 1. Edit `agent/zyal/sandbox-lanes.zyal`. Choose `runtime.backend`, fill `commands`
    carefully (start strict, expand later).
 2. Run `cargo run -p zyalc -- compile agent/zyal/sandbox-lanes.zyal` to regenerate
-   `agent/sandbox-lanes.toml`. CI fails if you commit a `.zyal` edit without
+   `generated/sandbox-lanes.toml`. CI fails if you commit a `.zyal` edit without
    the regenerated TOML.
 3. Validate locally: `cargo run -p sandboxctl -- validate`.
 4. Smoke the new lane: `tools/sandbox-wrap.sh --lane <name> -- echo ok`.

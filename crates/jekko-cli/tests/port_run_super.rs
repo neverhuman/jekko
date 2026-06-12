@@ -21,7 +21,7 @@ fn repo_root() -> PathBuf {
 }
 
 fn canonical_manifest() -> PathBuf {
-    repo_root().join("agent/superworkflows/ambitious-superworkflow.superworkflow.json")
+    repo_root().join("generated/superworkflows/ambitious-superworkflow.superworkflow.json")
 }
 
 #[test]

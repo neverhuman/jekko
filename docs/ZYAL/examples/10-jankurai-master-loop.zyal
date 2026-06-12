@@ -114,7 +114,7 @@ incubator:
       - risk_score_gte: 0.5
       - touches_paths:
           - "db/migrations/**"
-          - "agent/sandbox-lanes.toml"
+          - "generated/sandbox-lanes.toml"
           - "packages/sdk/js/src/gen/**"
           - "packages/jekko/src/session/**"
   exclude_when:

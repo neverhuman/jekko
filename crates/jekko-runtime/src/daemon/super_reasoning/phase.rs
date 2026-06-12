@@ -91,7 +91,7 @@ pub struct ReasoningLane {
 /// Write scope enforced for a phase or lane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum WriteScope {
+pub enum ReasoningWriteScope {
     /// No writes; read-only analysis.
     ReadOnly,
     /// Writes only to scratch/receipts.
@@ -162,7 +162,7 @@ pub struct PhaseBudget {
 /// Signoff style for a phase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum PhaseSignoffMode {
+pub enum ReasoningPhaseSignoffMode {
     /// Gate-only signoff.
     Automatic,
     /// Reviewer agent signoff.
@@ -172,6 +172,9 @@ pub enum PhaseSignoffMode {
     /// Evidence-only signoff.
     EvidenceOnly,
 }
+
+pub use ReasoningPhaseSignoffMode as PhaseSignoffMode;
+pub use ReasoningWriteScope as WriteScope;
 
 /// Strategy used to combine worker outputs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

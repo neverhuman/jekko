@@ -1,4 +1,4 @@
-//! TOML schema for `agent/sandbox-lanes.toml` + validation.
+//! TOML schema for `generated/sandbox-lanes.toml` + validation.
 //!
 //! Source-of-truth for both the Rust runtime (`sandboxctl`) and the TypeScript
 //! schema mirror in `packages/jekko/src/config/sandbox-lanes.ts`. Drift

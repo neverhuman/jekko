@@ -29,7 +29,7 @@ shipped.
 | Artifact home | `~/.local/share/agent-sandboxes/{run_id}/` | Tip4 default; surfaces outside repo, survives `git clean -fdx` |
 | `sandboxctl` language | Rust crate `crates/sandboxctl/` | Matches existing `crates/` idiom; safer for syscall work |
 | `zyalc` compiler | Standalone Rust crate `crates/zyalc/` | Single typed parser, deterministic emit, shares spec |
-| Canonical lane file | `agent/sandbox-lanes.toml` (compiled from `.zyal`) | Parallel to `agent/proof-lanes.toml` |
+| Canonical lane file | `generated/sandbox-lanes.toml` (compiled from `.zyal`) | Parallel to `agent/proof-lanes.toml` |
 | Standard version bump | `0.8.0` → `0.9.0` | Adds new function; documented in `agent/JANKURAI_STANDARD.md` |
 | ZYAL contract bump | `2.4.0` → `2.5.0` | Adds Profile B/C; documented in `docs/ZYAL/VERSION.md` |
 
@@ -54,7 +54,7 @@ a fresh re-compile.
 
 ## 4. Sandbox-Lane Schema
 
-Canonical example: `agent/sandbox-lanes.toml` (generated from
+Canonical example: `generated/sandbox-lanes.toml` (generated from
 `agent/sandbox-lanes.zyal`). Three lanes ship in v1, one per backend:
 `experiment-worktree`, `experiment-bubblewrap`, `experiment-docker`.
 
@@ -177,7 +177,7 @@ clear "use worktree instead" message when capability is absent.
 - `crates/zyalc/src/{lib,main,compile,profile}.rs`
 
 #### Spec + integration
-- `agent/sandbox-lanes.toml` (generated; checked in)
+- `generated/sandbox-lanes.toml` (generated; checked in)
 - `agent/sandbox-lanes.zyal` (source of truth)
 - `agent/workflows/README.md`
 - `tools/sandbox-wrap.sh` (forwarder used by lane commands)
@@ -256,10 +256,10 @@ capability).
 
 ## 10. Jankurai Standard Integration
 
-- **Owner-map**: `agent/sandbox-lanes.toml`, `agent/sandbox-lanes.zyal`,
+- **Owner-map**: `generated/sandbox-lanes.toml`, `agent/sandbox-lanes.zyal`,
   `agent/workflows/`, `tools/sandbox-wrap.sh`, `opencode.json` claimed by `agent` (workflows = `ops`).
 - **Test-map**: dedicated proof routes for every new file path.
-- **Generated-zones**: `agent/sandbox-lanes.toml` registered as
+- **Generated-zones**: `generated/sandbox-lanes.toml` registered as
   `source = "zyalc"`, command = compile invocation.
 - **Tool-adoption**: `zyalc-compile` (auto) + `sandboxctl` (manual).
 - **Proof-lanes**: `lane.sandbox-validate` (cost 4), `lane.zyalc-drift` (cost 5),
@@ -406,7 +406,7 @@ that shrinks the contiguous duplicate region:
 
 ## 15. Justification for Decisions
 
-- **Why a new `agent/sandbox-lanes.toml` instead of extending `proof-lanes.toml`?**
+- **Why a new `generated/sandbox-lanes.toml` instead of extending `proof-lanes.toml`?**
   Sandbox lanes have backend/workspace/runtime/commands subtables that don't
   belong in a generic proof-lane. Keeping them separate preserves the
   existing proof-lane schema for jankurai consumers and makes scoring rules

@@ -35,7 +35,7 @@ is no pragma for runbooks.
 Two new profiles are introduced for declarative-but-non-runbook ZYAL files:
 
 - **Profile B — declarative** (`# zyal: declarative target=toml schema=<name>@<ver>`)
-  compiles to TOML. First use: `agent/sandbox-lanes.zyal` → `agent/sandbox-lanes.toml`.
+  compiles to TOML. First use: `agent/sandbox-lanes.zyal` → `generated/sandbox-lanes.toml`.
 - **Profile C — workflow** (`# zyal: declarative target=github-workflow schema=actions/workflow@<ver>`)
   compiles to GitHub Actions YAML under `.github/workflows/`.
 

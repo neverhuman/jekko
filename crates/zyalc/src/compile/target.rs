@@ -9,10 +9,20 @@ pub(super) fn default_target(source: &Path, profile: &Profile) -> PathBuf {
         Profile::DeclarativeToml { .. } => {
             // Declarative `.zyal` sources canonically live under `agent/zyal/`
             // per the jankurai v1.0.0 conformance rule; the compiled TOML
-            // belongs one directory up at `agent/<stem>.toml` so other tools
-            // (proof-lanes, validators) find it on the well-known path.
+            // belongs at `generated/<stem>.toml` so the output stays out of the
+            // protected `agent/` control-plane tree.
             let stem = source.file_stem().and_then(|s| s.to_str()).unwrap_or("out");
-            if let Some(parent) = source.parent().and_then(|p| p.parent()) {
+            if source.starts_with("agent/zyal") {
+                if let Some(repo_root) = source
+                    .parent()
+                    .and_then(|p| p.parent())
+                    .and_then(|p| p.parent())
+                {
+                    repo_root.join("generated").join(format!("{stem}.toml"))
+                } else {
+                    source.with_extension("toml")
+                }
+            } else if let Some(parent) = source.parent().and_then(|p| p.parent()) {
                 parent.join(format!("{stem}.toml"))
             } else {
                 source.with_extension("toml")
@@ -30,13 +40,26 @@ pub(super) fn default_target(source: &Path, profile: &Profile) -> PathBuf {
         Profile::SuperWorkflow { .. } => {
             // SuperWorkflow `.zyal` sources live under `agent/zyal/`; the
             // emitted canonical JSON sits at
-            // `agent/superworkflows/<stem>.superworkflow.json` so downstream
-            // supervisors discover it on a well-known path.
+            // `generated/superworkflows/<stem>.superworkflow.json` so the
+            // output stays out of the protected `agent/` control-plane tree.
             let stem = source
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("workflow");
-            if let Some(parent) = source.parent().and_then(|p| p.parent()) {
+            if source.starts_with("agent/zyal") {
+                if let Some(repo_root) = source
+                    .parent()
+                    .and_then(|p| p.parent())
+                    .and_then(|p| p.parent())
+                {
+                    repo_root
+                        .join("generated")
+                        .join("superworkflows")
+                        .join(format!("{stem}.superworkflow.json"))
+                } else {
+                    source.with_extension("superworkflow.json")
+                }
+            } else if let Some(parent) = source.parent().and_then(|p| p.parent()) {
                 parent
                     .join("superworkflows")
                     .join(format!("{stem}.superworkflow.json"))

@@ -1,7 +1,7 @@
 # Canonical 12-stage SuperWorkflow. Phase ids match the daemon
 # canonical-phases blueprint (source_of_truth -> final_signoff).
 # zyal: declarative target=superworkflow schema=zyal/superworkflow@1
-# zyalc: emits agent/superworkflows/ambitious-superworkflow.superworkflow.json
+# zyalc: emits generated/superworkflows/ambitious-superworkflow.superworkflow.json
 # Target framing: target=redis (MiniRedis reference) replacement=candidate.
 <<<ZYAL v1:daemon id=ambitious-superworkflow-template>>>
 version: v1
