@@ -23,8 +23,8 @@ pub use crate::hero_judge_eval_io::{
     write_series_summary_csv,
 };
 pub use crate::hero_judge_eval_metrics::{
-    average_score, generation_quality_metric, lane_metric_records, lane_quality_metrics,
-    parse_substitute_lane_value, quality_trend,
+    average_score, build_evidence_keys, generation_quality_metric, lane_metric_records,
+    lane_quality_metrics, parse_substitute_lane_value, quality_trend,
 };
 
 // Re-export the public surface the rest of the crate already uses.

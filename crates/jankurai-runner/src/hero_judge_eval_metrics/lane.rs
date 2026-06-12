@@ -1,12 +1,13 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
-use crate::hero_judge::{HeroJudgeLaneArtifact, HeroJudgeLaneMetric};
+use crate::evidence::LoadedEvidence;
+use crate::hero_judge::{HeroJudgeLaneArtifact, HeroJudgeLaneMetric, HeroJudgeSearchReceipt};
 use crate::model_policy::ModelTaskKind;
 
 use super::defaults::rounded;
 use super::helpers::{
-    arrayish_count, evidence_grounding_score, metric_value, normalized, storage_safety_score,
-    structural_score,
+    arrayish_count, arrayish_strings, evidence_grounding_score, metric_value, normalized,
+    storage_safety_score, structural_score,
 };
 
 pub fn lane_quality_metrics(
@@ -14,6 +15,7 @@ pub fn lane_quality_metrics(
     value: &serde_json::Value,
     summary: &str,
     score: f64,
+    known_keys: &HashSet<String>,
 ) -> BTreeMap<String, f64> {
     let claims = arrayish_count(value, &["claims", "hypotheses", "theories"]);
     let questions = arrayish_count(
@@ -21,8 +23,9 @@ pub fn lane_quality_metrics(
         &["questions", "research_questions", "hard_questions"],
     );
     let rubric = arrayish_count(value, &["rubric", "criteria", "scoring_rubric"]);
-    let evidence_refs = arrayish_count(value, &["evidence_refs", "citations", "sources"]);
-    let evidence_grounding = evidence_grounding_score(value, evidence_refs);
+    let evidence_ref_strings = arrayish_strings(value, &["evidence_refs", "citations", "sources"]);
+    let evidence_refs = evidence_ref_strings.len();
+    let evidence_grounding = evidence_grounding_score(value, &evidence_ref_strings, known_keys);
     let storage_safety = storage_safety_score(value, summary);
     let structural = structural_score(kind, value, claims, questions, rubric, evidence_refs);
     let claim_quality =
@@ -111,6 +114,34 @@ pub fn lane_metric_records(
         .collect()
 }
 
+/// Build the set of resolvable evidence keys for grounding: loaded-evidence
+/// ids, sources, and hashes, plus the ids/hashes of research receipts that
+/// actually fetched something (`url_count > 0`). Used by `run_lane_group` to
+/// verify a candidate's claimed citations resolve to real evidence. An empty
+/// result means "no evidence loaded", which the grounding scorer treats as the
+/// offline fallback.
+pub fn build_evidence_keys(
+    evidence: &[LoadedEvidence],
+    receipts: &[HeroJudgeSearchReceipt],
+) -> HashSet<String> {
+    let mut keys = HashSet::new();
+    for item in evidence {
+        keys.insert(item.id.to_ascii_lowercase());
+        let source = item.source.trim();
+        if !source.is_empty() {
+            keys.insert(source.to_ascii_lowercase());
+        }
+        keys.insert(item.sha256.to_ascii_lowercase());
+    }
+    for receipt in receipts {
+        if receipt.url_count > 0 {
+            keys.insert(receipt.id.to_ascii_lowercase());
+            keys.insert(receipt.content_sha256.to_ascii_lowercase());
+        }
+    }
+    keys
+}
+
 pub fn role_group(kind: &str) -> &'static str {
     match kind {
         "hero_generate" => "hero",
@@ -118,5 +149,52 @@ pub fn role_group(kind: &str) -> &'static str {
         "literature_synthesis" => "research",
         "knowledge_curate" => "knowledge",
         _ => "other",
+    }
+}
+
+#[cfg(test)]
+mod grounding_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn grounding_rewards_resolving_refs_over_fabricated() {
+        let mut known = HashSet::new();
+        known.insert("ev-1".to_string());
+        let resolved = lane_quality_metrics(
+            ModelTaskKind::HeroGenerate,
+            &json!({"evidence_refs": ["ev-1"], "claims": ["x"]}),
+            "summary",
+            0.5,
+            &known,
+        );
+        let fabricated = lane_quality_metrics(
+            ModelTaskKind::HeroGenerate,
+            &json!({"evidence_refs": ["totally-made-up"], "claims": ["x"]}),
+            "summary",
+            0.5,
+            &known,
+        );
+        assert!(
+            resolved["evidence_grounding"] > fabricated["evidence_grounding"],
+            "a resolving citation should ground higher than a fabricated one: {} vs {}",
+            resolved["evidence_grounding"],
+            fabricated["evidence_grounding"],
+        );
+        assert_eq!(fabricated["evidence_grounding"], 0.0);
+    }
+
+    #[test]
+    fn empty_known_keys_uses_offline_fallback() {
+        // No loaded evidence: the prior marker heuristic still scores claims so
+        // deterministic/offline runs are not regressed.
+        let metrics = lane_quality_metrics(
+            ModelTaskKind::HeroGenerate,
+            &json!({"evidence_refs": ["a", "b"], "claims": ["x"]}),
+            "summary",
+            0.5,
+            &HashSet::new(),
+        );
+        assert!(metrics["evidence_grounding"] > 0.0);
     }
 }
