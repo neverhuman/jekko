@@ -27,13 +27,66 @@ fn value_count(value: &serde_json::Value) -> usize {
     }
 }
 
-pub(super) fn evidence_grounding_score(value: &serde_json::Value, evidence_refs: usize) -> f64 {
-    let text = value.to_string().to_ascii_lowercase();
-    let marker_bonus = ["sha256", "evidence", "doi", "arxiv", "citation", "source"]
+/// Extract the actual string values under any of `keys` (arrays of strings or a
+/// bare string), skipping empties. Used to read a candidate's *claimed*
+/// evidence references so they can be resolved against real evidence.
+pub(super) fn arrayish_strings(value: &serde_json::Value, keys: &[&str]) -> Vec<String> {
+    let mut out = Vec::new();
+    for key in keys {
+        match value.get(*key) {
+            Some(serde_json::Value::Array(items)) => {
+                for item in items {
+                    if let Some(text) = item.as_str() {
+                        if !text.trim().is_empty() {
+                            out.push(text.to_string());
+                        }
+                    }
+                }
+            }
+            Some(serde_json::Value::String(text)) if !text.trim().is_empty() => {
+                out.push(text.clone());
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Score how well a candidate's *claimed* evidence references resolve to real
+/// loaded evidence or fetched research receipts.
+///
+/// When `known_keys` is empty (offline/deterministic run with no loaded
+/// evidence) this falls back to the prior marker-based heuristic so those runs
+/// are not regressed. Otherwise only references that actually resolve count, and
+/// the resolution ratio penalizes fabricated references — a candidate that
+/// claims five citations none of which resolve scores low, not high.
+pub(super) fn evidence_grounding_score(
+    value: &serde_json::Value,
+    claimed_refs: &[String],
+    known_keys: &std::collections::HashSet<String>,
+) -> f64 {
+    if known_keys.is_empty() {
+        let text = value.to_string().to_ascii_lowercase();
+        let marker_bonus = ["sha256", "evidence", "doi", "arxiv", "citation", "source"]
+            .iter()
+            .filter(|marker| text.contains(**marker))
+            .count();
+        return (normalized(claimed_refs.len(), 4) * 0.70 + normalized(marker_bonus, 3) * 0.30)
+            .clamp(0.0, 1.0);
+    }
+    let resolved = claimed_refs
         .iter()
-        .filter(|marker| text.contains(**marker))
+        .filter(|reference| {
+            let key = reference.trim().to_ascii_lowercase();
+            !key.is_empty()
+                && known_keys
+                    .iter()
+                    .any(|known| known.contains(&key) || key.contains(known))
+        })
         .count();
-    (normalized(evidence_refs, 4) * 0.70 + normalized(marker_bonus, 3) * 0.30).clamp(0.0, 1.0)
+    let claimed = claimed_refs.len().max(1);
+    let resolution_ratio = resolved as f64 / claimed as f64;
+    (normalized(resolved, 4) * 0.60 + resolution_ratio * 0.40).clamp(0.0, 1.0)
 }
 
 pub(super) fn storage_safety_score(value: &serde_json::Value, summary: &str) -> f64 {

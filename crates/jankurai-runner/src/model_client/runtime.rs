@@ -70,6 +70,18 @@ impl JekkoRuntimeModelClient {
         }
     }
 
+    /// Like [`selected_route`](Self::selected_route) but diversifies generative
+    /// roles across the model_policy `lane_diversity` pool by lane index (U5).
+    /// Constructor overrides still win; evaluative roles are unaffected.
+    pub fn selected_route_for_lane(&self, kind: ModelTaskKind, lane: usize) -> ModelRouteRecord {
+        let policy_route = self.policy.select_for_lane(kind, lane);
+        ModelRouteRecord {
+            provider: self.provider.clone().or(policy_route.provider),
+            model: self.model_override.clone().or(policy_route.model),
+            quality_band: policy_route.quality_band,
+        }
+    }
+
     /// Return the selected model for a task kind, if one is explicitly routed.
     pub fn selected_model(&self, kind: ModelTaskKind) -> Option<String> {
         self.selected_route(kind).model
@@ -114,6 +126,16 @@ impl ModelClient for JekkoRuntimeModelClient {
         prompt: &str,
         cwd: &Path,
     ) -> Result<ModelCallReceipt> {
+        self.complete_lane(kind, prompt, cwd, 0).await
+    }
+
+    async fn complete_lane(
+        &self,
+        kind: ModelTaskKind,
+        prompt: &str,
+        cwd: &Path,
+        lane: usize,
+    ) -> Result<ModelCallReceipt> {
         let started = Instant::now();
         let mut command = Command::new(jekko_bin());
         let tool_mode = super::tool_mode::requires_tools(kind);
@@ -142,7 +164,7 @@ impl ModelClient for JekkoRuntimeModelClient {
             .arg("plan")
             .arg("--cwd")
             .arg(cwd);
-        let route = self.selected_route(kind);
+        let route = self.selected_route_for_lane(kind, lane);
         if let Some(provider) = route.provider.as_deref() {
             command.arg("--provider").arg(provider);
         }

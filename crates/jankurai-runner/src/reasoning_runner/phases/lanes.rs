@@ -35,12 +35,19 @@ const STRATEGIES: &[&str] = &[
     "parity_lab",
 ];
 
-fn lane_prompt(idx: usize, strategy: &str, evidence: &[LoadedEvidence]) -> String {
-    format!(
+fn lane_prompt(idx: usize, strategy: &str, evidence: &[LoadedEvidence], graph_slice: &str) -> String {
+    let mut prompt = format!(
         "Blind lane {lane}: brainstorm target-derived port stages as JSON. Strategy: {strategy}. Evidence:\n{evidence}",
         lane = idx + 1,
         evidence = evidence_prompt_fragment(evidence),
-    )
+    );
+    if !graph_slice.is_empty() {
+        prompt.push_str(
+            "\nRepository blast-radius (highest-impact symbols/files and their test coverage \u{2014} weigh ripple and protect untested paths):\n",
+        );
+        prompt.push_str(graph_slice);
+    }
+    prompt
 }
 
 fn parallel_brainstorm_enabled() -> bool {
@@ -57,6 +64,7 @@ pub(super) async fn brainstorm_phase(
     config: &AdvancedReasoningConfig,
     evidence: &[LoadedEvidence],
     context: &ReasoningArtifact,
+    graph_slice: &str,
     artifacts: &mut Vec<ReasoningArtifact>,
     edges: &mut Vec<ReasoningEdge>,
     lanes: &mut Vec<ReasoningLane>,
@@ -74,6 +82,7 @@ pub(super) async fn brainstorm_phase(
             config,
             evidence,
             context,
+            graph_slice,
             cap,
             artifacts,
             edges,
@@ -90,6 +99,7 @@ pub(super) async fn brainstorm_phase(
             config,
             evidence,
             context,
+            graph_slice,
             cap,
             artifacts,
             edges,
@@ -109,6 +119,7 @@ async fn run_brainstorm_sequential(
     config: &AdvancedReasoningConfig,
     evidence: &[LoadedEvidence],
     context: &ReasoningArtifact,
+    graph_slice: &str,
     cap: usize,
     artifacts: &mut Vec<ReasoningArtifact>,
     edges: &mut Vec<ReasoningEdge>,
@@ -123,7 +134,7 @@ async fn run_brainstorm_sequential(
             sink,
             model_client,
             ModelTaskKind::StageBrainstorm,
-            &lane_prompt(idx, strategy, evidence),
+            &lane_prompt(idx, strategy, evidence, graph_slice),
         )
         .await?;
         let (brainstorm_value, status, confidence) =
@@ -157,6 +168,7 @@ async fn run_brainstorm_parallel(
     config: &AdvancedReasoningConfig,
     evidence: &[LoadedEvidence],
     context: &ReasoningArtifact,
+    graph_slice: &str,
     cap: usize,
     artifacts: &mut Vec<ReasoningArtifact>,
     edges: &mut Vec<ReasoningEdge>,
@@ -167,7 +179,7 @@ async fn run_brainstorm_parallel(
 
     let results = run_lanes_parallel(cap, |idx| {
         let strategy = STRATEGIES[idx % STRATEGIES.len()].to_string();
-        let prompt = lane_prompt(idx, &strategy, evidence);
+        let prompt = lane_prompt(idx, &strategy, evidence, graph_slice);
         let repo_clone = repo_path.clone();
         let run_id_clone = run_id_owned.clone();
         async move {

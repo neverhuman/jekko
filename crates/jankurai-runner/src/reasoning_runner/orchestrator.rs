@@ -13,7 +13,9 @@ use crate::daemon_store;
 use crate::events::{EventKind, EventSink};
 use crate::model_client::ModelClient;
 use crate::model_policy::ModelTaskKind;
-use crate::parity_lab::{run_target_switched_cases, write_report_artifacts, FakeTargetAdapter};
+use crate::parity_lab::{
+    run_target_switched_cases, write_report_artifacts, CommandTargetAdapter, FakeTargetAdapter,
+};
 use crate::port::{PortRuntimeOptions, PortTargetRequest};
 use crate::reasoning::{
     stable_reasoning_hash, AdvancedReasoningConfig, EvidenceLevel, MemoryCapsule,
@@ -212,9 +214,48 @@ pub async fn run_advanced_reasoning_tick_with_db(
     } else {
         None
     };
-    let mut reference = FakeTargetAdapter::new("reference");
-    let mut candidate = FakeTargetAdapter::new("candidate");
-    let parity_report = run_target_switched_cases(&mut reference, &mut candidate, &cases)?;
+    // Parity oracle: when the operator supplied real reference/candidate
+    // commands, execute them so `parity_gate_passed` reflects actual
+    // reference-vs-candidate execution; otherwise fall back to the
+    // deterministic fake adapter (behavior unchanged for runs without commands).
+    let parity_report = if runtime.parity_exec.is_active() {
+        let reference_command = runtime
+            .parity_exec
+            .reference_command
+            .clone()
+            .unwrap_or_default();
+        let candidate_command = runtime
+            .parity_exec
+            .candidate_command
+            .clone()
+            .unwrap_or_default();
+        // Command floor: refuse to spawn catastrophic parity commands even
+        // though they come from trusted config (defense in depth).
+        for command in [&reference_command, &candidate_command] {
+            if let Some(reason) = crate::command_floor::blocked_reason(command) {
+                anyhow::bail!("command floor blocked parity command ({reason}): {command}");
+            }
+        }
+        let ref_cwd = runtime
+            .parity_exec
+            .reference_cwd
+            .as_deref()
+            .map(Path::new)
+            .unwrap_or(repo);
+        let cand_cwd = runtime
+            .parity_exec
+            .candidate_cwd
+            .as_deref()
+            .map(Path::new)
+            .unwrap_or(repo);
+        let mut reference = CommandTargetAdapter::new("reference", reference_command, ref_cwd);
+        let mut candidate = CommandTargetAdapter::new("candidate", candidate_command, cand_cwd);
+        run_target_switched_cases(&mut reference, &mut candidate, &cases)?
+    } else {
+        let mut reference = FakeTargetAdapter::new("reference");
+        let mut candidate = FakeTargetAdapter::new("candidate");
+        run_target_switched_cases(&mut reference, &mut candidate, &cases)?
+    };
     let parity_artifacts = write_report_artifacts(repo, run_id, &cases, parity_report)?;
     sink.emit(
         EventKind::ParityManifestGenerated,

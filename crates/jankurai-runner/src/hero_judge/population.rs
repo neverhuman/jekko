@@ -125,6 +125,12 @@ pub struct HeroJudgePromotionPolicy {
     /// Reject leaked fixture constants and hidden canaries.
     #[serde(default = "default_true")]
     pub anti_leak: bool,
+    /// Optional operator-supplied objective oracle command. When set, each
+    /// generation runs `sh -c <command>` in the run repo and grounds the
+    /// promotion score in its exit status (pass/fail) instead of relying on
+    /// model self-reported scores. A failing oracle hard-rejects promotion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objective_command: Option<String>,
 }
 
 impl Default for HeroJudgePromotionPolicy {
@@ -133,6 +139,7 @@ impl Default for HeroJudgePromotionPolicy {
             min_score: default_promotion_min_score(),
             canary_replay: true,
             anti_leak: true,
+            objective_command: None,
         }
     }
 }

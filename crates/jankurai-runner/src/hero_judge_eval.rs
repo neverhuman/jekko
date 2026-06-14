@@ -1,7 +1,10 @@
 //! Deterministic Hero/Judge scoring, artifact, and parser helpers.
 
+use std::collections::HashSet;
+
 use anyhow::Result;
 use jekko_store::db::Db;
+use serde::{Deserialize, Serialize};
 
 use crate::daemon_store;
 use crate::hashing::{sha256_hex, sha256_json};
@@ -20,8 +23,8 @@ pub use crate::hero_judge_eval_io::{
     write_series_summary_csv,
 };
 pub use crate::hero_judge_eval_metrics::{
-    average_score, generation_quality_metric, lane_metric_records, lane_quality_metrics,
-    parse_substitute_lane_value, quality_trend,
+    average_score, build_evidence_keys, generation_quality_metric, lane_metric_records,
+    lane_quality_metrics, parse_substitute_lane_value, quality_trend,
 };
 
 // Re-export the public surface the rest of the crate already uses.
@@ -30,6 +33,21 @@ pub use crate::hero_judge_eval_metrics::{
     scoreboard_for_generation, summary_from_value, synthetic_lane_value, GenerationMetricInputs,
 };
 
+/// Objective oracle verdict for a generation.
+///
+/// When present it grounds the promotion score in an external check (e.g.
+/// `sh -c <objective_command>` exit status) instead of model self-reports: a
+/// failing verdict hard-rejects every candidate regardless of self-score, and a
+/// passing verdict dominates the score blend.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct OracleVerdict {
+    /// Whether the objective check passed.
+    pub passed: bool,
+    /// Objective score in [0,1] contributed to the blend when passed.
+    pub score: f64,
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn reduce_generation(
     run_id: &str,
     generation: usize,
@@ -37,13 +55,31 @@ pub(crate) fn reduce_generation(
     verifier_score: f64,
     red_team: &[HeroJudgeLaneArtifact],
     config: &HeroJudgeConfig,
+    oracle: Option<OracleVerdict>,
+    rejected_shas: &HashSet<String>,
 ) -> PromotionDecision {
     let red_team_penalty = red_team_penalty(red_team);
+    let oracle_failed = matches!(oracle, Some(v) if !v.passed);
     let mut best: Option<(&HeroJudgeLaneArtifact, f64, String)> = None;
     for hero in heroes {
         let leak = leak_status(hero);
-        let mut score =
-            (hero.score * 0.70 + verifier_score * 0.25 - red_team_penalty).clamp(0.0, 1.0);
+        // Oracle-grounded score: when an external verdict is available it
+        // dominates the model self-report (0.55 oracle / 0.25 hero / 0.20
+        // verifier); a failing oracle hard-rejects. Absent => self-graded.
+        let mut score = match oracle {
+            Some(v) if v.passed => (v.score.clamp(0.0, 1.0) * 0.55
+                + hero.score * 0.25
+                + verifier_score * 0.20
+                - red_team_penalty)
+                .clamp(0.0, 1.0),
+            Some(_) => 0.0,
+            None => (hero.score * 0.70 + verifier_score * 0.25 - red_team_penalty).clamp(0.0, 1.0),
+        };
+        // Negative-memory dedup: an exact repeat of a previously rejected
+        // dead-end candidate cannot be re-promoted (U3).
+        if rejected_shas.contains(&hero.content_sha256) {
+            score = 0.0;
+        }
         if config.promotion.canary_replay && leak != "clean" {
             score = 0.0;
         }
@@ -68,7 +104,7 @@ pub(crate) fn reduce_generation(
             reason: "no hero candidates".to_string(),
         };
     };
-    let promoted = score >= config.promotion.min_score && leak == "clean";
+    let promoted = score >= config.promotion.min_score && leak == "clean" && !oracle_failed;
     PromotionDecision {
         run_id: run_id.to_string(),
         generation,
@@ -76,8 +112,13 @@ pub(crate) fn reduce_generation(
         winner_prompt_id: Some(format!("prompt-{}", winner.id)),
         score,
         promoted,
-        reason: if promoted {
+        reason: if promoted && oracle.is_some() {
+            "passed objective oracle, deterministic host score, canary replay, and anti-leak gates"
+                .to_string()
+        } else if promoted {
             "passed deterministic host score, canary replay, and anti-leak gates".to_string()
+        } else if oracle_failed {
+            "rejected by objective oracle".to_string()
         } else if leak != "clean" {
             format!("rejected by anti-leak gate: {leak}")
         } else {
@@ -313,4 +354,96 @@ fn metric_value(artifact: &HeroJudgeLaneArtifact, key: &str, default_score: f64)
         .copied()
         .unwrap_or(default_score)
         .clamp(0.0, 1.0)
+}
+
+#[cfg(test)]
+mod oracle_tests {
+    use super::*;
+    use std::collections::{BTreeMap, HashSet};
+
+    fn hero(id: &str, score: f64) -> HeroJudgeLaneArtifact {
+        HeroJudgeLaneArtifact {
+            id: id.into(),
+            generation: 0,
+            kind: "hero".into(),
+            lane: 0,
+            model_receipt_id: "receipt".into(),
+            summary: "a clean candidate".into(),
+            content_sha256: "abc".into(),
+            score,
+            metrics: BTreeMap::new(),
+            status: "candidate".into(),
+        }
+    }
+
+    #[test]
+    fn failing_oracle_hard_rejects_confident_candidate() {
+        // A model that self-reports 0.99 must NOT be promoted when the
+        // objective oracle fails — this is the core U1 guarantee.
+        let cfg = HeroJudgeConfig::default();
+        let heroes = vec![hero("h1", 0.99)];
+        let decision = reduce_generation(
+            "run",
+            0,
+            &heroes,
+            0.95,
+            &[],
+            &cfg,
+            Some(OracleVerdict {
+                passed: false,
+                score: 0.0,
+            }),
+            &HashSet::new(),
+        );
+        assert!(!decision.promoted);
+        assert_eq!(decision.score, 0.0);
+        assert_eq!(decision.reason, "rejected by objective oracle");
+    }
+
+    #[test]
+    fn passing_oracle_allows_promotion() {
+        let cfg = HeroJudgeConfig::default();
+        let heroes = vec![hero("h1", 0.9)];
+        let decision = reduce_generation(
+            "run",
+            0,
+            &heroes,
+            0.9,
+            &[],
+            &cfg,
+            Some(OracleVerdict {
+                passed: true,
+                score: 1.0,
+            }),
+            &HashSet::new(),
+        );
+        // blend = 1.0*0.55 + 0.9*0.25 + 0.9*0.20 = 0.955 >= 0.75 min_score
+        assert!(decision.promoted);
+        assert!(decision.score >= cfg.promotion.min_score);
+        assert!(decision.reason.contains("objective oracle"));
+    }
+
+    #[test]
+    fn absent_oracle_preserves_self_graded_behavior() {
+        let cfg = HeroJudgeConfig::default();
+        let heroes = vec![hero("h1", 0.9)];
+        let decision =
+            reduce_generation("run", 0, &heroes, 0.9, &[], &cfg, None, &HashSet::new());
+        // self-graded: 0.9*0.70 + 0.9*0.25 = 0.855 >= 0.75
+        assert!(decision.promoted);
+        assert!(decision.reason.contains("deterministic host score"));
+    }
+
+    #[test]
+    fn rejected_sha_blocks_repromotion_of_dead_end() {
+        // A candidate identical to a previously rejected dead end cannot be
+        // re-promoted, even with a high self-score (U3 dedup).
+        let cfg = HeroJudgeConfig::default();
+        let h = hero("h1", 0.95);
+        let mut rejected = HashSet::new();
+        rejected.insert(h.content_sha256.clone());
+        let decision = reduce_generation("run", 1, &[h], 0.95, &[], &cfg, None, &rejected);
+        assert!(!decision.promoted);
+        assert_eq!(decision.score, 0.0);
+    }
 }

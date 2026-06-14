@@ -37,6 +37,7 @@ pub(crate) async fn run_lane_group(
     max_parallel: usize,
     base_prompt: &str,
     require_parsed_live_json: bool,
+    known_keys: &std::collections::HashSet<String>,
 ) -> Result<Vec<HeroJudgeLaneArtifact>> {
     let mut artifacts = Vec::new();
     let cap = max_parallel
@@ -58,10 +59,10 @@ pub(crate) async fn run_lane_group(
                     require_parsed_live_json,
                 };
                 let (receipt, value) =
-                    complete_hero_json(completion, kind, generation, &prompt).await?;
+                    complete_hero_json(completion, kind, generation, lane, &prompt).await?;
                 let summary = summary_from_value(kind, generation, lane, &value);
                 let score = score_from_value(kind, generation, &value);
-                let metrics = lane_quality_metrics(kind, &value, &summary, score);
+                let metrics = lane_quality_metrics(kind, &value, &summary, score, known_keys);
                 Ok::<_, anyhow::Error>(HeroJudgeLaneArtifact {
                     id: format!("{}-g{generation:03}-l{lane:02}", kind_label(kind)),
                     generation,

@@ -74,6 +74,47 @@ impl RepoGraph {
         counts
     }
 
+    /// Render a compact, deterministic blast-radius slice: the most-connected
+    /// nodes (degree = incident edges, a proxy for change-impact) and, for
+    /// files, how many tests cover them. Fed into brainstorm lanes so workers
+    /// reason about what their changes would ripple into and what is protected
+    /// by tests. Empty when the graph has no nodes.
+    pub fn blast_radius_slice(&self, max_items: usize) -> String {
+        if self.nodes.is_empty() || max_items == 0 {
+            return String::new();
+        }
+        let mut degree: BTreeMap<&str, usize> = BTreeMap::new();
+        for edge in &self.edges {
+            *degree.entry(edge.from.as_str()).or_insert(0) += 1;
+            *degree.entry(edge.to.as_str()).or_insert(0) += 1;
+        }
+        let mut ranked: Vec<(&GraphNode, usize)> = self
+            .nodes
+            .iter()
+            .map(|node| (node, degree.get(node.id.as_str()).copied().unwrap_or(0)))
+            .collect();
+        // Highest blast radius first; ties broken by key for determinism.
+        ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.key.cmp(&b.0.key)));
+        ranked
+            .into_iter()
+            .take(max_items)
+            .map(|(node, deg)| {
+                let tests = if node.kind == "file" {
+                    let covering = self.tests_covering(&node.key).len();
+                    if covering == 0 {
+                        " [no covering tests]".to_string()
+                    } else {
+                        format!(" [{covering} covering test(s)]")
+                    }
+                } else {
+                    String::new()
+                };
+                format!("- {} ({}, blast~{}){}", node.label, node.kind, deg, tests)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     /// Export the graph as pretty JSON.
     pub fn export_json(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {

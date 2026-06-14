@@ -25,6 +25,7 @@ pub(crate) async fn complete_hero_json(
     ctx: HeroJudgeCompletionContext<'_>,
     kind: ModelTaskKind,
     generation: usize,
+    lane: usize,
     prompt: &str,
 ) -> Result<(ModelCallReceipt, serde_json::Value)> {
     let mut empty_tracker =
@@ -34,7 +35,10 @@ pub(crate) async fn complete_hero_json(
             EventKind::ModelAttempt,
             json!({"kind": kind_label(kind), "attempt": attempt}),
         )?;
-        let receipt = ctx.model_client.complete(kind, prompt, ctx.repo).await?;
+        let receipt = ctx
+            .model_client
+            .complete_lane(kind, prompt, ctx.repo, lane)
+            .await?;
         daemon_store::persist_model_receipt(ctx.db, ctx.run_id, &receipt)?;
         empty_tracker.record(&receipt, ctx.sink)?;
         let outcome = classify_hero_completion(

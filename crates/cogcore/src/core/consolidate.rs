@@ -14,7 +14,28 @@ use crate::index::{tokenize, TokenId};
 use crate::time::BENCH_NOW;
 use crate::topic::recompute as topic_recompute;
 
+/// Whether a consolidation pass is due: at least `every` events have entered the
+/// WAL since the last consolidation. Pure and deterministic so callers can own
+/// the cadence state directly. `every == 0` means "never".
+pub fn consolidation_due(wal_len: usize, last_consolidated_wal: usize, every: usize) -> bool {
+    every > 0 && wal_len.saturating_sub(last_consolidated_wal) >= every
+}
+
 impl Core {
+    /// Run consolidation if at least `every` events have entered the WAL since
+    /// the last consolidation, then advance the cadence cursor. Returns whether
+    /// it consolidated. Gives long-running agents an automatic compounding
+    /// cadence instead of leaving `consolidate()` to be called manually (or
+    /// never) — the scheduling gap noted in U9. `every == 0` disables it.
+    pub fn consolidate_if_due(&mut self, every: usize) -> bool {
+        if !consolidation_due(self.wal_len(), self.last_consolidated_wal, every) {
+            return false;
+        }
+        self.consolidate();
+        self.last_consolidated_wal = self.wal_len();
+        true
+    }
+
     pub fn consolidate(&mut self) {
         self.hebb.prune();
         let unprocessed: Vec<u32> = self
