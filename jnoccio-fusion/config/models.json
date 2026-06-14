@@ -3276,6 +3276,482 @@
         "exploration_floor": 0.08,
         "cooldown_seconds": 300
       }
+    },
+    {
+      "id": "requesty-nemotron-3-ultra-550b-free",
+      "provider": "requesty",
+      "model": "nvidia/nemotron-3-ultra-550b-a55b",
+      "display_name": "Nemotron 3 Ultra 550B (Requesty free)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://router.requesty.ai/v1"
+      },
+      "env": {
+        "api_key": "REQUESTY_API_KEY"
+      },
+      "signup_url": "https://app.requesty.ai/api-keys",
+      "limits": {
+        "rpm": null,
+        "rpd": 200,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://www.requesty.ai/free-models"
+      },
+      "context_window": 1048576,
+      "max_output_tokens": 65536,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": true,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 90,
+        "free_quota": 80,
+        "reliability": 75,
+        "integration": 88,
+        "latency": 60
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft",
+          "fusion"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "requesty-nemotron-3-super-120b-free",
+      "provider": "requesty",
+      "model": "nvidia/nemotron-3-super-120b-a12b",
+      "display_name": "Nemotron 3 Super 120B (Requesty free)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://router.requesty.ai/v1"
+      },
+      "env": {
+        "api_key": "REQUESTY_API_KEY"
+      },
+      "signup_url": "https://app.requesty.ai/api-keys",
+      "limits": {
+        "rpm": null,
+        "rpd": 200,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://www.requesty.ai/free-models"
+      },
+      "context_window": 1048576,
+      "max_output_tokens": 65536,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": true,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 86,
+        "free_quota": 80,
+        "reliability": 76,
+        "integration": 88,
+        "latency": 68
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft",
+          "fusion"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "requesty-nemotron-3-nano-30b-free",
+      "provider": "requesty",
+      "model": "nvidia/nemotron-3-nano-30b-a3b",
+      "display_name": "Nemotron 3 Nano 30B (Requesty free)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://router.requesty.ai/v1"
+      },
+      "env": {
+        "api_key": "REQUESTY_API_KEY"
+      },
+      "signup_url": "https://app.requesty.ai/api-keys",
+      "limits": {
+        "rpm": null,
+        "rpd": 200,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://www.requesty.ai/free-models"
+      },
+      "context_window": 262144,
+      "max_output_tokens": 32768,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": true,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 78,
+        "free_quota": 82,
+        "reliability": 78,
+        "integration": 88,
+        "latency": 80
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "requesty-nemotron-3-nano-omni-reasoning-free",
+      "provider": "requesty",
+      "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+      "display_name": "Nemotron 3 Nano Omni 30B Reasoning (Requesty free)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://router.requesty.ai/v1"
+      },
+      "env": {
+        "api_key": "REQUESTY_API_KEY"
+      },
+      "signup_url": "https://app.requesty.ai/api-keys",
+      "limits": {
+        "rpm": null,
+        "rpd": 200,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://www.requesty.ai/free-models"
+      },
+      "context_window": 131072,
+      "max_output_tokens": 20480,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": true,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 80,
+        "free_quota": 80,
+        "reliability": 76,
+        "integration": 86,
+        "latency": 72
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "requesty-poolside-laguna-m1-free",
+      "provider": "requesty",
+      "model": "poolside/laguna-m.1",
+      "display_name": "Poolside Laguna M.1 (Requesty free)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://router.requesty.ai/v1"
+      },
+      "env": {
+        "api_key": "REQUESTY_API_KEY"
+      },
+      "signup_url": "https://app.requesty.ai/api-keys",
+      "limits": {
+        "rpm": null,
+        "rpd": 200,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://www.requesty.ai/free-models"
+      },
+      "context_window": 32768,
+      "max_output_tokens": 8192,
+      "capabilities": {
+        "streaming": true,
+        "tools": false,
+        "reasoning": true,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 74,
+        "free_quota": 78,
+        "reliability": 74,
+        "integration": 84,
+        "latency": 78
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "requesty-poolside-laguna-xs2-free",
+      "provider": "requesty",
+      "model": "poolside/laguna-xs.2",
+      "display_name": "Poolside Laguna XS.2 (Requesty free)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://router.requesty.ai/v1"
+      },
+      "env": {
+        "api_key": "REQUESTY_API_KEY"
+      },
+      "signup_url": "https://app.requesty.ai/api-keys",
+      "limits": {
+        "rpm": null,
+        "rpd": 200,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://www.requesty.ai/free-models"
+      },
+      "context_window": 32768,
+      "max_output_tokens": 8192,
+      "capabilities": {
+        "streaming": true,
+        "tools": false,
+        "reasoning": true,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 66,
+        "free_quota": 80,
+        "reliability": 74,
+        "integration": 84,
+        "latency": 88
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "cohere-command-a-03-2025",
+      "provider": "cohere",
+      "model": "command-a-03-2025",
+      "display_name": "Cohere Command A 03-2025 (trial)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://api.cohere.ai/compatibility/v1"
+      },
+      "env": {
+        "api_key": "COHERE_API_KEY"
+      },
+      "signup_url": "https://dashboard.cohere.com/api-keys",
+      "limits": {
+        "rpm": 20,
+        "rpd": null,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://docs.cohere.com/docs/rate-limits"
+      },
+      "context_window": 256000,
+      "max_output_tokens": 8192,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": false,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 84,
+        "free_quota": 45,
+        "reliability": 82,
+        "integration": 85,
+        "latency": 70
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "cohere-command-r-plus-08-2024",
+      "provider": "cohere",
+      "model": "command-r-plus-08-2024",
+      "display_name": "Cohere Command R+ 08-2024 (trial)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://api.cohere.ai/compatibility/v1"
+      },
+      "env": {
+        "api_key": "COHERE_API_KEY"
+      },
+      "signup_url": "https://dashboard.cohere.com/api-keys",
+      "limits": {
+        "rpm": 20,
+        "rpd": null,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://docs.cohere.com/docs/rate-limits"
+      },
+      "context_window": 128000,
+      "max_output_tokens": 4096,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": false,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 80,
+        "free_quota": 45,
+        "reliability": 82,
+        "integration": 85,
+        "latency": 72
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "cohere-command-r-08-2024",
+      "provider": "cohere",
+      "model": "command-r-08-2024",
+      "display_name": "Cohere Command R 08-2024 (trial)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://api.cohere.ai/compatibility/v1"
+      },
+      "env": {
+        "api_key": "COHERE_API_KEY"
+      },
+      "signup_url": "https://dashboard.cohere.com/api-keys",
+      "limits": {
+        "rpm": 20,
+        "rpd": null,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://docs.cohere.com/docs/rate-limits"
+      },
+      "context_window": 128000,
+      "max_output_tokens": 4096,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": false,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 74,
+        "free_quota": 45,
+        "reliability": 82,
+        "integration": 85,
+        "latency": 78
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "cohere-command-r7b-12-2024",
+      "provider": "cohere",
+      "model": "command-r7b-12-2024",
+      "display_name": "Cohere Command R7B 12-2024 (trial)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://api.cohere.ai/compatibility/v1"
+      },
+      "env": {
+        "api_key": "COHERE_API_KEY"
+      },
+      "signup_url": "https://dashboard.cohere.com/api-keys",
+      "limits": {
+        "rpm": 20,
+        "rpd": null,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://docs.cohere.com/docs/rate-limits"
+      },
+      "context_window": 128000,
+      "max_output_tokens": 4096,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": false,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 68,
+        "free_quota": 50,
+        "reliability": 82,
+        "integration": 85,
+        "latency": 85
+      },
+      "routing": {
+        "enabled": true,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300
+      }
+    },
+    {
+      "id": "novita-nex-n2-pro",
+      "provider": "novita",
+      "model": "nex-agi/nex-n2-pro",
+      "display_name": "NEX N2 Pro (Novita; needs account balance)",
+      "api": {
+        "style": "openai_chat",
+        "base_url": "https://api.novita.ai/openai/v1"
+      },
+      "env": {
+        "api_key": "NOVITA_API_KEY"
+      },
+      "signup_url": "https://novita.ai/settings/key-management",
+      "limits": {
+        "rpm": null,
+        "rpd": null,
+        "rpd_after_10_usd_credits": null,
+        "source_url": "https://novita.ai/docs/guides/model-apis-rate-limits"
+      },
+      "context_window": 262144,
+      "max_output_tokens": 32768,
+      "capabilities": {
+        "streaming": true,
+        "tools": true,
+        "reasoning": true,
+        "openai_compatible": true
+      },
+      "score": {
+        "power": 82,
+        "free_quota": 30,
+        "reliability": 70,
+        "integration": 84,
+        "latency": 70
+      },
+      "routing": {
+        "enabled": false,
+        "roles": [
+          "draft"
+        ],
+        "exploration_floor": 0.08,
+        "cooldown_seconds": 300,
+        "disabled_reason": "insufficient_balance: NOT_ENOUGH_BALANCE returned even on the free model; top up at novita.ai/settings then set enabled=true"
+      }
     }
   ]
 }
