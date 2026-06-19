@@ -180,6 +180,10 @@
       "command": "just fast",
       "purpose": "verify the workspace manifest remains backed by the fast Rust lane"
     },
+    "ci-fast-push.sh": {
+      "command": "bash -n ci-fast-push.sh && echo OK",
+      "purpose": "verify the fast-push helper parses and keeps intentional staging guards visible"
+    },
     "DO_NOT_ASK_ZYAL.md": {
       "command": "just fast",
       "purpose": "verify ZYAL instructions proof route stays visible"

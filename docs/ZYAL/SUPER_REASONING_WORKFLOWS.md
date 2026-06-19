@@ -23,6 +23,10 @@ which validates the DAG (no cycles, all `requires` references resolve)
 and emits the canonical manifest JSON. The example at
 `agent/zyal/ambitious-superworkflow.zyal` compiles to
 `agent/superworkflows/ambitious-superworkflow.superworkflow.json`.
+The generated JSON also carries a top-level `exec` object with the
+`jekko port-run --super <manifest>` arguments, dry-run variant, source
+path, and manifest path. Supervisors ignore this object; it exists only
+for launchers and operator ergonomics.
 
 ## Canonical 12-stage plan
 

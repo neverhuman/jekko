@@ -1,10 +1,17 @@
+use std::path::Path;
+
 use anyhow::{anyhow, Context, Result};
 
 use crate::profile::Profile;
 
 /// Returns (body, comment-line-prefix). The comment prefix differs between
 /// TOML (`# `) and YAML (`# `), so we centralise it here for the trailer.
-pub(super) fn emit(profile: &Profile, raw: &str) -> Result<(String, String)> {
+pub(super) fn emit(
+    profile: &Profile,
+    raw: &str,
+    source: &Path,
+    target: &Path,
+) -> Result<(String, String)> {
     match profile {
         Profile::Runbook => Ok((raw.to_string(), String::new())),
         Profile::DeclarativeToml { .. } => Ok((emit_toml(raw)?, "# ".into())),
@@ -13,7 +20,10 @@ pub(super) fn emit(profile: &Profile, raw: &str) -> Result<(String, String)> {
         // SuperWorkflow emits canonical JSON; JSON has no comment syntax so
         // the banner is suppressed in `compile_one` and the header prefix is
         // empty here.
-        Profile::SuperWorkflow { .. } => Ok((emit_superworkflow(raw)?, String::new())),
+        Profile::SuperWorkflow { .. } => Ok((
+            emit_superworkflow_with_paths(raw, Some(source), Some(target))?,
+            String::new(),
+        )),
     }
 }
 
@@ -39,7 +49,16 @@ fn emit_workflow(raw: &str) -> Result<String> {
 /// Validation is re-run against the parsed YAML so a direct caller of
 /// `emit_superworkflow` (notably the unit tests) cannot bypass the structural
 /// checks performed by [`super::validation::validate_superworkflow_profile`].
+#[cfg(test)]
 pub(super) fn emit_superworkflow(raw: &str) -> Result<String> {
+    emit_superworkflow_with_paths(raw, None, None)
+}
+
+fn emit_superworkflow_with_paths(
+    raw: &str,
+    source: Option<&Path>,
+    target: Option<&Path>,
+) -> Result<String> {
     let body = strip_pragmas(raw);
     let parsed: serde_yaml::Value =
         serde_yaml::from_str(&body).context("parse superworkflow YAML body")?;
@@ -51,6 +70,7 @@ pub(super) fn emit_superworkflow(raw: &str) -> Result<String> {
     // top-level `_generated` object instead).
     let json_value = serde_json::to_value(&parsed).context("YAML → JSON for SuperWorkflow")?;
     let stamped = stamp_generated_header(json_value);
+    let stamped = stamp_exec_metadata(stamped, source, target);
     let rendered = serde_json::to_string_pretty(&stamped).context("render SuperWorkflow JSON")?;
     Ok(format!("{rendered}\n"))
 }
@@ -78,6 +98,56 @@ fn stamp_generated_header(value: serde_json::Value) -> serde_json::Value {
         }
         // Non-object root: leave untouched (the validator would have
         // rejected this shape upstream, so we shouldn't see it here).
+        other => other,
+    }
+}
+
+/// Add operator-facing execution metadata without making it part of the
+/// supervisor schema. `jekko port-run` ignores this top-level object while
+/// launchers can read it to build the expected command line.
+fn stamp_exec_metadata(
+    value: serde_json::Value,
+    source: Option<&Path>,
+    target: Option<&Path>,
+) -> serde_json::Value {
+    use serde_json::{Map, Value};
+
+    let source_path = source
+        .map(super::target::source_reference)
+        .unwrap_or_else(|| "<source.zyal>".to_string());
+    let manifest_path = target
+        .map(super::target::source_reference)
+        .unwrap_or_else(|| "<manifest.json>".to_string());
+    let exec = serde_json::json!({
+        "runner": "jekko",
+        "subcommand": "port-run",
+        "mode": "super",
+        "source_path": source_path,
+        "manifest_path": manifest_path,
+        "args": ["port-run", "--super", manifest_path],
+        "dry_run_args": ["port-run", "--super", manifest_path, "--dry-run"],
+        "source_args": ["port-run", "--super", source_path],
+        "status_args": ["port-run", "--status", "<run_id>"],
+    });
+
+    match value {
+        Value::Object(orig) => {
+            let mut out = Map::with_capacity(orig.len() + 1);
+            for (k, v) in orig {
+                if k == "_generated" {
+                    out.insert(k, v);
+                    out.insert("exec".to_string(), exec.clone());
+                } else if k == "exec" {
+                    continue;
+                } else {
+                    out.insert(k, v);
+                }
+            }
+            if !out.contains_key("exec") {
+                out.insert("exec".to_string(), exec);
+            }
+            Value::Object(out)
+        }
         other => other,
     }
 }

@@ -10,24 +10,24 @@ if [ -d "${HOME:-}/.cargo/bin" ]; then
   export PATH
 fi
 
-rtk_shim_dir=""
-cleanup_rtk_shim() {
-  if [ -n "$rtk_shim_dir" ]; then
-    rm -rf "$rtk_shim_dir"
+rtk_passthrough_dir=""
+cleanup_rtk_passthrough() {
+  if [ -n "$rtk_passthrough_dir" ]; then
+    rm -rf "$rtk_passthrough_dir"
   fi
 }
 
 if ! command -v rtk >/dev/null 2>&1; then
-  rtk_shim_dir="$(mktemp -d)"
-  cat >"${rtk_shim_dir}/rtk" <<'SH'
+  rtk_passthrough_dir="$(mktemp -d)"
+  cat >"${rtk_passthrough_dir}/rtk" <<'SH'
 #!/usr/bin/env sh
 exec "$@"
 SH
-  chmod +x "${rtk_shim_dir}/rtk"
-  PATH="${rtk_shim_dir}:${PATH}"
+  chmod +x "${rtk_passthrough_dir}/rtk"
+  PATH="${rtk_passthrough_dir}:${PATH}"
   export PATH
-  trap cleanup_rtk_shim EXIT
-  log "rtk not found; using passthrough shim"
+  trap cleanup_rtk_passthrough EXIT
+  log "rtk not found; using passthrough wrapper"
 fi
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"
@@ -60,12 +60,20 @@ commit_staged_if_needed() {
   log "committed $(git rev-parse --short HEAD) \"$message\""
 }
 
+require_no_unstaged_changes() {
+  if ! git diff --quiet --exit-code || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    log "$1"
+    git status --short
+    exit 4
+  fi
+}
+
 log "starting in $repo_root"
 git fetch origin main
 log "fetched origin/main $(git rev-parse --short origin/main)"
 require_origin_main_ancestor
 
-git add -A -- .
+require_no_unstaged_changes "stage intended changes explicitly before running ci-fast-push"
 commit_staged_if_needed "codex: fast push $(utc_now)"
 
 log "jekko-fast starting"
@@ -79,10 +87,7 @@ if [ "$ci_status" -ne 0 ]; then
 fi
 log "jekko-fast passed"
 
-git add -A -- .
-if ! git diff --cached --quiet --exit-code; then
-  commit_staged_if_needed "codex: fast push $(utc_now) ci drift"
-fi
+require_no_unstaged_changes "jekko-fast left worktree drift; inspect and stage intentionally"
 
 git fetch origin main
 log "fetched origin/main $(git rev-parse --short origin/main) before push"

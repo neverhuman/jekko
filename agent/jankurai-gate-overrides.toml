@@ -98,6 +98,12 @@ reason = "Rust idiom, same class as the already-waived `.ok_or_else(|| anyhow!` 
 expires = "2027-05-30"
 
 [[allow]]
+rule = "HLT-001-DEAD-MARKER"
+evidence = "crates/jekko-runtime/src/agent/provider/model.rs:35"
+reason = "`dummy_agent_llm` is the committed compatibility provider id documented in docs/dummy-agent-llm.md and exercised by provider runtime tests. Renaming the provider to satisfy a term detector would break existing fixtures and user configs; this override only acknowledges that exact provider-model lookup line."
+expires = "2027-05-30"
+
+[[allow]]
 rule = "HLT-002-GENERATED-MUTATION"
 evidence = "agent/sandbox-lanes.toml"
 reason = "Contract/detector mismatch. `agent/generated-zones.toml` correctly declares `agent/sandbox-lanes.toml` as a generated, read-only zone (compiled from agent/zyal/sandbox-lanes.zyal by zyalc). The HLT-002 detector additionally classifies any agent/*.toml as protected control-plane source and flags the overlap as a mutation risk — but the zone declaration IS the protection (read_only=true + source contract + regenerate command). The two contracts are mutually consistent; the detector lacks a 'generated-and-in-agent/' state. Re-review when jankurai recognizes generated outputs under agent/."
