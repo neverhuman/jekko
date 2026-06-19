@@ -9,7 +9,7 @@
 | Target | Result | Path | Size |
 |--------|--------|------|------|
 | `jekko` (release) | exit 0 | `target/release/jekko` | 15.3 MiB |
-| `jankurai-runner` (release) | exit 0 | `target/release/jankurai-runner` | (workspace member) |
+| `jekko-runner` (release) | exit 0 | `target/release/jekko-runner` | (workspace member) |
 | `jnoccio-fusion` (release) | exit 0 (171 crates, 54.15s) | `jnoccio-fusion/target/release/jnoccio-fusion` | 14.3 MiB |
 | `jnoccio-fusion` (debug) | already present | `jnoccio-fusion/target/debug/jnoccio-fusion` | 130.4 MiB |
 
@@ -62,12 +62,12 @@ Initial naïve start: `./target/debug/jnoccio-fusion --config config/server.json
 { "upstream_key_source": "config_env", "user_count": 0, "per_user_slot_counts": {} }
 ```
 
-Searching the source: `jnoccio-fusion/src/config.rs:338` reads env var `JNOCCIO_UPSTREAM_KEY_SOURCE`, falls back to `server.json::upstream_key_source`, then defaults to `ConfigEnv`. The recipes export `JEKKO_KEY_SOURCE_POLICY=users-only` for `jankurai-runner` — that env var is in a **different namespace** and is **not** propagated to the fusion gateway start.
+Searching the source: `jnoccio-fusion/src/config.rs:338` reads env var `JNOCCIO_UPSTREAM_KEY_SOURCE`, falls back to `server.json::upstream_key_source`, then defaults to `ConfigEnv`. The recipes export `JEKKO_KEY_SOURCE_POLICY=users-only` for `jekko-runner` — that env var is in a **different namespace** and is **not** propagated to the fusion gateway start.
 
 ### 🔴 Observation (FIX-CAND-B, FIRST CANDIDATE FOR FIX-1): live-batch.sh starts fusion without `JNOCCIO_UPSTREAM_KEY_SOURCE=users_pool`
 
 - **File:** `scripts/zyal-live-batch.sh::start_fusion` (around line 154–170)
-- **Symptom:** Fusion gateway runs in `ConfigEnv` mode in all prior batches — the multi-tenant user-pool path (`UsersPool`) the entire ZYAL multi-user campaign relies on is **never exercised**. user_1/user_2 keys may still be used by jankurai-runner's internal path, but the fusion gateway side advertises only the legacy single-pool.
+- **Symptom:** Fusion gateway runs in `ConfigEnv` mode in all prior batches — the multi-tenant user-pool path (`UsersPool`) the entire ZYAL multi-user campaign relies on is **never exercised**. user_1/user_2 keys may still be used by jekko-runner's internal path, but the fusion gateway side advertises only the legacy single-pool.
 - **Confirmation:** zero scripts in the repo grep-match `JNOCCIO_UPSTREAM_KEY_SOURCE` or `users_pool`.
 - **Severity:** **high** — defeats the architectural premise of `~/.jekko/users/{user_1,user_2}/`.
 - **Minimal fix:** export `JNOCCIO_UPSTREAM_KEY_SOURCE=users_pool` in `start_fusion()` (or read `JEKKO_KEY_SOURCE_POLICY` from the caller and translate). Phase 4 FIX-1.
@@ -150,7 +150,7 @@ score=70 raw=88 caps=4 findings=7
 | 4 | high   | HLT-034 (security) | `.gitlab-ci.yml:1` | `ci.timeout.missing` |
 | 5 | high   | HLT-024 (security) | `agent/zyal/ambitious-superworkflow.zyal:15` | non-open sentinel |
 | 6 | high   | HLT-013 (ux-qa)    | no web surface | UX QA lane is intentionally TUI-backed |
-| 7 | high   | HLT-001 (vibe)     | `crates/jankurai-runner/src/classifier.rs:141` | `let cap_marker = cap_id.unwrap_or_default()` |
+| 7 | high   | HLT-001 (vibe)     | `crates/jekko-runner/src/classifier.rs:141` | `let cap_marker = cap_id.unwrap_or_default()` |
 
 **Score floor for this campaign:** `final_score >= 70`, `raw >= 88`, `caps_applied == [those 4]`, `findings <= 7`. Any FIX-N that triggers a NEW finding or cap is reverted before commit.
 

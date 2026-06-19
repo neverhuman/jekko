@@ -1,0 +1,423 @@
+{
+  "_generated": {
+    "by": "zyalc",
+    "do_not_edit_by_hand": true,
+    "regenerate": "cargo run -p zyalc -- compile <source.zyal>",
+    "schema": "zyal/flowgraph@1"
+  },
+  "compile": {
+    "compiler": "zyalc",
+    "compiler_version": "0.1.0",
+    "params_hash": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "registry_hash": "sha256:6a2370109eae10f7500126115d73d0c2f800af261af5d3d13ac90a80074f0a82",
+    "source_hash": "sha256:ce519df043ee24ca042e8646d63fccad8a27e9d956f8cf6bdacd548612466562",
+    "timestamp_policy": "omitted_for_determinism"
+  },
+  "edges": [
+    {
+      "dst": "route_fusion/draft-0",
+      "id": "e1",
+      "kind": "fanout",
+      "src": "route_fusion",
+      "weight": 1.0
+    },
+    {
+      "dst": "route_fusion/draft-1",
+      "id": "e2",
+      "kind": "fanout",
+      "src": "route_fusion",
+      "weight": 1.0
+    },
+    {
+      "dst": "route_fusion/draft-2",
+      "id": "e3",
+      "kind": "fanout",
+      "src": "route_fusion",
+      "weight": 1.0
+    },
+    {
+      "dst": "route_fusion/draft-3",
+      "id": "e4",
+      "kind": "fanout",
+      "src": "route_fusion",
+      "weight": 1.0
+    },
+    {
+      "dst": "route_fusion/fusion-0",
+      "id": "e5",
+      "kind": "reduced_into",
+      "src": "route_fusion/draft-0",
+      "weight": 1.0
+    },
+    {
+      "dst": "route_fusion/fusion-0",
+      "id": "e6",
+      "kind": "reduced_into",
+      "src": "route_fusion/draft-1",
+      "weight": 1.0
+    },
+    {
+      "dst": "route_fusion/fusion-0",
+      "id": "e7",
+      "kind": "reduced_into",
+      "src": "route_fusion/draft-2",
+      "weight": 1.0
+    },
+    {
+      "dst": "route_fusion/fusion-0",
+      "id": "e8",
+      "kind": "reduced_into",
+      "src": "route_fusion/draft-3",
+      "weight": 1.0
+    },
+    {
+      "dst": "jailgun_pool/tab-1",
+      "id": "e9",
+      "kind": "spawn",
+      "src": "jailgun_pool",
+      "weight": 1.0
+    },
+    {
+      "dst": "jailgun_pool/tab-2",
+      "id": "e10",
+      "kind": "spawn",
+      "src": "jailgun_pool",
+      "weight": 1.0
+    },
+    {
+      "dst": "jailgun_pool/tab-3",
+      "id": "e11",
+      "kind": "spawn",
+      "src": "jailgun_pool",
+      "weight": 1.0
+    },
+    {
+      "dst": "jailgun_pool/tab-4",
+      "id": "e12",
+      "kind": "spawn",
+      "src": "jailgun_pool",
+      "weight": 1.0
+    },
+    {
+      "dst": "jailgun_pool/tab-5",
+      "id": "e13",
+      "kind": "spawn",
+      "src": "jailgun_pool",
+      "weight": 1.0
+    },
+    {
+      "dst": "hero/worker-0",
+      "id": "e14",
+      "kind": "fanout",
+      "src": "hero",
+      "weight": 1.0
+    },
+    {
+      "dst": "hero/worker-1",
+      "id": "e15",
+      "kind": "fanout",
+      "src": "hero",
+      "weight": 1.0
+    },
+    {
+      "dst": "hero/worker-2",
+      "id": "e16",
+      "kind": "fanout",
+      "src": "hero",
+      "weight": 1.0
+    },
+    {
+      "dst": "supervisor",
+      "id": "e17",
+      "kind": "feeds",
+      "src": "market_feed",
+      "weight": 1.0
+    },
+    {
+      "dst": "route_fusion",
+      "from_port": "out",
+      "id": "e18",
+      "kind": "dispatches",
+      "src": "supervisor",
+      "to_port": "prompt",
+      "weight": 1.0
+    },
+    {
+      "dst": "jailgun_pool",
+      "from_port": "winner",
+      "id": "e19",
+      "kind": "feeds",
+      "src": "route_fusion",
+      "weight": 1.0
+    },
+    {
+      "dst": "hero",
+      "id": "e20",
+      "kind": "feeds",
+      "src": "jailgun_pool",
+      "weight": 1.0
+    },
+    {
+      "dst": "judge",
+      "id": "e21",
+      "kind": "reduced_into",
+      "src": "hero",
+      "weight": 1.0
+    },
+    {
+      "dst": "verifier",
+      "id": "e22",
+      "kind": "verified_by",
+      "src": "judge",
+      "weight": 1.0
+    },
+    {
+      "dst": "report_pdf",
+      "id": "e23",
+      "kind": "derived_from",
+      "src": "verifier",
+      "weight": 1.0
+    },
+    {
+      "dst": "convergence_watch",
+      "id": "e24",
+      "kind": "observed_by",
+      "src": "verifier",
+      "weight": 0.5
+    },
+    {
+      "dst": "cost_kpi",
+      "id": "e25",
+      "kind": "observed_by",
+      "src": "route_fusion",
+      "weight": 0.5
+    },
+    {
+      "dst": "supervisor",
+      "id": "e26",
+      "kind": "loop_back",
+      "label": "next generation",
+      "loop_back": true,
+      "src": "report_pdf",
+      "weight": 1.0
+    }
+  ],
+  "generations_meta": {
+    "total": 3,
+    "window": [
+      0,
+      2
+    ]
+  },
+  "id": "openqg-foundry",
+  "ir_version": "flowgraph.v3",
+  "job": {
+    "name": "openQG theory foundry",
+    "objective": "Fan out to providers, spawn jailgun research tabs, run a hero/judge tournament, watch convergence, render the whitepaper."
+  },
+  "nodes": [
+    {
+      "agent": "plan",
+      "id": "supervisor",
+      "label": "Planner",
+      "node_type": "supervisor"
+    },
+    {
+      "data_feed": {
+        "kind": "stock_ticker",
+        "poll_interval": "15s",
+        "symbols": [
+          "SPX",
+          "NVDA"
+        ],
+        "taint": "web_content"
+      },
+      "id": "market_feed",
+      "label": "Market feed",
+      "node_type": "data_feed"
+    },
+    {
+      "cardinality": {
+        "kind": "source",
+        "source": "jnoccio.route_plan",
+        "value": 4
+      },
+      "id": "route_fusion",
+      "label": "jnoccio fusion route",
+      "node_type": "router",
+      "ports": {
+        "in": [
+          "prompt"
+        ],
+        "out": [
+          "winner"
+        ]
+      },
+      "router": {
+        "drafts": 4,
+        "fusion": 1,
+        "strategy": "fusion_sample"
+      }
+    },
+    {
+      "id": "route_fusion/draft-0",
+      "label": "draft 0",
+      "node_type": "agent"
+    },
+    {
+      "id": "route_fusion/draft-1",
+      "label": "draft 1",
+      "node_type": "agent"
+    },
+    {
+      "id": "route_fusion/draft-2",
+      "label": "draft 2",
+      "node_type": "agent"
+    },
+    {
+      "id": "route_fusion/draft-3",
+      "label": "draft 3",
+      "node_type": "agent"
+    },
+    {
+      "id": "route_fusion/fusion-0",
+      "label": "fusion",
+      "node_type": "agent",
+      "winner": true
+    },
+    {
+      "id": "jailgun_pool",
+      "label": "Jailgun research tabs",
+      "node_type": "spawn",
+      "spawn": {
+        "cardinality": {
+          "expr": "browser.tabs",
+          "kind": "config",
+          "value": 5
+        },
+        "child_template": {
+          "per_child_id": "tab_id",
+          "state_machine_ref": "tab_actor"
+        },
+        "runtime": "jailgun"
+      }
+    },
+    {
+      "id": "jailgun_pool/tab-1",
+      "label": "tab 1",
+      "node_type": "agent"
+    },
+    {
+      "id": "jailgun_pool/tab-2",
+      "label": "tab 2",
+      "node_type": "agent"
+    },
+    {
+      "id": "jailgun_pool/tab-3",
+      "label": "tab 3",
+      "node_type": "agent"
+    },
+    {
+      "id": "jailgun_pool/tab-4",
+      "label": "tab 4",
+      "node_type": "agent"
+    },
+    {
+      "id": "jailgun_pool/tab-5",
+      "label": "tab 5",
+      "node_type": "agent"
+    },
+    {
+      "cardinality": {
+        "kind": "static",
+        "value": 3
+      },
+      "id": "hero",
+      "label": "Hero candidates",
+      "node_type": "fanout"
+    },
+    {
+      "id": "hero/worker-0",
+      "label": "worker 0",
+      "node_type": "agent"
+    },
+    {
+      "id": "hero/worker-1",
+      "label": "worker 1",
+      "node_type": "agent"
+    },
+    {
+      "id": "hero/worker-2",
+      "label": "worker 2",
+      "node_type": "agent"
+    },
+    {
+      "id": "judge",
+      "label": "Cross-provider judge",
+      "node_type": "fanin"
+    },
+    {
+      "agent": "critic",
+      "id": "verifier",
+      "label": "Verifier",
+      "node_type": "agent"
+    },
+    {
+      "id": "convergence_watch",
+      "label": "Convergence",
+      "node_type": "watcher",
+      "watcher": {
+        "expr": "score[gen] - score[gen-1]",
+        "inputs": [
+          "verifier_score"
+        ],
+        "kind": "equation",
+        "on_breach": {
+          "action": "warn",
+          "threshold": 0.01
+        },
+        "plot": {
+          "series": [
+            "hero",
+            "judge"
+          ],
+          "x_axis": "generation",
+          "y_axis": "delta_score"
+        }
+      }
+    },
+    {
+      "id": "cost_kpi",
+      "kpi": {
+        "alert_at": 0.8,
+        "expr": "sum(model_call.cost_usd)",
+        "target": 25,
+        "unit": "USD"
+      },
+      "label": "Live cost",
+      "node_type": "kpi"
+    },
+    {
+      "artifact": {
+        "can_render": true,
+        "kind": "report",
+        "mime_type": "application/pdf",
+        "path": "openQG/paper.pdf",
+        "render": {
+          "from": "pdf",
+          "pages": "1-3",
+          "to": "png"
+        }
+      },
+      "id": "report_pdf",
+      "label": "openQG whitepaper",
+      "node_type": "artifact"
+    }
+  ],
+  "schema": "zyal/flowgraph@1",
+  "unroll": {
+    "generations": "window",
+    "loops": "backedge"
+  },
+  "zyal_version": "1.0"
+}

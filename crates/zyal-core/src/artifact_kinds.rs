@@ -1,6 +1,6 @@
 //! Canonical artifact kind enum.
 //!
-//! Extends the legacy `jankurai_runner::reasoning::ReasoningArtifactKind` with
+//! Extends the legacy `jekko_runner::reasoning::ReasoningArtifactKind` with
 //! the variants the super-agent kernel needs (`MacroPlan`, `PhaseDag`,
 //! `FunctionGraph`, `ParityCase`, `PerfGap`, `SignoffReceipt`, `Contradiction`,
 //! `ReducerDecision`). Phase B2.4 migrates the runner to use this enum.

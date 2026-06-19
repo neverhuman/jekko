@@ -1369,6 +1369,17 @@ impl Gateway {
                 receipt.error.map(Value::String).unwrap_or(Value::Null),
             );
         }
+        // M8-cont: embed the typed, secret-free routing IR + its content hash so
+        // the route is inspectable + reproducible in the cockpit. policy_id is the
+        // legacy planner mode; `route_ir.mode` is the richer IR strategy.
+        if let Some(map) = metadata.as_object_mut() {
+            let route_ir = route.to_route_ir(request_id, route.mode.as_str());
+            map.insert("route_ir_hash".to_string(), json!(route_ir.content_hash()));
+            map.insert(
+                "route_ir".to_string(),
+                serde_json::to_value(&route_ir).unwrap_or(Value::Null),
+            );
+        }
         response.extra.insert("jnoccio".to_string(), metadata);
         response
     }
@@ -1507,6 +1518,14 @@ impl Gateway {
                 route.primary_model_id.as_deref().unwrap_or("none")
             ),
             format!("backup_models={}", route.backup_model_ids.join(", ")),
+            format!("draft_models={}", route.draft_model_ids.join(", ")),
+            format!(
+                "fusion_model={}",
+                route.fusion_model_id.as_deref().unwrap_or("none")
+            ),
+            // Fan-out cardinality for the jekko-web diagram: one provider box per
+            // call. The runner parses `fanout=` into the flowgraph router node.
+            format!("fanout={}", route.cardinality().receipt_value()),
         ]
     }
 

@@ -117,7 +117,7 @@ impl AgentExecutor for ProviderAgentExecutor {
                 provider_options: None,
             }),
         );
-        // ZYAL `quality_band` opt-in: jankurai-runner sets the env var
+        // ZYAL `quality_band` opt-in: jekko-runner sets the env var
         // per stage from the active model_policy.<role>.quality_band.
         // Flow it through provider_options as a top-level key; the
         // OpenAI body builder copies it into the request body, and
@@ -220,6 +220,9 @@ impl AgentExecutor for ProviderAgentExecutor {
                 let mut assistant_text = String::new();
                 let mut reasoning_text = String::new();
                 let mut tool_calls = Vec::new();
+                // Accumulates OpenAI-compatible streaming tool calls (Start + InputDelta
+                // with no explicit end event) as (id, name, args_json) in arrival order.
+                let mut tool_builders: Vec<(String, String, String)> = Vec::new();
                 let mut router_metadata: Option<Value> = None;
                 while let Some(item) = stream.next().await {
                     let event = match item {
@@ -251,7 +254,18 @@ impl AgentExecutor for ProviderAgentExecutor {
                         ProviderEventKind::ReasoningDelta { text } => {
                             reasoning_text.push_str(&text)
                         }
+                        ProviderEventKind::ToolCallStart { id, name } => {
+                            tool_builders.push((id, name, String::new()));
+                        }
+                        ProviderEventKind::ToolCallInputDelta { id, delta } => {
+                            if let Some(b) = tool_builders.iter_mut().rev().find(|b| b.0 == id) {
+                                b.2.push_str(&delta);
+                            }
+                        }
                         ProviderEventKind::ToolCallEnd { id, name, input } => {
+                            // Adapters that emit an explicit end (e.g. Anthropic) deliver
+                            // the parsed input directly; drop any partial builder for it.
+                            tool_builders.retain(|b| b.0 != id);
                             tool_calls.push(json!({
                                 "id": id,
                                 "name": name,
@@ -266,11 +280,25 @@ impl AgentExecutor for ProviderAgentExecutor {
                                 router_metadata = Some(metadata);
                             }
                         }
-                        ProviderEventKind::StreamEnd { .. } => break,
+                        ProviderEventKind::StreamEnd { .. } => {
+                            // OpenAI-compatible adapters (openai/jnoccio/litellm) stream tool
+                            // calls as Start + InputDelta with NO explicit end event; finalize
+                            // any in-flight builders here by parsing the accumulated argument
+                            // JSON. Without this, a tool call (esp. when the model returns only
+                            // a tool call with null content) is silently dropped.
+                            for (id, name, args) in tool_builders.drain(..) {
+                                let input =
+                                    serde_json::from_str::<Value>(&args).unwrap_or(Value::Null);
+                                tool_calls.push(json!({
+                                    "id": id,
+                                    "name": name,
+                                    "input": input,
+                                }));
+                            }
+                            break;
+                        }
                         ProviderEventKind::Usage { .. }
                         | ProviderEventKind::StreamStart { .. }
-                        | ProviderEventKind::ToolCallStart { .. }
-                        | ProviderEventKind::ToolCallInputDelta { .. }
                         | ProviderEventKind::Error { .. } => {}
                     }
                 }
@@ -308,7 +336,7 @@ impl AgentExecutor for ProviderAgentExecutor {
                     let tool_input = tool_call.get("input").cloned().unwrap_or(Value::Null);
                     let tool = registry.get_case_insensitive(tool_name);
                     let output = if let Some(tool) = tool {
-                        execute_tool(
+                        match execute_tool(
                             tool.as_ref(),
                             tool_input,
                             &request,
@@ -317,7 +345,16 @@ impl AgentExecutor for ProviderAgentExecutor {
                             self.permissions.clone(),
                             self.sessions.clone(),
                         )
-                        .await?
+                        .await
+                        {
+                            Ok(out) => out,
+                            // A failed/denied tool must NOT abort the turn — feed the error
+                            // back to the model so it can recover (e.g. permission denied).
+                            Err(err) => ToolOutput::text(
+                                format!("tool {tool_name}"),
+                                format!("ERROR: {err}"),
+                            ),
+                        }
                     } else {
                         ToolOutput::text(
                             format!("tool {tool_name}"),

@@ -188,9 +188,43 @@ pub enum JekkoCommand {
 
     /// Drive a 12-stage ZYAL SuperWorkflow run (compile -> seed -> walk
     /// waves). Phase H scaffold; the per-phase body is a stub until
-    /// `jankurai-runner` is wired in.
+    /// `jekko-runner` is wired in.
     #[command(name = "port-run")]
     PortRun(cmd::port_run::PortRunArgs),
+
+    /// Execute a ZYAL runbook directly: run its loop (engine command per
+    /// iteration) with stop/quality/checkpoint gates, persisting to the daemon
+    /// store + NDJSON ledger so the run is observable in jekko-web and
+    /// `jekko watch`.
+    #[command(name = "zyal-run")]
+    ZyalRun(cmd::zyal_run::ZyalRunArgs),
+
+    /// Compile a `target=flowgraph` `.zyal` to its FlowGraph IR and dispatch the
+    /// graph's executable nodes (routing topology + data-feed ticks) through the
+    /// runner kernels, emitting receipted events to the per-run ledger.
+    #[command(name = "zyal-dispatch")]
+    ZyalDispatch(cmd::zyal_dispatch::ZyalDispatchArgs),
+
+    /// Durable, bounded job queue: submit prompt-jobs into a SQLite-backed queue
+    /// and drain them with a fixed pool of N live `jekko run` workers (hard cap,
+    /// reliable completion, crash recovery).
+    #[command(name = "zyal-queue")]
+    ZyalQueue(cmd::zyal_queue::ZyalQueueArgs),
+
+    /// Deterministic HTTP GET over jekko's `webfetch` tool (no model) — for
+    /// fetching no-key research APIs (OpenAlex/Crossref/arXiv/PatentsView).
+    #[command(name = "fetch")]
+    Fetch(cmd::fetch::FetchArgs),
+
+    /// Deterministic jekko-native research: fan out aspect queries to no-key
+    /// providers (OpenAlex/Crossref/PatentsView) via webfetch → evidence receipts.
+    #[command(name = "research")]
+    Research(cmd::research::ResearchArgs),
+
+    /// Call a tool on an MCP server (JSON-RPC tools/call) — the jekko-native,
+    /// no-subprocess bridge to jailgun (ChatGPT-Pro) and other MCP servers.
+    #[command(name = "mcp-call")]
+    McpCall(cmd::mcp_call::McpCallArgs),
 }
 
 pub use JekkoCommand as Command;

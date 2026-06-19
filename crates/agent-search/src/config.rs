@@ -190,6 +190,51 @@ impl SearchConfig {
             ));
         }
 
+        // ── Patent / prior-art providers (jekko-zyal patent-search crate) ──
+        // PatentsView (USPTO) needs no key. EPO OPS / SerpAPI / Lens are env-gated; absent => skip receipt.
+        providers.push(ProviderEntry::new(Arc::new(
+            providers::patents::PatentBackend::patentsview(),
+        )));
+
+        if let (Some(key), Some(secret)) = (
+            env_var("EPO_OPS_KEY", env_map),
+            env_var("EPO_OPS_SECRET", env_map),
+        ) {
+            providers.push(ProviderEntry::new(Arc::new(
+                providers::patents::PatentBackend::epo_ops(key, secret),
+            )));
+        } else {
+            skipped.push(ProviderReceipt::skipped(
+                ProviderId::EpoOps,
+                "",
+                "missing EPO_OPS_KEY / EPO_OPS_SECRET",
+            ));
+        }
+
+        if let Some(api_key) = env_var("SERPAPI_API_KEY", env_map) {
+            providers.push(ProviderEntry::new(Arc::new(
+                providers::patents::PatentBackend::serpapi(api_key),
+            )));
+        } else {
+            skipped.push(ProviderReceipt::skipped(
+                ProviderId::SerpapiPatents,
+                "",
+                "missing SERPAPI_API_KEY",
+            ));
+        }
+
+        if let Some(token) = env_var("LENS_API_TOKEN", env_map) {
+            providers.push(ProviderEntry::new(Arc::new(
+                providers::patents::PatentBackend::lens(token),
+            )));
+        } else {
+            skipped.push(ProviderReceipt::skipped(
+                ProviderId::Lens,
+                "",
+                "missing LENS_API_TOKEN",
+            ));
+        }
+
         Self {
             providers,
             skipped,

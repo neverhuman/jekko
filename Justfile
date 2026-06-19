@@ -307,7 +307,7 @@ cost-budget: audit-ci
 performance-score-signature:
 	: jankurai rust witness build .
 	: jankurai audit . --mode advisory --changed-fast --json target/jankurai/fast-score.json --md target/jankurai/fast-audit.md --score-history target/jankurai/audit-fast.json
-	: cargo check -p jankurai-runner --locked
+	: cargo check -p jekko-runner --locked
 	: cargo build --timings
 	: cargo nextest run -p jekko-tui
 	: sccache
@@ -513,7 +513,7 @@ zyalc-fast: zyalc-check zyalc-test zyalc-compile-check
 # ZYAL generic port workflow lane: runner, durable store, daemon surfaces, and ZYAL compile checks.
 # jankurai:proof HLT-032-ZYAL-COMPILE-DRIFT parallel=1 cache=cargo-test narrow-targets=true
 zyal-port-fast:
-	rtk cargo test --manifest-path crates/jankurai-runner/Cargo.toml --locked --no-fail-fast
+	rtk cargo test --manifest-path crates/jekko-runner/Cargo.toml --locked --no-fail-fast
 	rtk cargo test -p jekko-store --locked --test daemon_port_roundtrip -- --test-threads=1
 	rtk cargo check -p jekko-cli --locked
 	rtk cargo check -p jekko-server --locked
@@ -540,7 +540,7 @@ zyal-superreasoning-audit-live run_dir:
 # Composed superreasoning fast lane: runner packets, key routing, provider selection, and ZYAL lint.
 # jankurai:proof HLT-032-ZYAL-COMPILE-DRIFT parallel=1 cache=cargo-test narrow-targets=true
 zyal-superreasoning-fast:
-	rtk cargo test --manifest-path crates/jankurai-runner/Cargo.toml --locked --no-fail-fast
+	rtk cargo test --manifest-path crates/jekko-runner/Cargo.toml --locked --no-fail-fast
 	rtk cargo test -p jekko-store --locked --test daemon_port_roundtrip -- --test-threads=1
 	rtk cargo test -p jekko-runtime --locked agent::provider -- --test-threads=1
 	rtk cargo test -p jekko-runtime --locked key_balancer -- --test-threads=1
@@ -553,13 +553,13 @@ zyal-superreasoning-fast:
 
 # Deterministic fake-model OpenQG superreasoning packet smoke.
 zyal-superreasoning-openqg-smoke:
-	rtk cargo test --manifest-path crates/jankurai-runner/Cargo.toml --locked deterministic_run_writes_required_artifacts -- --test-threads=1
+	rtk cargo test --manifest-path crates/jekko-runner/Cargo.toml --locked deterministic_run_writes_required_artifacts -- --test-threads=1
 	rtk cargo run --manifest-path crates/zyalc/Cargo.toml --locked --quiet -- lint-super docs/ZYAL/examples/34-superreasoning-openqg-foundry.zyal --strict --format json
 
 # Deterministic Redis parity/headless smoke.
 zyal-superreasoning-redis-smoke:
-	rtk cargo test --manifest-path crates/jankurai-runner/Cargo.toml --locked parity_gap_converts_to_followup_task -- --test-threads=1
-	rtk cargo test --manifest-path crates/jankurai-runner/Cargo.toml --locked fake_advanced_tick_persists_artifacts_and_parity -- --test-threads=1
+	rtk cargo test --manifest-path crates/jekko-runner/Cargo.toml --locked parity_gap_converts_to_followup_task -- --test-threads=1
+	rtk cargo test --manifest-path crates/jekko-runner/Cargo.toml --locked fake_advanced_tick_persists_artifacts_and_parity -- --test-threads=1
 	rtk cargo run --manifest-path crates/zyalc/Cargo.toml --locked --quiet -- lint-super docs/ZYAL/examples/35-rust-redis-replacement-superreasoning.zyal --strict --format json
 
 # Opt-in live local superreasoning proof. Refuses CI and requires users-only credentials.
@@ -591,7 +591,7 @@ zyal-superreasoning-live-local run_id="superreasoning-live-local" provider="" mo
 	if [ -n "{{model}}" ]; then
 		args+=(--model "{{model}}")
 	fi
-	JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- "${args[@]}"
+	JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jekko-runner/Cargo.toml --locked -- "${args[@]}"
 	rtk just zyal-superreasoning-verify-replay target/zyal/runs/{{run_id}}
 	rtk just zyal-superreasoning-audit-live target/zyal/runs/{{run_id}}
 
@@ -624,7 +624,7 @@ zyal-advanced-reasoning-live-local run_id="advanced-reasoning-live-local" provid
 	if [ -n "{{model}}" ]; then
 		args+=(--model "{{model}}")
 	fi
-	JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- "${args[@]}"
+	JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jekko-runner/Cargo.toml --locked -- "${args[@]}"
 
 # Opt-in live local MiniRedis ladder proof. Refuses CI and requires users-only credentials.
 zyal-miniredis-live-local run_id="miniredis-live-local" provider="" model="":
@@ -655,12 +655,12 @@ zyal-miniredis-live-local run_id="miniredis-live-local" provider="" model="":
 	if [ -n "{{model}}" ]; then
 		args+=(--model "{{model}}")
 	fi
-	JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- "${args[@]}"
+	JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS="${JEKKO_MODEL_CALL_TIMEOUT_SECS:-180}" rtk cargo run --manifest-path crates/jekko-runner/Cargo.toml --locked -- "${args[@]}"
 
 # Heavy live super-agent run against the canonical 12-stage MiniRedis
 # SuperWorkflow manifest. Refuses CI and requires JEKKO_ZYAL_LIVE=1 +
 # JEKKO_BIN. Phase H scaffold: per-phase work is still a stub until the
-# jankurai-runner follow-up; the recipe exists so operators can drive the
+# jekko-runner follow-up; the recipe exists so operators can drive the
 # wave plan end-to-end against the supervisor store.
 zyal-super-redis run_id="zyal-super-redis-local":
 	#!/usr/bin/env bash
@@ -716,7 +716,7 @@ zyal-super-status run_id:
 # Broad full-suite lane for local release-style port workflow proof.
 # jankurai:proof HLT-032-ZYAL-COMPILE-DRIFT parallel=1 cache=cargo-test narrow-targets=false
 zyal-port-full:
-	rtk cargo test --manifest-path crates/jankurai-runner/Cargo.toml --locked --no-fail-fast
+	rtk cargo test --manifest-path crates/jekko-runner/Cargo.toml --locked --no-fail-fast
 	rtk cargo test -p jekko-store --locked --no-fail-fast
 	rtk cargo test -p jekko-runtime --locked --no-fail-fast
 	rtk cargo test -p jekko-cli --locked --no-fail-fast

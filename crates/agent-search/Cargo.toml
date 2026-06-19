@@ -25,6 +25,8 @@ tracing = "0.1"
 url = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "2"
+# Patent / prior-art providers live in the jekko-zyal split repo (self-contained, no cycle back here).
+patent-search = { path = "../../../jekko-zyal/crates/patent-search" }
 
 [dev-dependencies]
 tempfile = "3"

@@ -12,7 +12,7 @@
 ```bash
 JEKKO_ZYAL_LIVE=1 JEKKO_BIN=/home/ubuntu/jekko/target/release/jekko \
   JEKKO_KEY_SOURCE_POLICY=users-only JEKKO_MODEL_CALL_TIMEOUT_SECS=300 \
-  rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- \
+  rtk cargo run --manifest-path crates/jekko-runner/Cargo.toml --locked -- \
     --repo . --run-id heavy-mini-1779901731 port-run \
     --config docs/ZYAL/examples/35-rust-redis-replacement-superreasoning.port-run.json \
     --live --max-ticks 4
@@ -137,7 +137,7 @@ Total: **12 phases marked Complete** in the supervisor store.
 
 ### Phase status (12/12 complete, scaffold-mode)
 
-Every phase has the same summary: *"scaffold-mode: per-phase invocation deferred until --live wires the jankurai-runner subprocess for this phase"*.
+Every phase has the same summary: *"scaffold-mode: per-phase invocation deferred until --live wires the jekko-runner subprocess for this phase"*.
 
 Phase IDs (canonical order):
 `source_of_truth → architecture_blueprint → repo_graph_bootstrap → contracts_and_slices → parallel_subsystems → parity_lab → integration_fusion → parity_gap_closure → hardening_security → performance_closure → docs_release_ops → final_signoff`
@@ -150,10 +150,10 @@ Phase IDs (canonical order):
 | `fusion_success_total` | 248 | 248 | **0** |
 | `fusion_failure_total` | 62 | 62 | **0** |
 
-Confirmed: the 12-stage SuperWorkflow walker in its current form is a **plan/store scaffold only** — it does not yet wire jankurai-runner per phase. The integration is "Phase H scaffold" per the Justfile comment.
+Confirmed: the 12-stage SuperWorkflow walker in its current form is a **plan/store scaffold only** — it does not yet wire jekko-runner per phase. The integration is "Phase H scaffold" per the Justfile comment.
 
 ### Phase 4 candidate: FIX-CAND-L
-- The 12-stage supervisor walker should optionally invoke jankurai-runner per phase to make the SuperWorkflow plan executable. Right now `--live` mode on `port-run --super` spawns `jekko run --ephemeral --json --agent plan <prompt>` per phase, but the prompt comes from the manifest's phase definition. A bigger change would route each phase through the appropriate `port-run` or `hero-judge-run` recipe based on its `objective`.
+- The 12-stage supervisor walker should optionally invoke jekko-runner per phase to make the SuperWorkflow plan executable. Right now `--live` mode on `port-run --super` spawns `jekko run --ephemeral --json --agent plan <prompt>` per phase, but the prompt comes from the manifest's phase definition. A bigger change would route each phase through the appropriate `port-run` or `hero-judge-run` recipe based on its `objective`.
 - **Severity:** feature work, not a bug. Out of scope for this campaign.
 
 ## Phase 3 verdict
@@ -176,7 +176,7 @@ Confirmed: the 12-stage SuperWorkflow walker in its current form is a **plan/sto
 
 - **FIX-CAND-J:** new structured signal for "empty-response streak ≥ N" — would surface this content-side issue distinctly from generic retryable_failure.
 - **FIX-CAND-K:** quality-band escalation on empty-response streak — depends on the deferred quality-band feature.
-- **FIX-CAND-L:** wire jankurai-runner subprocess per phase in `port-run --super --live`. Feature work.
+- **FIX-CAND-L:** wire jekko-runner subprocess per phase in `port-run --super --live`. Feature work.
 
 These join the consolidated queue in `BATCH-zyal-testing-phase2.md`.
 
@@ -194,7 +194,7 @@ empty-response tracker → auto-generated SUMMARY.json.
 
 **Why OpenQG, not heavy MiniRedis here?** The fusion-side
 `quality_band` filter landed in Phase E (commit `c16933da0`), but the
-**MANIFEST → jankurai-runner → jekko-run → request.extra** plumbing
+**MANIFEST → jekko-runner → jekko-run → request.extra** plumbing
 that lets a ZYAL stage author *declare* a band per stage is a separate
 sub-feature (the manifest currently has an empty `model_policy.routine: {}`
 stanza — no field is yet parsed). Without that plumbing landed, the
@@ -264,9 +264,9 @@ The full SUMMARY.json + .md live at `target/zyal/runs/phaseh-live-1779917407/`.
 To exercise the same chain on the actual heavy MiniRedis brainstorm halt,
 the next session needs to add the manifest-to-request plumbing:
 
-1. `crates/jankurai-runner/src/model_policy.rs` (or similar): parse the
+1. `crates/jekko-runner/src/model_policy.rs` (or similar): parse the
    `quality_band` value from each stage's `model_policy.<role>` entry.
-2. `crates/jankurai-runner/src/model_client/runtime.rs`: forward the
+2. `crates/jekko-runner/src/model_client/runtime.rs`: forward the
    parsed band to the `jekko run` subprocess via env var
    (e.g. `JEKKO_RUN_QUALITY_BAND=top20`).
 3. `crates/jekko-cli/src/cmd/run.rs` (or `cmd/run/`): read the env var

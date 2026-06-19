@@ -328,7 +328,7 @@
       "command": "cargo test --manifest-path crates/agent-search/Cargo.toml --locked --no-fail-fast",
       "purpose": "verify academic provider search and dedupe primitives used by QBank discovery"
     },
-    "crates/jankurai-runner/": {
+    "crates/jekko-runner/": {
       "command": "just zyal-superreasoning-fast",
       "purpose": "verify headless runner scheduling, superreasoning packets, port workflow helpers, parity report checks, repo graph building, and safe worker-pool planning"
     },

@@ -31,11 +31,19 @@ pub enum ProviderId {
     Github,
     Firecrawl,
     Jina,
+    PatentsView,
+    EpoOps,
+    SerpapiPatents,
+    Lens,
 }
 
 impl ProviderId {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::PatentsView => "patentsview",
+            Self::EpoOps => "epo_ops",
+            Self::SerpapiPatents => "serpapi_patents",
+            Self::Lens => "lens",
             Self::OpenAlex => "openalex",
             Self::Crossref => "crossref",
             Self::Arxiv => "arxiv",
@@ -81,6 +89,10 @@ impl FromStr for ProviderId {
             "github" => Ok(Self::Github),
             "firecrawl" => Ok(Self::Firecrawl),
             "jina" => Ok(Self::Jina),
+            "patentsview" => Ok(Self::PatentsView),
+            "epo_ops" | "epo" | "epoops" => Ok(Self::EpoOps),
+            "serpapi_patents" | "google_patents" | "serpapi" => Ok(Self::SerpapiPatents),
+            "lens" | "lens_org" => Ok(Self::Lens),
             _ => Err(SearchError::UnknownProvider(value.to_string())),
         }
     }

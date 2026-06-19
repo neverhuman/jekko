@@ -29,6 +29,9 @@ pub enum Profile {
     Daemon { schema: String },
     /// Declarative SuperWorkflow manifest (9-12 macro phases). Emits canonical JSON.
     SuperWorkflow { schema: String },
+    /// Declarative FlowGraph manifest. Emits a fully-flattened agent-flow graph
+    /// (nodes + edges) as canonical JSON for the jekko-web diagram.
+    FlowGraph { schema: String },
 }
 
 impl std::fmt::Display for Profile {
@@ -39,6 +42,7 @@ impl std::fmt::Display for Profile {
             Profile::Workflow { .. } => write!(f, "workflow"),
             Profile::Daemon { .. } => write!(f, "daemon"),
             Profile::SuperWorkflow { .. } => write!(f, "superworkflow"),
+            Profile::FlowGraph { .. } => write!(f, "flowgraph"),
         }
     }
 }
@@ -80,6 +84,7 @@ pub fn parse_header(raw: &str) -> Result<(Profile, usize)> {
             "github-workflow" => Profile::Workflow { schema },
             "daemon" => Profile::Daemon { schema },
             "superworkflow" => Profile::SuperWorkflow { schema },
+            "flowgraph" => Profile::FlowGraph { schema },
             other => return Err(anyhow!("unsupported target '{other}'")),
         };
         let pragma_offset = raw.find(pragma_line).unwrap_or(0) + pragma_line.len();
@@ -169,6 +174,13 @@ mod tests {
             parse_header("# zyal: declarative target=superworkflow schema=zyal/superworkflow@1")
                 .expect("superworkflow target");
         assert!(matches!(p, Profile::SuperWorkflow { .. }));
+    }
+
+    #[test]
+    fn detects_flowgraph_target() {
+        let (p, _) = parse_header("# zyal: declarative target=flowgraph schema=zyal/flowgraph@1")
+            .expect("flowgraph target");
+        assert!(matches!(p, Profile::FlowGraph { .. }));
     }
 
     #[test]

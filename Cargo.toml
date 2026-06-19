@@ -19,7 +19,7 @@ members = [
   "crates/zyal-supervisor",
   "crates/zyalc",
   "crates/jankurai",
-  "crates/jankurai-runner",
+  "crates/jekko-runner",
   "crates/memory-benchmark",
   "mini-fleet-smoke",
 ]

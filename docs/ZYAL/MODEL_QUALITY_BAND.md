@@ -98,7 +98,7 @@ if pool.is_empty() && profile.quality_band != QualityBand::Any {
 5. **`routing.rs`** — new helper `compute_quality_percentiles(metrics: &[ModelMetric]) -> HashMap<String, f64>` that returns each model's percentile rank by win-rate.
 6. **`fusion.rs::route_meta`** — surface `quality_band` in receipt metadata so events.jsonl shows which band was used.
 7. **`OBSERVABILITY.md`** — document the new `fusion_quality_band_usage_total{band}` counter (one new Prom counter).
-8. **`crates/jankurai-runner/src/superreasoning/`** — adopt: stage definitions that want a stronger model add `quality_band: top10` to their model-policy entry. The Stage 2 reasoning (`brainstorm`, `critique`) might want `top20`. The non-critical Stage 8 docs-release work could use `bottom20` to free up better models for the hot path.
+8. **`crates/jekko-runner/src/superreasoning/`** — adopt: stage definitions that want a stronger model add `quality_band: top10` to their model-policy entry. The Stage 2 reasoning (`brainstorm`, `critique`) might want `top20`. The non-critical Stage 8 docs-release work could use `bottom20` to free up better models for the hot path.
 
 ## Safety / risk
 

@@ -26,7 +26,7 @@ github-sync:push-to-main:
   needs:
     - job: "typecheck: [jekko-cli]"
       artifacts: false
-    - job: "typecheck: [jankurai-runner]"
+    - job: "typecheck: [jekko-runner]"
       artifacts: false
     - job: "typecheck: [zyal-supervisor]"
       artifacts: false

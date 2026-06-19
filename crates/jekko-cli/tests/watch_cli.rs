@@ -12,7 +12,7 @@ use assert_cmd::Command;
 use predicates::str::contains;
 
 /// Build the per-run events.jsonl path relative to a repo root, mirroring
-/// `jankurai_runner::events::run_event_file_rel`.
+/// `jekko_runner::events::run_event_file_rel`.
 fn events_path(repo_root: &std::path::Path, run_id: &str) -> PathBuf {
     repo_root
         .join("target")

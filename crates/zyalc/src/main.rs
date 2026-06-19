@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use zyalc::{compile, live_audit, replay_verify, runbook_lint};
+use zyalc::{compile, fmt, live_audit, replay_verify, runbook_lint, schema};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -36,6 +36,23 @@ enum Cmd {
     },
     /// Print the detected profile + emitted target for a `.zyal` file.
     Inspect { path: PathBuf },
+    /// Run the ZYAL conformance suite: every diagnostic fixture fires its
+    /// declared code + the IR is byte-deterministic. Exit 1 on any failure.
+    Conformance,
+    /// Format a `.zyal` file in place (idempotent; comments + pragma preserved).
+    Fmt {
+        /// Path to the `.zyal` file to format.
+        path: PathBuf,
+        /// Report whether the file is already formatted (exit 1 on drift); don't write.
+        #[arg(long)]
+        check: bool,
+    },
+    /// Generate the FlowGraph IR contract artifacts (flowgraph.schema.json + zyal.d.ts).
+    Schema {
+        /// Output directory (default: print the JSON Schema to stdout).
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     /// Lint strict superreasoning runbooks.
     LintSuper {
         /// Path to a .zyal file. Omit with --all to lint known sources.
@@ -155,6 +172,56 @@ fn dispatch(cli: &Cli) -> Result<i32> {
                 println!("schema:  {schema}");
             }
             Ok(0)
+        }
+        Cmd::Fmt { path, check } => match fmt::fmt_file(path, *check)? {
+            fmt::FmtOutcome::Unchanged => {
+                eprintln!("zyalc fmt: {} already formatted", path.display());
+                Ok(0)
+            }
+            fmt::FmtOutcome::Formatted => {
+                eprintln!("zyalc fmt: formatted {}", path.display());
+                Ok(0)
+            }
+            fmt::FmtOutcome::Drift => {
+                eprintln!(
+                    "zyalc fmt: {} is not formatted (run without --check)",
+                    path.display()
+                );
+                Ok(1)
+            }
+        },
+        Cmd::Schema { out } => {
+            match out {
+                Some(dir) => {
+                    let written = schema::write_schema(dir)?;
+                    for p in &written {
+                        eprintln!("zyalc schema: wrote {}", p.display());
+                    }
+                }
+                None => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&schema::flowgraph_schema())?
+                    );
+                }
+            }
+            Ok(0)
+        }
+        Cmd::Conformance => {
+            let (passed, total, failures) = compile::run_conformance();
+            if failures.is_empty() {
+                println!("zyalc conformance: {passed}/{total} green");
+                Ok(0)
+            } else {
+                eprintln!(
+                    "zyalc conformance: {} failure(s) ({passed}/{total} passed):",
+                    failures.len()
+                );
+                for (name, why) in &failures {
+                    eprintln!("  - {name}: {why}");
+                }
+                Ok(1)
+            }
         }
         Cmd::LintSuper {
             path,

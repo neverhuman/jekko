@@ -22,6 +22,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
+ "patent-search",
  "regex",
  "reqwest",
  "rusqlite",
@@ -1781,31 +1782,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jankurai-runner"
-version = "0.1.0"
-dependencies = [
- "agent-search",
- "anyhow",
- "async-trait",
- "clap",
- "futures",
- "jekko-store",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha1",
- "sha2",
- "syn",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "toml",
- "zyal-core",
-]
-
-[[package]]
 name = "jekko-cli"
 version = "2.0.6"
 dependencies = [
@@ -1814,11 +1790,11 @@ dependencies = [
  "clap",
  "clap_complete",
  "crossterm 0.28.1",
- "jankurai-runner",
  "jekko-core",
  "jekko-jnoccio-boot",
  "jekko-plugin-api",
  "jekko-provider",
+ "jekko-runner",
  "jekko-runtime",
  "jekko-server",
  "jekko-store",
@@ -1826,9 +1802,12 @@ dependencies = [
  "notify",
  "predicates",
  "ratatui",
+ "reqwest",
  "rusqlite",
  "serde",
  "serde_json",
+ "serde_yaml",
+ "sha2",
  "tempfile",
  "tokio",
  "toml",
@@ -1887,6 +1866,32 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "jekko-runner"
+version = "0.1.0"
+dependencies = [
+ "agent-search",
+ "anyhow",
+ "async-trait",
+ "clap",
+ "futures",
+ "jekko-store",
+ "paper-builder",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha1",
+ "sha2",
+ "syn",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
+ "zyal-core",
 ]
 
 [[package]]
@@ -2490,6 +2495,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "paper-builder"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2517,6 +2531,20 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "patent-search"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "url",
+]
 
 [[package]]
 name = "percent-encoding"

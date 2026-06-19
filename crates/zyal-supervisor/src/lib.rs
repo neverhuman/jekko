@@ -4,7 +4,7 @@
 //! manifest, computes phase readiness from the dependency DAG, and persists
 //! run / phase / task / memory / evidence / sign-off state in SQLite.
 //!
-//! Host runtimes (e.g. `jekko-runtime`, `sandboxctl`, `jankurai-runner`) can
+//! Host runtimes (e.g. `jekko-runtime`, `sandboxctl`, `jekko-runner`) can
 //! wire this in without making the ZYAL compiler itself a long-running
 //! process. The API is intentionally synchronous for Phase F4; an async
 //! wrapper is a follow-up.

@@ -67,10 +67,10 @@ Live proof runs may declare bounded `evidence_inputs`, `live_call_budget`, and `
 
 ## Headless Operation
 
-`jankurai-runner port-run` defaults to one tick. Use `--forever`, `--max-ticks`, `--tick-interval-secs`, and `--stop-file` for headless operation:
+`jekko-runner port-run` defaults to one tick. Use `--forever`, `--max-ticks`, `--tick-interval-secs`, and `--stop-file` for headless operation:
 
 ```bash
-rtk jankurai-runner --repo . --run-id port-smoke port-run --config port.json --max-ticks 3 --tick-interval-secs 5
+rtk jekko-runner --repo . --run-id port-smoke port-run --config port.json --max-ticks 3 --tick-interval-secs 5
 ```
 
 `jekko daemon start --port-run <config>` starts the port runner in forever mode unless `--max-ticks` is supplied. `jekko daemon status` reports the durable run id, phase, current reasoning artifact, active lane count, last event, parity gap count, memory capsule count, model reliability winner, and last Jankurai score when present.

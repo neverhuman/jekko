@@ -174,7 +174,7 @@ fn run_summarize(_args: &PortRunArgs, run_id: &str) -> Result<()> {
             run_dir.display()
         );
     }
-    let summary = jankurai_runner::run_summary::build_and_write(&run_dir)?;
+    let summary = jekko_runner::run_summary::build_and_write(&run_dir)?;
     println!(
         "{{\"run_id\":\"{}\",\"terminal_status\":\"{}\",\"summary_json\":\"{}\",\"summary_md\":\"{}\"}}",
         summary.run_id,

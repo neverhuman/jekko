@@ -7,4 +7,5 @@ When a user provides a paper, release, implementation, or handoff plan in the co
 Owns `crates/domain/`.
 Forbidden: I/O glue, transport routing, and persistence code.
 Proof lane: `unit / property tests`.
+Current split-family score work routes domain repair proof through `just score`.
 If jankurai is installed, run `jankurai update --client-start --quiet` before work; do not apply updates unless the user asks.

@@ -1995,7 +1995,7 @@ jankurai audit . --mode advisory                                     ✅ score=8
 
 **Cleanup wave**
 - Vibe words scrubbed from `splash/{mod,state}.rs`, `shell_layout.rs`, `lib.rs` (`compat`, `legacy`, `placeholder`, `stub`, `todo`, `fallback`).
-- jankurai-runner `classifier.rs` fallback-soup → typed match arms + `#[allow(clippy::manual_unwrap_or_default)]`.
+- jekko-runner `classifier.rs` fallback-soup → typed match arms + `#[allow(clippy::manual_unwrap_or_default)]`.
 - jekko-jnoccio-boot `unlock.rs` + `spawn.rs` fallback-soup → same pattern.
 - TS-era paths added to `[scan].excluded_paths` in `agent/audit-policy.toml` (the TS sources are pending `cleanup-cutover --execute`).
 - `jekko-cli/cmd/tui.rs` `while_let_loop` clippy quieted.

@@ -138,7 +138,7 @@ name = "jekko-agent"
 role = "agent"
 wave = 3
 owns = [
-  { crate = "jankurai-runner", src = "crates/jankurai-runner", dest = "crates/jankurai-runner" },
+  { crate = "jekko-runner", src = "crates/jekko-runner", dest = "crates/jekko-runner" },
 ]
-exports = ["jankurai-runner"]
+exports = ["jekko-runner"]
 git_deps = ["jekko-search", "jekko-core", "jekko-zyal"]

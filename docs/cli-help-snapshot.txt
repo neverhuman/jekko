@@ -38,7 +38,7 @@ Commands:
   upgrade    Upgrade Jekko in place
   uninstall  Uninstall Jekko and remove data directories
   watch      Tail a ZYAL run's NDJSON event stream and emit per-tick snapshot + remediation actions
-  port-run   Drive a 12-stage ZYAL SuperWorkflow run (compile -> seed -> walk waves). Phase H scaffold; the per-phase body is a stub until `jankurai-runner` is wired in
+  port-run   Drive a 12-stage ZYAL SuperWorkflow run (compile -> seed -> walk waves). Phase H scaffold; the per-phase body is a stub until `jekko-runner` is wired in
 
 Arguments:
   [PATH]

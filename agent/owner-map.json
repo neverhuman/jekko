@@ -70,7 +70,7 @@
     "contracts/": "contracts",
     "crates/": "tools",
     "crates/agent-search/": "tools",
-    "crates/jankurai-runner/": "tools",
+    "crates/jekko-runner/": "tools",
     "crates/jankurai/tests/fixtures/coverage/": "agent",
     "crates/jekko-cli/src/cmd/daemon.rs": "tools",
     "crates/jekko-store/src/daemon/": "tools",

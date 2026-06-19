@@ -289,7 +289,7 @@ Note: worktree creation blocked by git-crypt encrypted submodule. Subagent ran o
 - `cargo test -p jekko-plugin-api --locked --no-fail-fast` → 21 passed across 5 suites
 - guard grep → clean
 
-**Consolidation note for future packets:** `crates/jekko-plugin-api/Cargo.toml` has two explicit-version (non-workspace) deps because I told the subagent not to touch root: `semver = { version = "1", features = ["serde"] }` and `toml = "0.8"`. `toml = "0.8"` is already at that version in `jankurai-runner`, `sandboxctl`, `zyalc`, so promoting it to a workspace dep is trivial whenever someone touches root `Cargo.toml` next.
+**Consolidation note for future packets:** `crates/jekko-plugin-api/Cargo.toml` has two explicit-version (non-workspace) deps because I told the subagent not to touch root: `semver = { version = "1", features = ["serde"] }` and `toml = "0.8"`. `toml = "0.8"` is already at that version in `jekko-runner`, `sandboxctl`, `zyalc`, so promoting it to a workspace dep is trivial whenever someone touches root `Cargo.toml` next.
 
 ### [2026-05-15T14:05Z] Claude-Opus-4.7 — done L (with deferred subset)
 

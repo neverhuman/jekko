@@ -274,7 +274,7 @@ run_miniredis_focus() {
     rid=$(printf '%s-miniredis-%02d' "$RUN_ID_PREFIX" "$idx")
     run_and_capture "$rid" "MiniRedis heavy attempt $idx" \
       env JEKKO_REASONING_PARALLEL=1 JEKKO_MODEL_CALL_TIMEOUT_SECS=300 \
-      rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- \
+      rtk cargo run --manifest-path crates/jekko-runner/Cargo.toml --locked -- \
         --repo . --run-id "$rid" \
         port-run --config "$SERIOUS_ABS/config/miniredis-serious.port-run.json" \
         --live --max-ticks 12
@@ -289,7 +289,7 @@ run_openqg_focus() {
     JEKKO_ZYAL_HERO_MODEL_CALL_BUDGET=64 \
     JEKKO_ZYAL_HERO_MAX_PARALLEL=4 \
     HERO_JUDGE_SERIES_PARALLEL=3 \
-    rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- \
+    rtk cargo run --manifest-path crates/jekko-runner/Cargo.toml --locked -- \
       --repo . --run-id "$series_id" \
       hero-judge-run --zyal docs/ZYAL/examples/34-superreasoning-openqg-foundry.zyal \
       --live --max-generations 2 --runs 3

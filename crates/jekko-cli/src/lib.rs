@@ -42,7 +42,7 @@ where
 fn dispatch(cli: Cli) -> Result<()> {
     runtime::bootstrap(&cli.global, cli.directory.as_deref())?;
 
-    // Short-circuit: `-j` / `--jankurai` runs one cycle via jankurai-runner.
+    // Short-circuit: `-j` / `--jankurai` runs one cycle via jekko-runner.
     if cli.jankurai {
         return cmd::jankurai::run(
             &cli.global,
@@ -78,6 +78,12 @@ fn dispatch(cli: Cli) -> Result<()> {
         Some(Command::Uninstall(args)) => cmd::uninstall::run(&cli.global, args),
         Some(Command::Watch(args)) => cmd::watch::run(&cli.global, args),
         Some(Command::PortRun(args)) => cmd::port_run::run(&cli.global, args),
+        Some(Command::ZyalRun(args)) => cmd::zyal_run::run(&cli.global, args),
+        Some(Command::ZyalDispatch(args)) => cmd::zyal_dispatch::run(&cli.global, args),
+        Some(Command::ZyalQueue(args)) => cmd::zyal_queue::run(&cli.global, args),
+        Some(Command::Fetch(args)) => cmd::fetch::run(&cli.global, args),
+        Some(Command::Research(args)) => cmd::research::run(&cli.global, args),
+        Some(Command::McpCall(args)) => cmd::mcp_call::run(&cli.global, args),
         None => {
             // Default: launch the TUI.
             let tui_args = cmd::tui::TuiArgs {

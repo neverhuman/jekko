@@ -25,7 +25,7 @@ Centralization + super-agent kernel work toward driving long-running multi-stage
 | B2.5 | Split MemoryCapsule write-gate into named helpers | done | d06c90d35 |
 | B2.6 | LaneId/RunId/ArtifactRef newtypes | scaffolded in B1; first usage lands in Phase F | — |
 | C1 | Scaffold zyal-key-pool crate (pool / balancer / budget) | done | b288ca619 |
-| C2 | Wire zyal-key-pool into jnoccio-fusion + jankurai-runner (UsersPool fanout + PolicyHook gate) | done | 983771fee |
+| C2 | Wire zyal-key-pool into jnoccio-fusion + jekko-runner (UsersPool fanout + PolicyHook gate) | done | 983771fee |
 | C3 | Create this MASTER_PLAN.md (closes `missing-agent-readable-docs` cap) | done | f081adf28 |
 | D1 | ToolMode { Off, ReadOnly, Full } policy + per-role mapping | done | 830c1ee15 |
 | D2 | Lift hardcoded JEKKO_RUN_DISABLE_TOOLS, add JEKKO_RUN_TOOL_ALLOWLIST | done | 830c1ee15 (same commit as D1) |
@@ -34,7 +34,7 @@ Centralization + super-agent kernel work toward driving long-running multi-stage
 | E2 substrate | embedding column + encode_embedding / decode_embedding / cosine_similarity | done | faf8b4cff |
 | E2 runtime | OpenAICompatibleEmbedder + retrieve_for_run + jnoccio-fusion /v1/embeddings | done | fdc834bed |
 | F1 | jekko-runtime daemon: SuperReasoningPlan registration API + canonical_phases() 12-stage builder | done | fb0adf07cf |
-| F2 | jankurai-runner: SuperReasoningConfig extension (parallel/memory/graph/parity policies + draft_super_master_plan) | done | ff2237baf |
+| F2 | jekko-runner: SuperReasoningConfig extension (parallel/memory/graph/parity policies + draft_super_master_plan) | done | ff2237baf |
 | F3 | 12-stage blueprint wiring | done via F2's canonical_stage_templates() (mirrors F1's canonical_phases names) | (covered by F2) |
 | F4 | New zyal-supervisor crate (model + planner + SQLite store, 8 tables) | done | 73603a979 |
 | F5 | zyalc Profile::SuperWorkflow + ambitious-superworkflow.zyal + emitted JSON | done | c5c597272 |

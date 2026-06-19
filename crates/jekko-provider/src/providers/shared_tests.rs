@@ -42,7 +42,7 @@ fn build_openai_style_helpers_cover_body_and_headers() {
 #[test]
 fn quality_band_in_options_lands_at_request_top_level() {
     // FIX-CAND-M: ZYAL declares quality_band on a stage's model_policy
-    // role; jankurai-runner sets JEKKO_RUN_QUALITY_BAND; jekko run
+    // role; jekko-runner sets JEKKO_RUN_QUALITY_BAND; jekko run
     // injects it into provider_options; the body builder must hoist
     // it to a top-level field so fusion's RequestProfile reads it
     // from `extra`.

@@ -220,6 +220,320 @@ fn superworkflow_dependencies_are_acyclic(phases: &[serde_yaml::Value]) -> Resul
     Ok(visited == indegree.len())
 }
 
+/// Validate a FlowGraph `.zyal` source by parsing the YAML body and running
+/// [`validate_flowgraph_value`] on it.
+pub(super) fn validate_flowgraph_profile(source: &Path, raw: &str) -> Result<()> {
+    let body = strip_pragmas(raw);
+    let parsed: serde_yaml::Value = serde_yaml::from_str(&body)
+        .with_context(|| format!("parse flowgraph YAML body in {}", source.display()))?;
+    validate_flowgraph_value(source, &parsed)
+}
+
+/// Validate a parsed FlowGraph manifest value.
+///
+/// FlowGraph validation is intentionally LENIENT — the IR is meant to be robust
+/// and AI-authorable, fully mapping arbitrary agent flows:
+///
+/// * `id`, `job.name`, and `job.objective` are required (the framing).
+/// * When an explicit `graph.nodes` block is present, each node must have a
+///   unique non-empty `id` and a `type`.
+/// * `graph.edges` (when present) must each carry a `from`/`src` and `to`/`dst`.
+///
+/// Deliberately NOT enforced: acyclicity (`loop_back` edges express iteration),
+/// and edge-endpoint membership (edges may reference runtime-resolved or
+/// implicit nodes that the compiler expands).
+pub(super) fn validate_flowgraph_value(source: &Path, value: &serde_yaml::Value) -> Result<()> {
+    let root = value.as_mapping().ok_or_else(|| {
+        anyhow!(
+            "flowgraph body in {} must be a YAML mapping",
+            source.display()
+        )
+    })?;
+    // M4-cont: validate the optional `zyal:` contract header before anything
+    // else, so a document that targets an unsupported dialect / registry / IR
+    // fails fast with a precise diagnostic.
+    validate_flowgraph_header(root)?;
+    validate_uses_shape(root)?;
+    validate_paper_builder_block(root)?;
+    require_present(root, "id")?;
+    let job = require_map(root, "job")?;
+    require_present(job, "name")?;
+    require_present(job, "objective")?;
+
+    let Some(graph) = lookup(root, "graph").and_then(|v| v.as_mapping()) else {
+        return Ok(()); // no authored graph — synthesized from policy blocks
+    };
+    if let Some(nodes) = lookup(graph, "nodes").and_then(|v| v.as_sequence()) {
+        let mut ids = std::collections::BTreeSet::new();
+        for node in nodes {
+            let node = node
+                .as_mapping()
+                .ok_or_else(|| anyhow!("flowgraph graph.node must be a mapping"))?;
+            let id = lookup(node, "id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("flowgraph graph.node missing id"))?;
+            if id.trim().is_empty() {
+                return Err(anyhow!("flowgraph graph.node id must be non-empty"));
+            }
+            // `.` is reserved as the `node.port` edge separator (F3); a dotted id
+            // would make edge-endpoint resolution ambiguous.
+            if id.contains('.') {
+                return Err(anyhow!(
+                    "flowgraph graph.node id `{id}` must not contain `.` (reserved for node.port edge refs)"
+                ));
+            }
+            if !ids.insert(id.to_string()) {
+                return Err(anyhow!("duplicate flowgraph graph.node id {id}"));
+            }
+            require_present(node, "type")?;
+            // F2: an authored node must name a registered kind. Synthesized
+            // graphs (no `graph.nodes`) never reach here and only emit known
+            // kinds. Adding a kind is a `node-types.json` entry, not a code edit.
+            let ty = lookup(node, "type").and_then(|v| v.as_str()).unwrap_or("");
+            if !ty.is_empty() && !super::registry::known_node_kind(ty) {
+                return Err(anyhow!(
+                    "ZYAL_E_UNKNOWN_NODE_KIND: flowgraph graph.node `{id}` has unknown type `{ty}` (register it in contracts/node-types.json)"
+                ));
+            }
+        }
+    }
+    if let Some(edges) = lookup(graph, "edges").and_then(|v| v.as_sequence()) {
+        for edge in edges {
+            let edge = edge
+                .as_mapping()
+                .ok_or_else(|| anyhow!("flowgraph graph.edge must be a mapping"))?;
+            let from = lookup(edge, "from").or_else(|| lookup(edge, "src"));
+            let to = lookup(edge, "to").or_else(|| lookup(edge, "dst"));
+            if from.and_then(|v| v.as_str()).is_none() {
+                return Err(anyhow!("flowgraph graph.edge missing `from`/`src`"));
+            }
+            if to.and_then(|v| v.as_str()).is_none() {
+                return Err(anyhow!("flowgraph graph.edge missing `to`/`dst`"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_uses_shape(root: &serde_yaml::Mapping) -> Result<()> {
+    let mut aliases = std::collections::BTreeMap::<String, String>::new();
+    let Some(uses) = lookup(root, "uses") else {
+        return Ok(());
+    };
+    let uses = uses
+        .as_sequence()
+        .ok_or_else(|| anyhow!("ZYAL_E_USES_SHAPE: `uses` must be a sequence"))?;
+    for item in uses {
+        let item = item
+            .as_mapping()
+            .ok_or_else(|| anyhow!("ZYAL_E_USES_SHAPE: each `uses` entry must be a mapping"))?;
+        let ref_id = lookup(item, "ref")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("ZYAL_E_USES_SHAPE: `uses[].ref` is required"))?;
+        if !ref_id.starts_with("zyal://") {
+            return Err(anyhow!(
+                "ZYAL_E_UNSUPPORTED_REF: `uses[].ref` `{ref_id}` must be a zyal:// ref"
+            ));
+        }
+        let mut alias_value = None;
+        if let Some(alias) = lookup(item, "as") {
+            let alias = alias
+                .as_str()
+                .ok_or_else(|| anyhow!("ZYAL_E_USES_SHAPE: `uses[].as` must be a string"))?;
+            if alias.trim().is_empty() {
+                return Err(anyhow!("ZYAL_E_USES_SHAPE: `uses[].as` must be non-empty"));
+            }
+            alias_value = Some(alias.to_string());
+        }
+        if let Some(alias) = alias_value {
+            if let Some(existing) = aliases.insert(alias.clone(), ref_id.to_string()) {
+                if existing != ref_id {
+                    return Err(anyhow!(
+                        "ZYAL_E_USE_ALIAS_CONFLICT: alias `{alias}` maps to both `{existing}` and `{ref_id}`"
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_paper_builder_block(root: &serde_yaml::Mapping) -> Result<()> {
+    let Some(block) = lookup(root, "paper_builder") else {
+        return Ok(());
+    };
+    let block = block
+        .as_mapping()
+        .ok_or_else(|| anyhow!("paper_builder must be a mapping"))?;
+    let id = lookup(block, "id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("paper_builder");
+    if id.trim().is_empty() || id.contains('.') {
+        return Err(anyhow!(
+            "paper_builder.id must be non-empty and must not contain `.`"
+        ));
+    }
+    if let Some(use_ref) = lookup(block, "use").and_then(|v| v.as_str()) {
+        if !use_ref.starts_with("zyal://") {
+            return Err(anyhow!(
+                "ZYAL_E_UNSUPPORTED_REF: paper_builder.use `{use_ref}` must be a zyal:// ref"
+            ));
+        }
+    }
+    let goal = lookup(block, "paper_goal")
+        .or_else(|| lookup(block, "goal"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if goal.trim().is_empty() {
+        return Err(anyhow!("paper_builder.paper_goal is required"));
+    }
+    for key in ["data_artifacts", "success_criteria", "authors"] {
+        let seq = lookup(block, key)
+            .ok_or_else(|| anyhow!("paper_builder.{key} is required"))?
+            .as_sequence()
+            .ok_or_else(|| anyhow!("paper_builder.{key} must be a sequence"))?;
+        if seq.is_empty() {
+            return Err(anyhow!("paper_builder.{key} must not be empty"));
+        }
+    }
+    if let Some(mode) = lookup(block, "mode").and_then(|v| v.as_str()) {
+        if !matches!(mode, "light" | "medium" | "heavy") {
+            return Err(anyhow!(
+                "paper_builder.mode must be one of light, medium, heavy"
+            ));
+        }
+    }
+    if let Some(target) = lookup(block, "journal_target").and_then(|v| v.as_str()) {
+        if target != "ieee" {
+            return Err(anyhow!(
+                "paper_builder.journal_target currently supports ieee"
+            ));
+        }
+    }
+    for author in lookup(block, "authors")
+        .and_then(|v| v.as_sequence())
+        .into_iter()
+        .flatten()
+    {
+        let author = author
+            .as_mapping()
+            .ok_or_else(|| anyhow!("paper_builder.authors entries must be mappings"))?;
+        for key in ["name", "affiliation", "email"] {
+            let value = lookup(author, key)
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("paper_builder.authors[].{key} is required"))?;
+            if value.trim().is_empty() {
+                return Err(anyhow!("paper_builder.authors[].{key} must be non-empty"));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Highest ZYAL dialect major this compiler accepts. v1/v2 documents compile;
+/// a declared major above this is rejected (`ZYAL_E_UNSUPPORTED_MAJOR`).
+const SUPPORTED_DIALECT_MAJOR: u64 = 2;
+/// The IR envelope version this compiler emits (mirrors `flowgraph::IR_VERSION`).
+/// A document requiring a newer IR is rejected (`ZYAL_E_IR_TOO_NEW_FOR_RUNNER`).
+const SUPPORTED_IR_VERSION: u64 = 3;
+
+/// Validate the optional top-level `zyal:` contract header.
+///
+/// Absent header → OK (the implicit v1 dialect, for back-compat with the 36
+/// pre-header examples). When PRESENT, the header must be well-formed and must
+/// not require a dialect / registry / IR newer than this compiler supports:
+///   * no `version` under `zyal:` → `ZYAL_E_VERSION_MISSING`
+///   * `version` major > supported → `ZYAL_E_UNSUPPORTED_MAJOR`
+///   * `contract.registry_version` newer than the embedded registry →
+///     `ZYAL_E_REGISTRY_TOO_OLD`
+///   * `contract.ir_version` newer than the emitted IR →
+///     `ZYAL_E_IR_TOO_NEW_FOR_RUNNER`
+fn validate_flowgraph_header(root: &serde_yaml::Mapping) -> Result<()> {
+    let Some(zyal) = lookup(root, "zyal").and_then(|v| v.as_mapping()) else {
+        return Ok(());
+    };
+    let Some(version) = lookup(zyal, "version") else {
+        return Err(anyhow!(
+            "ZYAL_E_VERSION_MISSING: a `zyal:` header must declare a `version`"
+        ));
+    };
+    let version = scalar_str(version);
+    let major = parse_major(&version).ok_or_else(|| {
+        anyhow!("ZYAL_E_VERSION_MISSING: `zyal.version` `{version}` is not a valid version")
+    })?;
+    if major > SUPPORTED_DIALECT_MAJOR {
+        return Err(anyhow!(
+            "ZYAL_E_UNSUPPORTED_MAJOR: document declares ZYAL dialect major {major}, but this compiler supports up to {SUPPORTED_DIALECT_MAJOR}"
+        ));
+    }
+
+    if let Some(contract) = lookup(zyal, "contract").and_then(|v| v.as_mapping()) {
+        if let Some(rv) = lookup(contract, "registry_version") {
+            let rv = scalar_str(rv);
+            let embedded = super::registry::registry_version();
+            if semver_gt(&rv, embedded) {
+                return Err(anyhow!(
+                    "ZYAL_E_REGISTRY_TOO_OLD: document requires node registry {rv}, but this compiler embeds {embedded}"
+                ));
+            }
+        }
+        if let Some(ir) = lookup(contract, "ir_version") {
+            let ir = scalar_str(ir);
+            let required = parse_ir_version(&ir);
+            if required > SUPPORTED_IR_VERSION {
+                return Err(anyhow!(
+                    "ZYAL_E_IR_TOO_NEW_FOR_RUNNER: document requires IR `{ir}` (v{required}), but this compiler emits flowgraph.v{SUPPORTED_IR_VERSION}"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Render a YAML scalar (string or number) as a plain string.
+fn scalar_str(v: &serde_yaml::Value) -> String {
+    if let Some(s) = v.as_str() {
+        return s.to_string();
+    }
+    if let Some(n) = v.as_u64() {
+        return n.to_string();
+    }
+    if let Some(f) = v.as_f64() {
+        return f.to_string();
+    }
+    String::new()
+}
+
+/// First dotted component of a version, stripping an optional leading `v`.
+fn parse_major(ver: &str) -> Option<u64> {
+    let ver = ver.trim().trim_start_matches('v');
+    ver.split('.').next()?.parse::<u64>().ok()
+}
+
+/// Parse `MAJOR.MINOR.PATCH` (missing components default to 0) for comparison.
+fn semver_tuple(ver: &str) -> (u64, u64, u64) {
+    let ver = ver.trim().trim_start_matches('v');
+    let mut it = ver.split('.').map(|p| p.parse::<u64>().unwrap_or(0));
+    (
+        it.next().unwrap_or(0),
+        it.next().unwrap_or(0),
+        it.next().unwrap_or(0),
+    )
+}
+
+fn semver_gt(a: &str, b: &str) -> bool {
+    semver_tuple(a) > semver_tuple(b)
+}
+
+/// Extract the trailing integer of an IR version string like `flowgraph.v3`.
+fn parse_ir_version(ir: &str) -> u64 {
+    ir.rsplit('.')
+        .next()
+        .map(|tail| tail.trim_start_matches('v'))
+        .and_then(|n| n.parse::<u64>().ok())
+        .unwrap_or(0)
+}
+
 fn lookup<'a>(map: &'a serde_yaml::Mapping, key: &str) -> Option<&'a serde_yaml::Value> {
     map.get(serde_yaml::Value::String(key.to_string()))
 }

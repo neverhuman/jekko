@@ -68,7 +68,7 @@ docs/ZYAL/live-tests/<RUN>.md       → committed per-test forensic reports (thi
 ## 3. Reading a SUMMARY.json field-by-field
 
 Schema: `zyal.run_summary.v1`. Defined in
-`crates/jankurai-runner/src/run_summary/types.rs`. Built by
+`crates/jekko-runner/src/run_summary/types.rs`. Built by
 `run_summary::build(run_dir)`. Always present after a finalized hero-judge
 run; backfill via `jekko port-run --summarize <run_id>` for prior runs.
 
@@ -168,28 +168,28 @@ path, and a fix template.
 
 | # | Name | Fires when | First inspection | Fix template |
 |---|------|------------|------------------|--------------|
-| 1 | `model_attempt_outcome_burst` | `attempts >= 20 AND failures/attempts > 0.5` (matches `ProviderErrorBurst`) | `crates/jankurai-runner/src/watcher/remediation.rs` | Check provider health; consider cooldown adjustment |
+| 1 | `model_attempt_outcome_burst` | `attempts >= 20 AND failures/attempts > 0.5` (matches `ProviderErrorBurst`) | `crates/jekko-runner/src/watcher/remediation.rs` | Check provider health; consider cooldown adjustment |
 | 2 | `balancer_no_rotation` | cursor unchanged across a run that emitted ≥1 `model_attempt` | `crates/zyal-key-pool/src/balancer.rs` | Check cursor key (provider, model); add user dimension if rotation needs to be per-user |
-| 3 | `parity_gap_open_growth` | parity_gap count > parity_result count, ≥ 3 gaps | `crates/jankurai-runner/src/parity_lab/gaps.rs` | Escalate to Critique lane — see watcher::ParityGapsGrowing |
-| 4 | `worker_stall_or_quarantine` | any `worker_stall` or `worker_quarantine` event | `crates/jankurai-runner/src/watcher/mod.rs` | Tune the stall-threshold; investigate heartbeat cadence |
+| 3 | `parity_gap_open_growth` | parity_gap count > parity_result count, ≥ 3 gaps | `crates/jekko-runner/src/parity_lab/gaps.rs` | Escalate to Critique lane — see watcher::ParityGapsGrowing |
+| 4 | `worker_stall_or_quarantine` | any `worker_stall` or `worker_quarantine` event | `crates/jekko-runner/src/watcher/mod.rs` | Tune the stall-threshold; investigate heartbeat cadence |
 | 5 | `live_budget_exhaustion` | `live_budget.data.remaining <= 0` | `crates/zyal-key-pool/src/budget.rs` | Raise manifest's `live_call_budget.max_calls` |
-| 6 | `proof_failed_in_live_lane` | any `proof_failed` event | `crates/jankurai-runner/src/stage0_proof/` | Inspect `proof_failed.data.reason` |
+| 6 | `proof_failed_in_live_lane` | any `proof_failed` event | `crates/jekko-runner/src/stage0_proof/` | Inspect `proof_failed.data.reason` |
 | 7 | `provider_error_rate_explosion` | `fusion_model_failure_total / fusion_model_requests_total > 0.5` AND ≥ 20 attempts | `jnoccio-fusion/src/failure_log.rs` + `state.rs` | Check provider keys; consider rotating user_1↔user_2 manually |
 | 8 | `latency_outlier_per_provider` | `fusion_model_latency_avg_ms` outlier vs. the pool median | `jnoccio-fusion/src/limits.rs::cooldown_for` | Adjust cooldown for that provider |
 | 9 | `jankurai_regression` | `audit_result.data.hard_findings` increased mid-run | `.jankurai/repo-score.md` | Fix the new finding before re-attempting the run |
-| 10 | `heartbeat_silence` | gap > 90 s between `heartbeat` events | `crates/jankurai-runner/src/superreasoning/runner.rs` | Tune heartbeat cadence; ensure background tasks emit progress events |
-| 11 | `parity_result_no_evidence` | `parity_result` event with `evidence_paths == null` | `crates/jankurai-runner/src/parity_lab/runner.rs` | Ensure parity adapters emit at least one evidence path |
-| 12 | `judge_patch_without_proof` | `judge_patch` event with no matching `proof_passed` within 120 s | `crates/jankurai-runner/src/hero_judge_runner_finalize/` | Likely budget-driven — raise budget OR tighten judge→proof loop |
-| — | `empty_response_streak` | 3 consecutive `response_bytes == 0` at the same stage | `crates/jankurai-runner/src/empty_response_tracker.rs` | **Declare `quality_band: top20`** on the affected stage's model_policy |
+| 10 | `heartbeat_silence` | gap > 90 s between `heartbeat` events | `crates/jekko-runner/src/superreasoning/runner.rs` | Tune heartbeat cadence; ensure background tasks emit progress events |
+| 11 | `parity_result_no_evidence` | `parity_result` event with `evidence_paths == null` | `crates/jekko-runner/src/parity_lab/runner.rs` | Ensure parity adapters emit at least one evidence path |
+| 12 | `judge_patch_without_proof` | `judge_patch` event with no matching `proof_passed` within 120 s | `crates/jekko-runner/src/hero_judge_runner_finalize/` | Likely budget-driven — raise budget OR tighten judge→proof loop |
+| — | `empty_response_streak` | 3 consecutive `response_bytes == 0` at the same stage | `crates/jekko-runner/src/empty_response_tracker.rs` | **Declare `quality_band: top20`** on the affected stage's model_policy |
 
 ## 5. Adding a new signal — recipe
 
 1. **Decide whether you need a new `EventKind` variant.** Often you don't — enrich the `data` payload of an existing event.
-2. **If yes:** add the variant to `crates/jankurai-runner/src/events.rs` with a doc comment explaining when it fires. The `serde(rename_all = "snake_case")` macro at the top of the enum gives you a `snake_case` JSON name automatically.
-3. **Detect & emit** in the appropriate source location. Pattern: a small struct that holds the state (counter, observed providers, …) + a `record()` method that emits exactly once on threshold crossing. See `crates/jankurai-runner/src/empty_response_tracker.rs` as the canonical template.
-4. **Fold into the WatcherSnapshot** if the signal should affect remediation. Edit `crates/jankurai-runner/src/watcher/metrics.rs`; add a field; bump fold logic.
-5. **Add a remediation rule** if the signal warrants automatic action: `crates/jankurai-runner/src/watcher/remediation.rs::detect_and_remediate`.
-6. **Surface in SUMMARY.json.** Edit `crates/jankurai-runner/src/run_summary/build.rs::canonical_signal_table` to include the new id/name. The `operator_next_steps` heuristic in the same file can recommend a fix.
+2. **If yes:** add the variant to `crates/jekko-runner/src/events.rs` with a doc comment explaining when it fires. The `serde(rename_all = "snake_case")` macro at the top of the enum gives you a `snake_case` JSON name automatically.
+3. **Detect & emit** in the appropriate source location. Pattern: a small struct that holds the state (counter, observed providers, …) + a `record()` method that emits exactly once on threshold crossing. See `crates/jekko-runner/src/empty_response_tracker.rs` as the canonical template.
+4. **Fold into the WatcherSnapshot** if the signal should affect remediation. Edit `crates/jekko-runner/src/watcher/metrics.rs`; add a field; bump fold logic.
+5. **Add a remediation rule** if the signal warrants automatic action: `crates/jekko-runner/src/watcher/remediation.rs::detect_and_remediate`.
+6. **Surface in SUMMARY.json.** Edit `crates/jekko-runner/src/run_summary/build.rs::canonical_signal_table` to include the new id/name. The `operator_next_steps` heuristic in the same file can recommend a fix.
 7. **Update `scripts/zyal-live-report.sh`** if the signal should appear in the 12-signal batch scorecard.
 8. **Document in this playbook (§4) and in `docs/ZYAL/OBSERVABILITY.md`.**
 9. **Test.** Unit-test the detector (`empty_response_tracker::tests` is the template). Integration-test that SUMMARY.json carries the signal.
@@ -201,7 +201,7 @@ Carried forward from the zyal-testing campaign:
 1. **Reproduce.** Run the failing recipe alone; confirm the signal fires deterministically.
 2. **Read** the inspection target end-to-end. Don't skim.
 3. **Design** a surgical single-concern diff. Prefer reusing existing helpers (`cooldown_for`, `error_rate`, `EventSink::emit`).
-4. **Stay under 500 LOC per file.** `crates/jankurai-runner/src/reasoning_io.rs` is the dominant score lever at 498 LOC — DO NOT touch beyond the absolute minimum. Use a helper module if the change is non-trivial.
+4. **Stay under 500 LOC per file.** `crates/jekko-runner/src/reasoning_io.rs` is the dominant score lever at 498 LOC — DO NOT touch beyond the absolute minimum. Use a helper module if the change is non-trivial.
 5. **Local test.** `cargo check -p <crate> --locked && cargo test -p <crate> --locked --lib`.
 6. **Audit.** `rtk jankurai audit . --mode advisory --json .jankurai/repo-score.json --md .jankurai/repo-score.md`. Assert `final_score >= 70`, `raw >= 88`, no new caps.
 7. **Commit.** One logical change per commit. Match the conventional-commit style of `git log`: `fix(<scope>): <one-line>` or `feat(<scope>): <one-line>`.
@@ -298,7 +298,7 @@ Status legend: 🟢 landed, 🟡 deferred, 🔴 known issue.
 | FIX-CAND-Q | 🟢 landed | heavy MiniRedis verifier-stage parse failures: tightened verifier prompt to strict JSON schema in finalize.rs. | this session |
 | Caps/findings sweep | 🟢 partial | raw 88→91, caps 4→3, findings 7→4: ci-bad-behavior CLEARED, 2 fallback-soup sites + sentinel restructured + web surface removed. fallback-soup-in-product-code cap (70) holds the floor — 55+ remaining sites mostly Rust idiom; clearing requires bulk sweep. agent-tool-supply-chain-gap + missing-rendered-ux-qa-lane caps are jankurai detector-binding issues. | this session |
 | Cleanup pass | 🟡 in progress | stale `packages/ux-qa` lane dependency removed, `run_summary` folding split into `fold.rs`, and the serious live-test report is now checked in; final audit/copy-code reruns still pending after the local `jankurai` update. | follow-up cleanup |
-| FIX-CAND-L | 🟡 deferred | wire jankurai-runner per phase in port-run --super --live | Future feature |
+| FIX-CAND-L | 🟡 deferred | wire jekko-runner per phase in port-run --super --live | Future feature |
 | 12-stage walker scaffold | 🔴 known | `port-run --super` doesn't drive real LLM work yet | Tracked by FIX-CAND-L |
 
 ## 10. Glossary
@@ -308,7 +308,7 @@ Status legend: 🟢 landed, 🟡 deferred, 🔴 known issue.
 - **quality_band** — request-side knob that constrains routing to a percentile slice of models by observed win-rate.
 - **users_pool** — fusion routing mode where each `~/.jekko/users/<id>/llm.env` becomes an independent slot. Activated by `JNOCCIO_UPSTREAM_KEY_SOURCE=users_pool`.
 - **fusion_sample** — the 10%-rate competitive routing where a primary call is duplicated to a backup model and the winner increments `model_metrics.win_count`. This is the data source the quality_band feature consumes.
-- **EventKind** — the 44-variant enum at `crates/jankurai-runner/src/events.rs` that types every line in events.jsonl.
+- **EventKind** — the 44-variant enum at `crates/jekko-runner/src/events.rs` that types every line in events.jsonl.
 - **WatcherSnapshot** — the in-memory rollup of an events.jsonl, computed by `fold_events`. Consumed by remediation rules.
 - **12-stage canonical kernel** — `agent/zyal/ambitious-superworkflow.zyal`'s phase DAG: source_of_truth → architecture_blueprint → repo_graph_bootstrap → contracts_and_slices → parallel_subsystems → parity_lab → integration_fusion → parity_gap_closure → hardening_security → performance_closure → docs_release_ops → final_signoff.
 - **jankurai gate** — `rtk jankurai audit . --mode advisory` must report `final_score >= 70`, `raw >= 88`, no new caps applied. Run before EVERY commit.
@@ -321,7 +321,7 @@ Status legend: 🟢 landed, 🟡 deferred, 🔴 known issue.
 
 ```bash
 # Build the release binary the live recipes pick up
-cargo build --release -p jekko-cli -p jankurai-runner --locked
+cargo build --release -p jekko-cli -p jekko-runner --locked
 
 # Start fusion in users_pool mode (the only correct mode for live tests)
 cd jnoccio-fusion && JNOCCIO_UPSTREAM_KEY_SOURCE=users_pool RUST_LOG=info,jnoccio_fusion=debug ./target/debug/jnoccio-fusion --config config/server.json --env-file .env.jnoccio &

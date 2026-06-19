@@ -13,7 +13,7 @@ across every commit.
 
 **Fixes (FIX-1..7):**
 
-- **FIX-1** `jankurai-runner/src/model_client/runtime.rs`: honor inner
+- **FIX-1** `jekko-runner/src/model_client/runtime.rs`: honor inner
   `jekko run` JSON `"success": true` flag. Stops misclassifying every
   live model call as failed because stderr was non-empty.
 - **FIX-2** `scripts/zyal-live-batch.sh`: default fusion to

@@ -13,6 +13,7 @@ pub mod gdelt;
 pub mod github;
 pub mod jina;
 pub mod openalex;
+pub mod patents;
 pub mod pubmed;
 pub mod searxng;
 pub mod semantic_scholar;

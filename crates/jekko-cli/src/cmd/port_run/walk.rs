@@ -99,7 +99,7 @@ pub(super) fn walk_waves(
                 // Non-live path records the phase as completed with a
                 // descriptive summary so --status can distinguish scaffolded
                 // walks from real per-phase invocations. Use --live to
-                // delegate per-phase work to the jankurai-runner subprocess.
+                // delegate per-phase work to the jekko-runner subprocess.
                 Ok(SCAFFOLD_PHASE_SUMMARY.to_string())
             };
 
@@ -165,7 +165,7 @@ pub(super) fn walk_waves(
 /// the two apart at a glance.
 const SCAFFOLD_PHASE_SUMMARY: &str =
     "scaffold-mode: per-phase invocation deferred until --live wires the \
-     jankurai-runner subprocess for this phase";
+     jekko-runner subprocess for this phase";
 
 #[derive(Debug)]
 enum HaltReason {

@@ -24,7 +24,7 @@ releases, see `UPCOMING_CHANGELOG.md`.
 
 ### Fixed (zyal-testing session, 2026-05-27)
 
-- **`crates/jankurai-runner/src/model_client/runtime.rs`** now honors the inner `jekko run --json` subprocess's explicit `"success": true` flag. Before, any non-empty stderr (tracing init, session boot, zyalc compile chatter) was misread as a failure indicator — every live ZYAL pipeline halted at the first model call. Now the JSON self-report wins; stdout/stderr chatter on successful runs is ignored. (FIX-1)
+- **`crates/jekko-runner/src/model_client/runtime.rs`** now honors the inner `jekko run --json` subprocess's explicit `"success": true` flag. Before, any non-empty stderr (tracing init, session boot, zyalc compile chatter) was misread as a failure indicator — every live ZYAL pipeline halted at the first model call. Now the JSON self-report wins; stdout/stderr chatter on successful runs is ignored. (FIX-1)
 - **`crates/zyalc/src/live_audit.rs`** strict audit now accepts `model_receipt_count >= model_outcome_event_count` (failed retries write receipts but not `model_outcome` events). The prior `==` invariant was a pre-FIX-1 assumption and falsely flagged every successful run with a single retried attempt. (FIX-3)
 - **`crates/zyalc/src/main.rs`** routes "wrote/unchanged" compile status to stderr instead of stdout. The chatter previously leaked into `jekko port-run --dry-run` stdout and broke downstream JSON consumers. (FIX-4)
 - **`scripts/zyal-live-batch.sh::run_r0`** unsets `JEKKO_BIN` before running `cargo test --workspace`. With JEKKO_BIN set, the `tuiwright-jekko-unlock::baseline_matrix` capture suite was driving the reference binary across 5 terminal sizes (`#[serial]`, minutes per test). Workaround for now — see `JEKKO_TUI_CAPTURE` follow-up. (FIX-5)

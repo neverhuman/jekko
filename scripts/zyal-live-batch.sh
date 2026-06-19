@@ -72,7 +72,7 @@ fi
 log() { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
 fail() { log "ERROR: $*"; exit 1; }
 
-# Returns the per-run events.jsonl path. The recipes drive jankurai-runner /
+# Returns the per-run events.jsonl path. The recipes drive jekko-runner /
 # jekko-cli with --run-id <RUN_IDS[i]>, so files live at
 # target/zyal/runs/<run_id>/events.jsonl.
 events_path_for() {
@@ -313,7 +313,7 @@ run_miniredis() {
   (
     export JEKKO_ZYAL_LIVE=1 JEKKO_KEY_SOURCE_POLICY=users-only JNOCCIO_UPSTREAM_KEY_SOURCE="${JNOCCIO_UPSTREAM_KEY_SOURCE:-users_pool}" JEKKO_REASONING_PARALLEL=1
     /usr/bin/time -v -o "$BATCH_ABS/runs/$rid.time" \
-      rtk cargo run --manifest-path crates/jankurai-runner/Cargo.toml --locked -- \
+      rtk cargo run --manifest-path crates/jekko-runner/Cargo.toml --locked -- \
         --repo . --run-id "$rid" \
         port-run --config "$config" \
         --live --max-ticks "$max_ticks"

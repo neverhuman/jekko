@@ -22,7 +22,7 @@ typecheck:
   parallel:
     matrix:
       - LANE: "jekko-cli"        # pulls jekko-* runtime + tui + server
-      - LANE: "jankurai-runner"  # pulls jankurai + agent-search + reasoning
+      - LANE: "jekko-runner"  # pulls jankurai + agent-search + reasoning
       - LANE: "zyal-supervisor"  # pulls zyal-* + zyalc
   # No resource_group — per-job CARGO_HOME isolation (.rust_setup) already
   # prevents the cargo registry-lock contention this used to serialize.

@@ -111,8 +111,8 @@ Total signals tripped across the batch: **25** (21 × `s1` + 4 × `s12`). All ot
 | # | Description | Priority | Touch |
 |---|---|---|---|
 | FIX-CAND-D | r0 cargo smoke hangs when JEKKO_BIN is set (TUI baseline matrix tests). `unset JEKKO_BIN` inside `run_r0()` or env-gate the test. | low | `scripts/zyal-live-batch.sh` |
-| FIX-CAND-E | s1 burst signal fires on attempt-volume rather than failure-rate; for hero-judge that's a false positive. | medium | `crates/jankurai-runner/src/watcher/remediation.rs` or `metrics.rs` |
-| FIX-CAND-F | r3/r4 emit judge_patch without subsequent proof_passed within 120s — likely budget-driven. | medium | `crates/jankurai-runner/src/hero_judge_runner_finalize/` (or raise budget) |
+| FIX-CAND-E | s1 burst signal fires on attempt-volume rather than failure-rate; for hero-judge that's a false positive. | medium | `crates/jekko-runner/src/watcher/remediation.rs` or `metrics.rs` |
+| FIX-CAND-F | r3/r4 emit judge_patch without subsequent proof_passed within 120s — likely budget-driven. | medium | `crates/jekko-runner/src/hero_judge_runner_finalize/` (or raise budget) |
 | FIX-CAND-G | `zyal-superreasoning-audit-live` recipe asserts `model_attempt == model_outcome` — invariant is wrong post-FIX-1. | high (blocks recipe exit-0) | `Justfile::zyal-superreasoning-audit-live` (or whatever the audit-live-run target is) |
 | FIX-CAND-H | `port-run --super` ignores `--run-id`; emits warning but downstream tooling looks at the requested id and finds nothing. | medium | `crates/jekko-cli/src/cmd/port_run.rs` |
 | FIX-CAND-I | report.sh flags r6 plan-walk balancer as `STALLED` even though zero events = correct behavior. | low | `scripts/zyal-live-report.sh` |

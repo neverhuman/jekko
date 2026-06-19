@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::{anyhow, Context, Result};
 
 use crate::profile::Profile;
@@ -8,7 +10,11 @@ pub(crate) use emit_toml_impl::render as emit_toml;
 
 /// Returns (body, comment-line-prefix). The comment prefix differs between
 /// TOML (`# `) and YAML (`# `), so we centralise it here for the trailer.
-pub(super) fn emit(profile: &Profile, raw: &str) -> Result<(String, String)> {
+pub(super) fn emit(
+    profile: &Profile,
+    raw: &str,
+    source: Option<&Path>,
+) -> Result<(String, String)> {
     match profile {
         Profile::Runbook => Ok((raw.to_string(), String::new())),
         Profile::DeclarativeToml { .. } => Ok((emit_toml(raw)?, "# ".into())),
@@ -18,7 +24,32 @@ pub(super) fn emit(profile: &Profile, raw: &str) -> Result<(String, String)> {
         // the banner is suppressed in `compile_one` and the header prefix is
         // empty here.
         Profile::SuperWorkflow { .. } => Ok((emit_superworkflow(raw)?, String::new())),
+        // FlowGraph likewise emits canonical JSON (the diagram IR).
+        Profile::FlowGraph { .. } => Ok((emit_flowgraph_with_source(raw, source)?, String::new())),
     }
+}
+
+/// Emit a FlowGraph manifest as the canonical flattened agent-flow JSON IR.
+///
+/// Validation is re-run against the parsed YAML so a direct caller of
+/// `emit_flowgraph` (notably the unit tests) cannot bypass the structural
+/// checks performed by [`super::validation::validate_flowgraph_profile`].
+pub(super) fn emit_flowgraph(raw: &str) -> Result<String> {
+    emit_flowgraph_with_source(raw, None)
+}
+
+pub(super) fn emit_flowgraph_with_source(raw: &str, source: Option<&Path>) -> Result<String> {
+    let body = strip_pragmas(raw);
+    let parsed: serde_yaml::Value =
+        serde_yaml::from_str(&body).context("parse flowgraph YAML body")?;
+    super::validation::validate_flowgraph_value(std::path::Path::new("<memory>"), &parsed)?;
+    let uses = match source {
+        Some(source) => super::uses::resolve(source, raw)?,
+        None => super::uses::ResolvedUses::default(),
+    };
+    let ir = super::flowgraph::build_flowgraph(&parsed, &body, &uses)?;
+    let rendered = serde_json::to_string_pretty(&ir).context("render FlowGraph JSON")?;
+    Ok(format!("{rendered}\n"))
 }
 
 fn emit_workflow(raw: &str) -> Result<String> {

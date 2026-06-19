@@ -4,7 +4,7 @@
 //! `replay_receipt.json`, this module re-hashes every artifact named in the
 //! receipt, confirms the packet's recorded hashes match the receipt's
 //! cross-references, and reports per-gate status. It deliberately does not
-//! depend on `jankurai-runner` — running the producer and verifier from the
+//! depend on `jekko-runner` — running the producer and verifier from the
 //! same crate undermines the third-party-reproducibility guarantee the
 //! superreasoning packet is supposed to provide.
 

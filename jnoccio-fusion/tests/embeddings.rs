@@ -3,7 +3,7 @@
 //! When jnoccio-fusion is configured with no embedding-capable model
 //! (the common case — most deployments only wire chat-completion models),
 //! POSTing to `/v1/embeddings` must still return a usable response so
-//! cold-start runs and the jankurai-runner memory module work. The
+//! cold-start runs and the jekko-runner memory module work. The
 //! deterministic sha256-derived fake satisfies that contract.
 
 use anyhow::{Context, Result, bail};

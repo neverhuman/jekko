@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::Result;
-use jankurai_runner::watcher::{RemediationAction, WatcherSnapshot};
+use jekko_runner::watcher::{RemediationAction, WatcherSnapshot};
 use serde::Serialize;
 
 use super::rule_label;

@@ -2,7 +2,7 @@
 //! per-tick snapshots + remediation actions.
 //!
 //! Wires Phase G1's pure `fold_events` + `detect_and_remediate` (in the
-//! `jankurai-runner` crate) to a shippable operator surface. The watcher
+//! `jekko-runner` crate) to a shippable operator surface. The watcher
 //! opens `target/zyal/runs/<run_id>/events.jsonl`, reads any existing lines,
 //! and then either exits (`--once`) or follows the file via the `notify`
 //! crate, re-folding on every append batch.
@@ -30,9 +30,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use clap::{Args, ValueEnum};
-use jankurai_runner::events::{run_event_file_rel, Event};
-use jankurai_runner::watcher::{
-    detect_and_remediate, fold_events, RemediationAction, RemediationRule, WatcherSnapshot,
+use jekko_runner::events::{run_event_file_rel, Event, EventSink};
+use jekko_runner::watcher::{
+    detect_and_remediate, emit_live_snapshot, fold_events, RemediationAction, RemediationRule,
+    WatcherSnapshot,
 };
 
 use crate::cli::GlobalOpts;
@@ -86,6 +87,13 @@ pub struct WatchArgs {
     /// without a real terminal.
     #[arg(long = "tui-once-snapshot")]
     pub tui_once_snapshot: bool,
+
+    /// Append derived KPI + watcher live frames (`kpi_update`/`watcher_update`)
+    /// back into the run's event stream so the jekko-web diagram's global-KPI
+    /// and watcher boxes update. Frames are emitted only when progress counters
+    /// advance (no tail→emit feedback loop). Plain/JSON formats only.
+    #[arg(long = "emit-live")]
+    pub emit_live: bool,
 }
 
 /// Output format for the watcher.
@@ -125,6 +133,11 @@ pub fn run(_global: &GlobalOpts, args: &WatchArgs) -> Result<()> {
     // that case `read_from_offset` returns an empty initial tick.
     let mut offset: u64 = 0;
     let mut tick_state = TickState::default();
+    if args.emit_live {
+        tick_state.live_sink = Some(
+            EventSink::open(&repo_root, &args.run_id).context("open event sink for --emit-live")?,
+        );
+    }
     let (new_events, new_offset) = read_from_offset(&events_path, offset)?;
     offset = new_offset;
     emit_tick(
@@ -156,6 +169,11 @@ struct TickState {
     /// Last `jankurai_hard_findings` value we observed; used to detect
     /// regression. None until the first audit event.
     prior_hard_findings: Option<i64>,
+    /// When `--emit-live`, the sink we append KPI/watcher frames to.
+    live_sink: Option<EventSink>,
+    /// Signature of the last snapshot we emitted live frames for; we only emit
+    /// when progress counters change, so re-reading our own frames is a no-op.
+    last_live_sig: Option<String>,
 }
 
 /// Compute the snapshot, run remediation, and emit per-format output for a
@@ -192,11 +210,43 @@ fn emit_tick(
         WatchFormat::Tui => unreachable!("tui handled in run_tui"),
     }
 
+    // Emit derived KPI/watcher live frames — but only when progress counters
+    // change, so re-reading our own frames on the next tick is a no-op (the
+    // fold ignores kpi_update/watcher_update kinds, so the signature is stable).
+    if state.live_sink.is_some() {
+        let sig = live_signature(&snap);
+        if state.last_live_sig.as_deref() != Some(sig.as_str()) {
+            let first_ts = state.all_events.first().map(|e| e.ts);
+            if let Some(sink) = &state.live_sink {
+                emit_live_snapshot(sink, &snap, first_ts, now_ts)?;
+            }
+            state.last_live_sig = Some(sig);
+        }
+    }
+
     state.prior_gaps_history.push(snap.parity_gaps_open);
     if let Some(hf) = snap.last_jankurai_hard_findings {
         state.prior_hard_findings = Some(hf);
     }
     Ok(())
+}
+
+/// Signature of the progress-bearing snapshot fields. Live frames are re-emitted
+/// only when this changes — the watcher's own `kpi_update`/`watcher_update`
+/// frames don't move these counters, so they never trigger another emit.
+fn live_signature(snap: &WatcherSnapshot) -> String {
+    format!(
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}",
+        snap.lanes_started,
+        snap.lanes_finished,
+        snap.workers_pass,
+        snap.workers_fail,
+        snap.parity_gaps_open,
+        snap.model_attempts,
+        snap.model_failures,
+        (snap.model_spend_usd * 100.0).round() as i64,
+        snap.last_jankurai_score.unwrap_or(-1),
+    )
 }
 
 fn emit_plain(

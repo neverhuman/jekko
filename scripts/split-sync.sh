@@ -8,7 +8,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/split-sync.sh [--remote github|jeryu] [--root PATH]
 
-Clone or fast-forward the nine supporting Jekko split-family repositories.
+Clone or fast-forward the supporting Jekko split-family repositories.
 The portal repository itself is not cloned by this script.
 EOF
 }
@@ -49,6 +49,7 @@ repos=(
   jekko-deploy
   jekko-jnoccio
   jekko-jailgun
+  jekko-web
   jekko-zyal
   jekko-search
   jekko-memory
@@ -68,6 +69,13 @@ remote_url() {
   case "$REMOTE" in
     github) github_url "$repo" ;;
     jeryu) jeryu_url "$repo" ;;
+  esac
+}
+
+repo_branch() {
+  case "$1" in
+    jekko-web) printf 'master\n' ;;
+    *) printf 'main\n' ;;
   esac
 }
 
@@ -105,12 +113,14 @@ sync_existing() {
   fi
 
   ensure_remotes "$dest" "$repo"
-  git -C "$dest" fetch "$selected" main
-  if git -C "$dest" rev-parse --verify --quiet refs/heads/main >/dev/null; then
-    git -C "$dest" checkout main >/dev/null
+  local branch
+  branch="$(repo_branch "$repo")"
+  git -C "$dest" fetch "$selected" "$branch"
+  if git -C "$dest" rev-parse --verify --quiet "refs/heads/${branch}" >/dev/null; then
+    git -C "$dest" checkout "$branch" >/dev/null
     git -C "$dest" merge --ff-only FETCH_HEAD
   else
-    git -C "$dest" checkout -B main FETCH_HEAD >/dev/null
+    git -C "$dest" checkout -B "$branch" FETCH_HEAD >/dev/null
   fi
 }
 
@@ -118,11 +128,13 @@ clone_repo() {
   local dest="$1"
   local repo="$2"
   local url
+  local branch
   url="$(remote_url "$repo")"
+  branch="$(repo_branch "$repo")"
   if [[ "$REMOTE" = "github" ]]; then
-    git clone --origin github --branch main "$url" "$dest"
+    git clone --origin github --branch "$branch" "$url" "$dest"
   else
-    git clone --origin origin --branch main "$url" "$dest"
+    git clone --origin origin --branch "$branch" "$url" "$dest"
   fi
   ensure_remotes "$dest" "$repo"
 }

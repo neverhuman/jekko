@@ -1,0 +1,84 @@
+# zyal: declarative target=flowgraph schema=zyal/flowgraph@1
+version: v1
+intent: daemon
+confirm: RUN_FOREVER
+id: openqg-foundry
+job:
+  name: "openQG theory foundry"
+  objective: "Fan out to providers, spawn jailgun research tabs, run a hero/judge tournament, watch convergence, render the whitepaper."
+
+# --- Explicit, topology-first agent graph. Authoritative for the diagram. ---
+# Loops render as a single back-edge (default); set unroll.loops: unroll to
+# materialize each generation as repeated boxes instead.
+graph:
+  unroll: { loops: backedge, generations: window }
+  nodes:
+    - { id: supervisor, type: supervisor, agent: plan, label: "Planner" }
+
+    # Live stock-ticker / online-data feed (source box).
+    - id: market_feed
+      type: data_feed
+      label: "Market feed"
+      data_feed: { kind: stock_ticker, symbols: [SPX, NVDA], poll_interval: 15s, taint: web_content }
+
+    # jnoccio fusion route: one agent call -> N draft provider boxes + a fusion box.
+    - id: route_fusion
+      type: router
+      label: "jnoccio fusion route"
+      router: { strategy: fusion_sample, drafts: 4, fusion: 1 }
+      cardinality: { kind: source, source: jnoccio.route_plan, value: 4 }
+      ports: { in: [prompt], out: [winner] }
+
+    # jailgun multi-agent spawn with explicit cardinality -> N tab boxes.
+    - id: jailgun_pool
+      type: spawn
+      label: "Jailgun research tabs"
+      spawn:
+        runtime: jailgun
+        cardinality: { kind: config, expr: "browser.tabs", value: 5 }
+        child_template: { state_machine_ref: tab_actor, per_child_id: tab_id }
+
+    # Hero/judge tournament expressed explicitly as fan-out -> judge -> reduce.
+    - { id: hero, type: fanout, label: "Hero candidates", cardinality: { kind: static, value: 3 } }
+    - { id: judge, type: fanin, label: "Cross-provider judge" }
+    - { id: verifier, type: agent, label: "Verifier", agent: critic }
+
+    # Watcher box: live equation + plot (side-channel).
+    - id: convergence_watch
+      type: watcher
+      label: "Convergence"
+      watcher:
+        kind: equation
+        expr: "score[gen] - score[gen-1]"
+        inputs: [verifier_score]
+        plot: { x_axis: generation, y_axis: delta_score, series: [hero, judge] }
+        on_breach: { threshold: 0.01, action: warn }
+
+    # Global KPI box.
+    - id: cost_kpi
+      type: kpi
+      label: "Live cost"
+      kpi: { expr: "sum(model_call.cost_usd)", unit: USD, target: 25, alert_at: 0.8 }
+
+    # Whitepaper artifact with pdf->png rendering.
+    - id: report_pdf
+      type: artifact
+      label: "openQG whitepaper"
+      artifact: { kind: report, path: "openQG/paper.pdf", render: { from: pdf, to: png, pages: "1-3" }, can_render: true, mime_type: application/pdf }
+
+  edges:
+    - { id: e1, from: market_feed,   to: supervisor,        kind: feeds }
+    - { id: e2, from: supervisor,    to: route_fusion,      kind: dispatches, from_port: out, to_port: prompt }
+    - { id: e3, from: route_fusion,  to: jailgun_pool,      kind: feeds, from_port: winner }
+    - { id: e4, from: jailgun_pool,  to: hero,              kind: feeds }
+    - { id: e5, from: hero,          to: judge,             kind: reduced_into }
+    - { id: e6, from: judge,         to: verifier,          kind: verified_by }
+    - { id: e7, from: verifier,      to: report_pdf,        kind: derived_from }
+    - { id: e8, from: verifier,      to: convergence_watch, kind: observed_by, weight: 0.5 }
+    - { id: e9, from: route_fusion,  to: cost_kpi,          kind: observed_by, weight: 0.5 }
+    # Iteration as a single labeled loop-back arrow (no generation axis):
+    - { id: e10, from: report_pdf,   to: supervisor,        kind: loop_back, label: "next generation" }
+
+# Execution-only metadata kept for the daemon; NOT drawn as a loop node:
+loop: { policy: bounded, sleep: 5s, continue_on: [assistant_stop] }
+hero_judge: { generations: 3, population: { hero_lanes: 3, judge_lanes: 2 } }

@@ -19,8 +19,8 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use jankurai_runner::events::Event;
-use jankurai_runner::watcher::{
+use jekko_runner::events::Event;
+use jekko_runner::watcher::{
     detect_and_remediate, fold_events, RemediationAction, WatcherSnapshot,
 };
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};

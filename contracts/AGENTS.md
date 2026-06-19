@@ -7,4 +7,5 @@ When a user provides a paper, release, implementation, or handoff plan in the co
 Owns `contracts/`.
 Forbidden: generated clients, handwritten transport glue, and product truth.
 Proof lane: `generation / drift checks`.
+Current split-family score work routes contract drift proof through `just score`.
 If jankurai is installed, run `jankurai update --client-start --quiet` before work; do not apply updates unless the user asks.

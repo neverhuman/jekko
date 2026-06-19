@@ -52,7 +52,11 @@ pub use reasoning::{
     ReasoningEdgeRow, ReasoningLaneRow,
 };
 pub use run::{delete_run, get_run, list_runs, upsert_run, DaemonRunRow};
-pub use task::{delete_task, get_task, upsert_task, DaemonTaskRow};
+pub use task::{
+    claim_next_task, complete_task, count_tasks_by_status, delete_task, ensure_placeholder_run,
+    extend_lease, get_task, list_claimable_tasks, queued_task, release_task, upsert_task,
+    DaemonTaskRow,
+};
 pub use task_memory::{upsert_task_memory, DaemonTaskMemoryRow};
 pub use task_pass::{get_task_pass, upsert_task_pass, DaemonTaskPassRow};
 pub use worker::{upsert_worker, DaemonWorkerRow};

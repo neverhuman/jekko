@@ -43,7 +43,7 @@ rules, and emits a per-tick summary.
 
 ### Remediation rules
 
-All four rules are evaluated by `jankurai_runner::watcher::remediation`
+All four rules are evaluated by `jekko_runner::watcher::remediation`
 on every tick. Triggered rules surface as a `RemediationTriggered`
 event-style action with `{rule, summary, detail}`. The watcher does
 not perform side effects on its own — it surfaces; the caller acts.

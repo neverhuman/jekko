@@ -45,12 +45,12 @@ pub(super) fn resolve_runner_bin() -> Result<PathBuf> {
     }
     let current = std::env::current_exe().context("resolve current executable")?;
     if let Some(parent) = current.parent() {
-        let sibling = parent.join("jankurai-runner");
+        let sibling = parent.join("jekko-runner");
         if sibling.exists() {
             return Ok(sibling);
         }
     }
-    Ok(PathBuf::from("jankurai-runner"))
+    Ok(PathBuf::from("jekko-runner"))
 }
 
 pub(super) fn last_line(path: &std::path::Path) -> Option<String> {

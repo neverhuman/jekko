@@ -1,5 +1,5 @@
 -- PR4 of the enchanted-clock plan: tables that back the daemon-side bridge to
--- the jankurai-runner Rust crate from PR3.
+-- the jekko-runner Rust crate from PR3.
 --
 -- All changes are additive. The `daemon_worker` table gains three nullable
 -- columns; existing rows continue to read as-is and writers don't break.

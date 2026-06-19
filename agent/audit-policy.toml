@@ -27,6 +27,15 @@ expires = "2099-01-01"
 max = 100
 reason = "Jekko is TUI-only and has no web surface on disk; the HLT-013 detector phantom-flags a non-existent rendered-UX path. Rendered-UX QA lives in crates/tuiwright-jekko-unlock as a PTY-driven baseline matrix and dialog interaction harness. cap_overrides max=100 keeps the cap from compressing the score; the rendered-UX lane is intentionally TUI-backed rather than browser-backed."
 
+# Dead-language allow-list: terms that read as "future-hostile/dead-language" to
+# the marker scan but are legitimate DOMAIN vocabulary here. Every other dead /
+# fallback-soup / process marker still runs on the same files.
+#   stale -> the research evidence graph's claim lifecycle has a `ClaimStatus::Stale`
+#            state (a Verified claim whose sources aged out) + a `temporal_auditor`
+#            that flags stale citations. It is a typed lifecycle state, not a TODO.
+[dead_language]
+allow_terms = ["stale"]
+
 [history]
 dedupe = "consecutive-equivalent"
 max_bytes = 1048576
@@ -273,15 +282,15 @@ excluded_paths = [
     # threshold; these exclusions keep the advisory shape rule from forcing a
     # broad unrelated refactor during this health wrap-up.
     "crates/zyal-supervisor/src/planner.rs",
-    "crates/jankurai-runner/src/classifier.rs",
+    "crates/jekko-runner/src/classifier.rs",
     "crates/jekko-runtime/src/agent/executor/turn.rs",
     "crates/jekko-runtime/src/daemon/super_reasoning/policies.rs",
-    "crates/jankurai-runner/src/reasoning_runner/phases/lanes.rs",
-    "crates/jankurai-runner/src/reasoning_io.rs",
+    "crates/jekko-runner/src/reasoning_runner/phases/lanes.rs",
+    "crates/jekko-runner/src/reasoning_io.rs",
     "crates/jekko-core/src/github.rs",
-    "crates/jankurai-runner/src/reasoning_runner/orchestrator.rs",
-    "crates/jankurai-runner/src/superreasoning/config.rs",
-    "crates/jankurai-runner/src/model_client/runtime.rs",
+    "crates/jekko-runner/src/reasoning_runner/orchestrator.rs",
+    "crates/jekko-runner/src/superreasoning/config.rs",
+    "crates/jekko-runner/src/model_client/runtime.rs",
     "crates/zyal-supervisor/src/model.rs",
     "crates/xtask/src/main.rs",
     "crates/xtask/src/commands/security_lane.rs",
@@ -292,30 +301,30 @@ excluded_paths = [
     "crates/zyal-supervisor/src/store.rs",
     "crates/jekko-cli/src/cmd/jnoccio.rs",
     "crates/xtask/src/commands/package.rs",
-    "crates/jankurai-runner/src/superreasoning/config/plan.rs",
-    "crates/jankurai-runner/src/receipts.rs",
+    "crates/jekko-runner/src/superreasoning/config/plan.rs",
+    "crates/jekko-runner/src/receipts.rs",
     "crates/jekko-tui/src/inline_runtime/popups.rs",
-    "crates/jankurai-runner/src/run_summary/fold.rs",
-    "crates/jankurai-runner/src/locks.rs",
+    "crates/jekko-runner/src/run_summary/fold.rs",
+    "crates/jekko-runner/src/locks.rs",
     "crates/jekko-tui/src/engine/sandbox_linux.rs",
-    "crates/jankurai-runner/src/hero_judge_runner_artifacts.rs",
+    "crates/jekko-runner/src/hero_judge_runner_artifacts.rs",
     "crates/qbank-builder/src/lib.rs",
     "crates/qbank-builder/src/bank.rs",
     "crates/zyalc/src/replay_verify.rs",
     "crates/qbank-builder/src/paper_tournament/execution.rs",
     "crates/jekko-tui/src/engine/plain_runner.rs",
     "crates/jekko-tui/src/slash/user_defined.rs",
-    "crates/jankurai-runner/src/hero_judge_eval.rs",
+    "crates/jekko-runner/src/hero_judge_eval.rs",
     "crates/jekko-tui/src/background.rs",
     "crates/jekko-jnoccio-boot/src/unlock.rs",
     "crates/qbank-builder/src/paper_tournament/live_candidate.rs",
-    "crates/jankurai-runner/src/reasoning/memory.rs",
+    "crates/jekko-runner/src/reasoning/memory.rs",
     "crates/qbank-builder/src/fixture.rs",
     "crates/qbank-builder/src/cli/tournament_audit.rs",
-    "crates/jankurai-runner/src/model_policy.rs",
+    "crates/jekko-runner/src/model_policy.rs",
     "crates/jekko-core/src/v2/session_message.rs",
-    "crates/jankurai-runner/src/hero_judge_runner_completion.rs",
-    "crates/jankurai-runner/src/reasoning_benchmark.rs",
+    "crates/jekko-runner/src/hero_judge_runner_completion.rs",
+    "crates/jekko-runner/src/reasoning_benchmark.rs",
     "crates/jekko-tui/src/engine/output_collapse.rs",
     "crates/jekko-tui/src/components/footer_status.rs",
     "crates/sandboxctl/src/wrapper.rs",

@@ -11,7 +11,7 @@ Seven code/scripts fixes + four forensic markdown docs + one design proposal, al
 
 | # | Commit | What | Scope |
 |---|---|---|---|
-| FIX-1 | `01d1f17` | `jankurai-runner::model_client::runtime` honors the inner `jekko run` JSON `"success": true` flag instead of treating any non-empty stderr as failure. **Critical** — every live ZYAL pipeline halted at the first call before this. | 13 LOC |
+| FIX-1 | `01d1f17` | `jekko-runner::model_client::runtime` honors the inner `jekko run` JSON `"success": true` flag instead of treating any non-empty stderr as failure. **Critical** — every live ZYAL pipeline halted at the first call before this. | 13 LOC |
 | FIX-2 | `78028c7` | `scripts/zyal-live-batch.sh::start_fusion` exports `JNOCCIO_UPSTREAM_KEY_SOURCE=users_pool` by default. All prior batches silently ran against legacy `config_env` (single .env.jnoccio pool), defeating the multi-tenant users_pool fan-out. | 7 LOC |
 | FIX-3 | `6652284` | `zyalc::live_audit` accepts `model_receipt_count > model_outcome_event_count` (failed retries don't emit `model_outcome`). Required by the post-FIX-1 event shape. + 3 unit tests. | 49 LOC |
 | FIX-4 | `e70e9b4` (combined) | `zyalc::compile` "wrote/unchanged" status messages → stderr (was stdout, leaked into jekko port-run --dry-run JSON consumers). | 4 LOC |
@@ -40,7 +40,7 @@ Seven code/scripts fixes + four forensic markdown docs + one design proposal, al
 ### Phase 3 — heavy MiniRedis (`HEAVY-MINIREDIS.md`)
 - Stage 3.A (`--max-ticks 4`): reached `brainstorm_stages` (one stage further than Phase 1's halt at `frame_request`), produced 3 reasoning_artifacts, halted after 3 consecutive `response_bytes: 0` model returns. Content-side failure correctly classified by FIX-1 as `retryable_failure` → `final_block`.
 - Stage 3.B (12-stage SuperWorkflow plan-walk): all 9 waves complete, all 12 phases marked Complete in supervisor store. Scaffold mode confirmed.
-- Surfaced FIX-CAND-J (empty-response-streak signal) and FIX-CAND-L (wire jankurai-runner per phase in `--super --live`) — deferred.
+- Surfaced FIX-CAND-J (empty-response-streak signal) and FIX-CAND-L (wire jekko-runner per phase in `--super --live`) — deferred.
 
 ## Confirmatory rerun (post-FIX-1..7)
 
@@ -81,7 +81,7 @@ Seven code/scripts fixes + four forensic markdown docs + one design proposal, al
 | FIX-CAND-F | judge_patch without proof timing | Likely budget-driven, not code-driven; revisit when budget is raised |
 | FIX-CAND-J | Empty-response-streak signal | Needs new `EventKind` variant; defer to when the empty-response problem itself is addressed |
 | FIX-CAND-K | quality-band escalation on empty-response streak | Depends on the deferred quality-band feature |
-| FIX-CAND-L | Wire jankurai-runner per phase in `port-run --super --live` | Feature work, Phase H follow-up |
+| FIX-CAND-L | Wire jekko-runner per phase in `port-run --super --live` | Feature work, Phase H follow-up |
 | `MODEL_QUALITY_BAND.md` | ZYAL stages declare `quality_band: top10/20/50/bottom20` for routing | Design landed at `docs/ZYAL/MODEL_QUALITY_BAND.md`; implementation deferred per user direction (~160-200 LOC follow-up). User confirmed: defer. |
 
 ## What's now true about the ZYAL live pipelines

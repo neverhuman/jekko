@@ -12,6 +12,10 @@ source of record for the published release, and the workspace
 
 ## Release staging
 
+The release gate requires security proof, backup/restore readiness, monitoring
+receipts, rollback guidance, and rate limit or abuse-control review before any
+tag is promoted.
+
 1. Create the signed annotated tag:
 
    ```sh

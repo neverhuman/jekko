@@ -10,6 +10,8 @@ embedded SQLite store, and a streaming provider runtime, all shipped as a
 single static binary.
 
 See [AGENTS.md](AGENTS.md) for the repository entrypoint and operating rules.
+Score-maintenance work routes through [docs/architecture.md](docs/architecture.md),
+[docs/testing.md](docs/testing.md), and [docs/release.md](docs/release.md).
 
 <p align="center">
   <img src="docs/assets/jekko-tui-zyal-demo.gif" alt="Animated Jekko TUIwright demo" width="960">

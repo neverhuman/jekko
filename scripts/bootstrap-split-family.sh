@@ -445,6 +445,18 @@ command = "bash ops/ci/jankurai.sh"
 path = "agent/repo-score.md"
 read_only = false
 source = "installed jankurai binary"
+
+[[zone]]
+command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- schema --out generated/ir"
+path = "generated/ir/flowgraph.schema.json"
+read_only = true
+source = "contracts/node-types.json"
+
+[[zone]]
+command = "cargo run -p zyalc --manifest-path crates/zyalc/Cargo.toml -- schema --out generated/ir"
+path = "generated/ir/zyal.d.ts"
+read_only = true
+source = "contracts/node-types.json"
 EOF
 
   cargo generate-lockfile >/dev/null

@@ -1,6 +1,6 @@
 //! Strict live-run audit for ZYAL superreasoning proof directories.
 //!
-//! This is intentionally independent of `jankurai-runner`: it validates the
+//! This is intentionally independent of `jekko-runner`: it validates the
 //! run directory artifacts, replay receipt, event stream, and sanitized model
 //! receipts after the producer has finished.
 

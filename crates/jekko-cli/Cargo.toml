@@ -25,13 +25,16 @@ jekko-server = { path = "../jekko-server" }
 jekko-plugin-api = { path = "../jekko-plugin-api" }
 jekko-store = { path = "../jekko-store" }
 jekko-tui = { path = "../jekko-tui" }
-jankurai-runner = { path = "../jankurai-runner" }
+jekko-runner = { path = "../jekko-runner" }
 crossterm = "0.28"
 notify = "6"
 ratatui = { version = "0.28", default-features = false, features = ["crossterm"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+sha2 = "0.10"
 tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 toml = "0.8"

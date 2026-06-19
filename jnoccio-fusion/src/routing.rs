@@ -6,6 +6,7 @@ use crate::quality_band::{
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -26,7 +27,7 @@ impl ComplexityTier {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RouteMode {
     Fast,
@@ -215,6 +216,255 @@ pub struct RoutePlan {
     pub backup_model_ids: Vec<String>,
     pub draft_model_ids: Vec<String>,
     pub fusion_model_id: Option<String>,
+}
+
+/// The fan-out shape of a route — how many concrete provider calls this plan
+/// expands into. Mirrors the flowgraph `router` node so the jekko-web diagram
+/// can render one box per provider call (drafts + fusion, or primary + backups).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RouteCardinality {
+    pub mode: String,
+    pub primary: usize,
+    pub drafts: usize,
+    pub backups: usize,
+    pub fusion: usize,
+    /// Total concrete provider-call boxes this route expands into.
+    pub provider_calls: usize,
+    /// The fan-out member model ids, in call order.
+    pub members: Vec<String>,
+}
+
+impl RouteCardinality {
+    /// Compact `key:val,…` value embedded in route metadata; the runner parses
+    /// it into the flowgraph `router` node's cardinality.
+    pub fn receipt_value(&self) -> String {
+        format!(
+            "mode:{},primary:{},drafts:{},backups:{},fusion:{},calls:{}",
+            self.mode, self.primary, self.drafts, self.backups, self.fusion, self.provider_calls
+        )
+    }
+}
+
+impl RoutePlan {
+    /// Derive the fan-out cardinality from the resolved plan. In `fusion_sample`
+    /// mode the primary aliases draft[0], so it is reported as drafts (+fusion);
+    /// in `fast` mode it is primary (+backups).
+    pub fn cardinality(&self) -> RouteCardinality {
+        match self.mode {
+            RouteMode::FusionSample => {
+                let mut members = self.draft_model_ids.clone();
+                if let Some(fusion) = &self.fusion_model_id {
+                    members.push(fusion.clone());
+                }
+                RouteCardinality {
+                    mode: self.mode.as_str().to_string(),
+                    primary: 0,
+                    drafts: self.draft_model_ids.len(),
+                    backups: 0,
+                    fusion: usize::from(self.fusion_model_id.is_some()),
+                    provider_calls: members.len(),
+                    members,
+                }
+            }
+            RouteMode::Fast | RouteMode::Backup => {
+                let mut members = Vec::new();
+                if let Some(primary) = &self.primary_model_id {
+                    members.push(primary.clone());
+                }
+                members.extend(self.backup_model_ids.iter().cloned());
+                RouteCardinality {
+                    mode: self.mode.as_str().to_string(),
+                    primary: usize::from(self.primary_model_id.is_some()),
+                    drafts: 0,
+                    backups: self.backup_model_ids.len(),
+                    fusion: 0,
+                    provider_calls: members.len(),
+                    members,
+                }
+            }
+        }
+    }
+}
+
+// ---- Route IR (M8-cont, vertical 3.1) --------------------------------------
+//
+// A typed, deterministic, secret-free description of a routing decision that the
+// runner emits + the cockpit renders. The live planner resolves a [`RouteMode`]
+// (fast/backup/fusion_sample); the IR maps it into a richer [`RouteStrategy`]
+// space so the topology can describe score/cascade/speculative/debate/ensemble/
+// quorum/shadow/bandit routes as the planner grows — WITHOUT destabilizing the
+// live router's match arms. No raw keys or credentials ever enter the IR.
+
+/// The routing-strategy vocabulary carried by [`RouteIr`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteStrategy {
+    Score,
+    Cascade,
+    Speculative,
+    Debate,
+    Ensemble,
+    Quorum,
+    Shadow,
+    Bandit,
+}
+
+impl RouteStrategy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Score => "score",
+            Self::Cascade => "cascade",
+            Self::Speculative => "speculative",
+            Self::Debate => "debate",
+            Self::Ensemble => "ensemble",
+            Self::Quorum => "quorum",
+            Self::Shadow => "shadow",
+            Self::Bandit => "bandit",
+        }
+    }
+
+    /// Map the live planner's mode into the IR strategy space (compat aliases).
+    pub fn from_route_mode(mode: &RouteMode) -> Self {
+        match mode {
+            RouteMode::Fast => Self::Score,
+            RouteMode::Backup => Self::Cascade,
+            RouteMode::FusionSample => Self::Ensemble,
+        }
+    }
+}
+
+/// One provider candidate in a route, in call order. `model_id` is a public
+/// model identifier — never a key.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteCandidate {
+    pub model_id: String,
+    /// `primary` | `backup` | `draft` | `fusion`.
+    pub role: String,
+    /// 0-based call order.
+    pub order: usize,
+}
+
+/// Declared routing constraints (secret-free, deterministic).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteConstraints {
+    pub complexity_tier: String,
+    pub sampled: bool,
+}
+
+/// Budget posture at decision time (reserved typed slot; filled by the runner).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RouteBudget {
+    pub remaining_usd: f64,
+    pub ceiling_usd: f64,
+}
+
+/// Provider-health posture at decision time (reserved typed slot).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RouteHealth {
+    pub primary_score: f64,
+    pub backup_scores: Vec<f64>,
+}
+
+/// The inspectable routing IR.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RouteIr {
+    /// Deterministic id = `route_<sha256(request_id|mode|candidate ids)[..12]>`.
+    pub route_id: String,
+    pub policy_id: String,
+    pub mode: RouteStrategy,
+    pub candidates: Vec<RouteCandidate>,
+    pub constraints: RouteConstraints,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget: Option<RouteBudget>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub health: Option<RouteHealth>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sticky: Option<String>,
+}
+
+impl RouteIr {
+    /// `sha256:<hex>` of the canonical IR — embedded in `response.extra` so a
+    /// route is reproducible against a known decision.
+    pub fn content_hash(&self) -> String {
+        let body = serde_json::to_string(self).unwrap_or_default();
+        format!("sha256:{:x}", Sha256::digest(body.as_bytes()))
+    }
+}
+
+impl RoutePlan {
+    /// The provider candidates of this plan, in call order, with their roles.
+    pub fn route_candidates(&self) -> Vec<RouteCandidate> {
+        let mut out: Vec<RouteCandidate> = Vec::new();
+        let push = |model_id: &str, role: &str, out: &mut Vec<RouteCandidate>| {
+            let order = out.len();
+            out.push(RouteCandidate { model_id: model_id.to_string(), role: role.to_string(), order });
+        };
+        match self.mode {
+            RouteMode::FusionSample => {
+                for d in &self.draft_model_ids {
+                    push(d, "draft", &mut out);
+                }
+                if let Some(f) = &self.fusion_model_id {
+                    push(f, "fusion", &mut out);
+                }
+            }
+            RouteMode::Fast | RouteMode::Backup => {
+                if let Some(p) = &self.primary_model_id {
+                    push(p, "primary", &mut out);
+                }
+                for b in &self.backup_model_ids {
+                    push(b, "backup", &mut out);
+                }
+            }
+        }
+        out
+    }
+
+    /// Materialize the inspectable, secret-free routing IR for this plan.
+    /// Deterministic: identical (request_id, plan) → identical `route_id`.
+    pub fn to_route_ir(&self, request_id: &str, policy_id: &str) -> RouteIr {
+        let candidates = self.route_candidates();
+        let mut hasher = Sha256::new();
+        hasher.update(request_id.as_bytes());
+        hasher.update(b"|");
+        hasher.update(self.mode.as_str().as_bytes());
+        for c in &candidates {
+            hasher.update(b"|");
+            hasher.update(c.model_id.as_bytes());
+        }
+        let route_id = format!("route_{}", &format!("{:x}", hasher.finalize())[..12]);
+        RouteIr {
+            route_id,
+            policy_id: policy_id.to_string(),
+            mode: RouteStrategy::from_route_mode(&self.mode),
+            candidates,
+            constraints: RouteConstraints {
+                complexity_tier: format!("{:?}", self.complexity_tier).to_lowercase(),
+                sampled: self.sampled,
+            },
+            budget: None,
+            health: None,
+            sticky: None,
+        }
+    }
+}
+
+/// A sink the runner wires in to record routing topology events as it executes a
+/// route. The gateway stays decoupled: the default [`NullRouteEventEmitter`]
+/// no-ops, so planning never depends on the runner.
+pub trait RouteEventEmitter {
+    fn emit_routing_decision(&self, ir: &RouteIr);
+    fn emit_provider_call(&self, route_id: &str, candidate: &RouteCandidate);
+    fn emit_route_winner(&self, route_id: &str, model_id: &str);
+}
+
+/// The default no-op emitter (uninstrumented runs).
+pub struct NullRouteEventEmitter;
+
+impl RouteEventEmitter for NullRouteEventEmitter {
+    fn emit_routing_decision(&self, _ir: &RouteIr) {}
+    fn emit_provider_call(&self, _route_id: &str, _candidate: &RouteCandidate) {}
+    fn emit_route_winner(&self, _route_id: &str, _model_id: &str) {}
 }
 
 pub fn required_total_tokens(model: &RoutingModelInput, profile: &RequestProfile) -> u64 {
@@ -686,6 +936,100 @@ mod tests {
     fn sample_draw_below_rate_samples() {
         assert!(should_sample(0.10, 0.099));
         assert!(!should_sample(0.10, 0.10));
+    }
+
+    fn plan(mode: RouteMode, primary: Option<&str>, backups: &[&str], drafts: &[&str], fusion: Option<&str>) -> RoutePlan {
+        RoutePlan {
+            mode,
+            sampled: matches!(mode, RouteMode::FusionSample),
+            complexity_score: 0,
+            complexity_tier: ComplexityTier::Light,
+            primary_model_id: primary.map(str::to_string),
+            backup_model_ids: backups.iter().map(|s| s.to_string()).collect(),
+            draft_model_ids: drafts.iter().map(|s| s.to_string()).collect(),
+            fusion_model_id: fusion.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn fusion_sample_cardinality_counts_drafts_plus_fusion() {
+        let p = plan(RouteMode::FusionSample, Some("a"), &[], &["a", "b"], Some("c"));
+        let c = p.cardinality();
+        assert_eq!(c.mode, "fusion_sample");
+        assert_eq!(c.drafts, 2);
+        assert_eq!(c.fusion, 1);
+        assert_eq!(c.primary, 0);
+        assert_eq!(c.backups, 0);
+        assert_eq!(c.provider_calls, 3);
+        assert_eq!(c.members, vec!["a", "b", "c"]);
+        assert_eq!(c.receipt_value(), "mode:fusion_sample,primary:0,drafts:2,backups:0,fusion:1,calls:3");
+    }
+
+    #[test]
+    fn route_ir_candidates_in_call_order_with_roles() {
+        let p = plan(RouteMode::FusionSample, Some("a"), &[], &["d0", "d1"], Some("f"));
+        let ir = p.to_route_ir("req-1", "standard");
+        assert_eq!(ir.mode, RouteStrategy::Ensemble);
+        let roles: Vec<(&str, &str)> =
+            ir.candidates.iter().map(|c| (c.model_id.as_str(), c.role.as_str())).collect();
+        assert_eq!(roles, vec![("d0", "draft"), ("d1", "draft"), ("f", "fusion")]);
+        assert_eq!(ir.candidates[2].order, 2);
+    }
+
+    #[test]
+    fn route_ir_fast_lists_primary_then_backups() {
+        let p = plan(RouteMode::Fast, Some("p"), &["b0", "b1"], &[], None);
+        let ir = p.to_route_ir("req-1", "standard");
+        assert_eq!(ir.mode, RouteStrategy::Score);
+        let roles: Vec<&str> = ir.candidates.iter().map(|c| c.role.as_str()).collect();
+        assert_eq!(roles, vec!["primary", "backup", "backup"]);
+    }
+
+    #[test]
+    fn route_id_is_deterministic_and_content_addressed() {
+        let p = plan(RouteMode::Fast, Some("p"), &["b"], &[], None);
+        let a = p.to_route_ir("req-9", "standard");
+        let b = p.to_route_ir("req-9", "standard");
+        assert_eq!(a.route_id, b.route_id, "identical (request, plan) → identical route_id");
+        assert!(a.route_id.starts_with("route_"));
+        // A different request id changes the route id.
+        assert_ne!(a.route_id, p.to_route_ir("req-OTHER", "standard").route_id);
+        let h = a.content_hash();
+        assert!(h.starts_with("sha256:") && h.len() == "sha256:".len() + 64);
+    }
+
+    #[test]
+    fn route_ir_is_secret_free_and_round_trips() {
+        let p = plan(RouteMode::Backup, Some("p"), &["b"], &[], None);
+        let ir = p.to_route_ir("req-1", "proof");
+        let json = serde_json::to_string(&ir).unwrap();
+        assert!(!json.contains("sk-") && !json.to_lowercase().contains("api_key"));
+        let back: RouteIr = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ir);
+        assert_eq!(ir.policy_id, "proof");
+    }
+
+    #[test]
+    fn null_route_event_emitter_is_a_noop() {
+        let p = plan(RouteMode::Fast, Some("p"), &[], &[], None);
+        let ir = p.to_route_ir("r", "standard");
+        let e = NullRouteEventEmitter;
+        e.emit_routing_decision(&ir);
+        e.emit_provider_call(&ir.route_id, &ir.candidates[0]);
+        e.emit_route_winner(&ir.route_id, "p");
+    }
+
+    #[test]
+    fn fast_cardinality_counts_primary_plus_backups() {
+        let p = plan(RouteMode::Fast, Some("p"), &["b1", "b2"], &[], None);
+        let c = p.cardinality();
+        assert_eq!(c.mode, "fast");
+        assert_eq!(c.primary, 1);
+        assert_eq!(c.backups, 2);
+        assert_eq!(c.drafts, 0);
+        assert_eq!(c.fusion, 0);
+        assert_eq!(c.provider_calls, 3);
+        assert_eq!(c.members, vec!["p", "b1", "b2"]);
     }
 
     #[test]

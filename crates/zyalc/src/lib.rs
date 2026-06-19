@@ -7,7 +7,9 @@
 //! - Profile D — SuperWorkflow (`# zyal: declarative target=superworkflow ...`), emits JSON.
 
 pub mod compile;
+pub mod fmt;
 pub mod live_audit;
 pub mod profile;
 pub mod replay_verify;
 pub mod runbook_lint;
+pub mod schema;

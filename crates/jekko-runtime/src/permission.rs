@@ -127,6 +127,35 @@ impl PermissionService {
         request: PermissionRequest,
         ruleset: Vec<PermissionRule>,
     ) -> RuntimeResult<PermissionReply> {
+        // Non-interactive SCOPED auto-approve: a headless run (e.g. a bounded-queue
+        // worker invoking `jekko run`) has no one to answer a prompt, so a tool that
+        // needs `Ask` would block forever. An operator may pre-authorize a specific
+        // set of permission kinds via env (comma-separated; `*` = all). Off by
+        // default. e.g. JEKKO_PERMISSION_ALLOW=websearch,webfetch,read,grep,glob
+        if let Ok(allow) = std::env::var("JEKKO_PERMISSION_ALLOW") {
+            let permitted = allow
+                .split(',')
+                .map(str::trim)
+                .any(|kind| kind == "*" || kind == request.permission.as_str());
+            if permitted {
+                return Ok(PermissionReply::Once);
+            }
+        }
+
+        // Headless DENY: a non-interactive run (e.g. a bounded-queue worker) that opts
+        // into headless mode can never answer a prompt, so an un-pre-authorized
+        // permission must DENY (error the tool) rather than block the run forever. This
+        // only RESTRICTS — it never grants — so a worker can run safely without hanging
+        // on, e.g., a stray `bash` call. Combine with JEKKO_PERMISSION_ALLOW to permit a
+        // specific read-only set while denying everything else.
+        if std::env::var("JEKKO_PERMISSION_HEADLESS").as_deref() == Ok("1") {
+            let target = request.patterns.first().map(String::as_str).unwrap_or("*");
+            return Err(RuntimeError::PermissionDenied(format!(
+                "{}:{} (headless: not pre-authorized via JEKKO_PERMISSION_ALLOW)",
+                request.permission, target
+            )));
+        }
+
         // Pre-evaluate against the combined ruleset.
         let mut needs_ask = false;
         let approved = self.approved().await;

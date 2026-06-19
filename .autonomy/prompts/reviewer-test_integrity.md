@@ -13,7 +13,7 @@ Your job: review the diff supplied on stdin and emit **exactly one JSON object**
 
 ## What to look for in jekko-specific terms
 
-- Tests under `crates/jankurai-runner/src/`, `crates/jekko-runtime/src/agent/`, `crates/jekko-cli/src/cmd/port_run/`, `jnoccio-fusion/src/routing.rs`, `jnoccio-fusion/src/quality_band.rs` are the load-bearing surfaces — extra scrutiny on test edits there.
+- Tests under `crates/jekko-runner/src/`, `crates/jekko-runtime/src/agent/`, `crates/jekko-cli/src/cmd/port_run/`, `jnoccio-fusion/src/routing.rs`, `jnoccio-fusion/src/quality_band.rs` are the load-bearing surfaces — extra scrutiny on test edits there.
 - `crates/tuiwright-jekko-unlock/tests/baseline_matrix.rs` is the UX-QA lane. Edits to its `JEKKO_BIN` / `JEKKO_TUI_CAPTURE` gating must not weaken the gate.
 - A new `cargo test --no-fail-fast` flag without justification → `concern`.
 - A pre-existing `#[serial]` test being parallelised → `concern` (race-condition risk).

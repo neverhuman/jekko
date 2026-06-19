@@ -78,7 +78,7 @@ jekko_run.log
 # xtask schema --emit output — regenerated on demand from jekko-core types.
 crates/xtask/generated-schemas/
 
-# jankurai-runner (crates/jankurai-runner) artifacts
+# jekko-runner (crates/jekko-runner) artifacts
 .zyal/
 target/zyal/
 .zyal/worktrees/

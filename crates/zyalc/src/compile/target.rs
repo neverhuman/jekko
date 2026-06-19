@@ -67,6 +67,36 @@ pub(super) fn default_target(source: &Path, profile: &Profile) -> PathBuf {
                 source.with_extension("superworkflow.json")
             }
         }
+        Profile::FlowGraph { .. } => {
+            // FlowGraph `.zyal` sources live under `agent/zyal/` (or anywhere);
+            // the emitted canonical JSON sits at
+            // `generated/flowgraphs/<stem>.flowgraph.json` so the output stays
+            // out of the protected `agent/` control-plane tree.
+            let stem = source
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("workflow");
+            if source.starts_with("agent/zyal") {
+                if let Some(repo_root) = source
+                    .parent()
+                    .and_then(|p| p.parent())
+                    .and_then(|p| p.parent())
+                {
+                    repo_root
+                        .join("generated")
+                        .join("flowgraphs")
+                        .join(format!("{stem}.flowgraph.json"))
+                } else {
+                    source.with_extension("flowgraph.json")
+                }
+            } else if let Some(parent) = source.parent().and_then(|p| p.parent()) {
+                parent
+                    .join("flowgraphs")
+                    .join(format!("{stem}.flowgraph.json"))
+            } else {
+                source.with_extension("flowgraph.json")
+            }
+        }
     }
 }
 

@@ -121,7 +121,7 @@ pub fn build_openai_style_body(req: &ProviderRequest) -> Value {
     // ZYAL `quality_band` request hint — flows through as a top-level
     // field so fusion's RequestProfile::from_request can lift it into
     // its `extra` map. Set by `jekko run` from JEKKO_RUN_QUALITY_BAND,
-    // which jankurai-runner sets per stage from the manifest's
+    // which jekko-runner sets per stage from the manifest's
     // `model_policy.<role>.quality_band` declaration. See
     // docs/ZYAL/MODEL_QUALITY_BAND.md.
     if let Some(band) = req.options.get("quality_band") {

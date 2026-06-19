@@ -2,6 +2,7 @@
   "bind": "0.0.0.0:4317",
   "database": "state/jnoccio.sqlite",
   "env_file": ".env.jnoccio",
+  "upstream_key_source": "users_pool",
   "models_file": "config/models.json",
   "receipts_dir": "receipts",
   "model": "jnoccio/jnoccio-fusion",

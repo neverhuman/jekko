@@ -362,7 +362,7 @@
       "score": 45,
       "weighted_points": 5.4,
       "evidence": [
-        "largest authored code file: crates/jankurai-runner/src/parity_lab.rs (1089 LOC)",
+        "largest authored code file: crates/jekko-runner/src/parity_lab.rs (1089 LOC)",
         "code file exceeds 500 LOC",
         "code file exceeds 1000 LOC",
         "most code files stay under 300 LOC",
@@ -481,9 +481,9 @@
       ],
       "artifact_backed_proof": [
         "agent/ux-qa.toml",
-        "crates/jankurai-runner/src/hero_judge.rs",
-        "crates/jankurai-runner/src/hero_judge_runner_flow.rs",
-        "crates/jankurai-runner/src/superreasoning.rs",
+        "crates/jekko-runner/src/hero_judge.rs",
+        "crates/jekko-runner/src/hero_judge_runner_flow.rs",
+        "crates/jekko-runner/src/superreasoning.rs",
         "crates/jekko-cli/src/cli.rs"
       ],
       "design_tokens": [
@@ -1458,42 +1458,42 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/model_client.rs",
+            "path": "crates/jekko-runner/src/model_client.rs",
             "language": "rust",
             "start_line": 596,
             "end_line": 597,
             "unit_name": "fake_model_success_receipt_is_deterministic"
           },
           {
-            "path": "crates/jankurai-runner/src/model_client.rs",
+            "path": "crates/jekko-runner/src/model_client.rs",
             "language": "rust",
             "start_line": 610,
             "end_line": 611,
             "unit_name": "fake_model_failure_receipt_records_error"
           },
           {
-            "path": "crates/jankurai-runner/src/model_client.rs",
+            "path": "crates/jekko-runner/src/model_client.rs",
             "language": "rust",
             "start_line": 626,
             "end_line": 627,
             "unit_name": "budgeted_client_blocks_after_limit"
           },
           {
-            "path": "crates/jankurai-runner/src/model_client.rs",
+            "path": "crates/jekko-runner/src/model_client.rs",
             "language": "rust",
             "start_line": 644,
             "end_line": 645,
             "unit_name": "budgeted_client_rejects_fake_when_live_required"
           },
           {
-            "path": "crates/jankurai-runner/src/model_client.rs",
+            "path": "crates/jekko-runner/src/model_client.rs",
             "language": "rust",
             "start_line": 675,
             "end_line": 676,
             "unit_name": "runtime_client_does_not_pass_model_when_route_model_is_unspecified"
           },
           {
-            "path": "crates/jankurai-runner/src/repo_graph.rs",
+            "path": "crates/jekko-runner/src/repo_graph.rs",
             "language": "rust",
             "start_line": 430,
             "end_line": 431,
@@ -1599,28 +1599,28 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jekko-runner/src/hero_judge.rs",
             "language": "rust",
             "start_line": 664,
             "end_line": 666,
             "unit_name": "default_true"
           },
           {
-            "path": "crates/jankurai-runner/src/port.rs",
+            "path": "crates/jekko-runner/src/port.rs",
             "language": "rust",
             "start_line": 413,
             "end_line": 415,
             "unit_name": "default_true"
           },
           {
-            "path": "crates/jankurai-runner/src/port_runner.rs",
+            "path": "crates/jekko-runner/src/port_runner.rs",
             "language": "rust",
             "start_line": 277,
             "end_line": 279,
             "unit_name": "default_fake_worker"
           },
           {
-            "path": "crates/jankurai-runner/src/superreasoning.rs",
+            "path": "crates/jekko-runner/src/superreasoning.rs",
             "language": "rust",
             "start_line": 324,
             "end_line": 326,
@@ -1748,14 +1748,14 @@
         "recommended_action": "keep the named unit in one owner and call it from the other sites",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/worker_pool.rs",
+            "path": "crates/jekko-runner/src/worker_pool.rs",
             "language": "rust",
             "start_line": 121,
             "end_line": 128,
             "unit_name": "sanitize_branch_segment"
           },
           {
-            "path": "crates/jankurai-runner/src/worktree.rs",
+            "path": "crates/jekko-runner/src/worktree.rs",
             "language": "rust",
             "start_line": 170,
             "end_line": 177,
@@ -1942,21 +1942,21 @@
         "recommended_action": "keep the named unit in one owner and call it from the other sites",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jekko-runner/src/hero_judge.rs",
             "language": "rust",
             "start_line": 664,
             "end_line": 666,
             "unit_name": "default_true"
           },
           {
-            "path": "crates/jankurai-runner/src/port.rs",
+            "path": "crates/jekko-runner/src/port.rs",
             "language": "rust",
             "start_line": 413,
             "end_line": 415,
             "unit_name": "default_true"
           },
           {
-            "path": "crates/jankurai-runner/src/superreasoning.rs",
+            "path": "crates/jekko-runner/src/superreasoning.rs",
             "language": "rust",
             "start_line": 324,
             "end_line": 326,
@@ -1991,28 +1991,28 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jekko-runner/src/hero_judge.rs",
             "language": "rust",
             "start_line": 668,
             "end_line": 670,
             "unit_name": "default_generations"
           },
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jekko-runner/src/hero_judge.rs",
             "language": "rust",
             "start_line": 680,
             "end_line": 682,
             "unit_name": "default_verifier_lanes"
           },
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jekko-runner/src/hero_judge.rs",
             "language": "rust",
             "start_line": 684,
             "end_line": 686,
             "unit_name": "default_literature_lanes"
           },
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jekko-runner/src/hero_judge.rs",
             "language": "rust",
             "start_line": 688,
             "end_line": 690,
@@ -2230,14 +2230,14 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/locks.rs",
+            "path": "crates/jekko-runner/src/locks.rs",
             "language": "rust",
             "start_line": 53,
             "end_line": 58,
             "unit_name": "release"
           },
           {
-            "path": "crates/jankurai-runner/src/locks.rs",
+            "path": "crates/jekko-runner/src/locks.rs",
             "language": "rust",
             "start_line": 66,
             "end_line": 71,
@@ -2266,7 +2266,7 @@
         "recommended_action": "keep the named unit in one owner and call it from the other sites",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/parity_lab.rs",
+            "path": "crates/jekko-runner/src/parity_lab.rs",
             "language": "rust",
             "start_line": 899,
             "end_line": 904,
@@ -2301,7 +2301,7 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge_eval_metrics.rs",
+            "path": "crates/jekko-runner/src/hero_judge_eval_metrics.rs",
             "language": "rust",
             "start_line": 396,
             "end_line": 397,
@@ -2528,7 +2528,7 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge_runner_completion.rs",
+            "path": "crates/jekko-runner/src/hero_judge_runner_completion.rs",
             "language": "rust",
             "start_line": 167,
             "end_line": 168,
@@ -2633,7 +2633,7 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge_eval_metrics.rs",
+            "path": "crates/jekko-runner/src/hero_judge_eval_metrics.rs",
             "language": "rust",
             "start_line": 412,
             "end_line": 413,
@@ -2802,7 +2802,7 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge_runner_completion.rs",
+            "path": "crates/jekko-runner/src/hero_judge_runner_completion.rs",
             "language": "rust",
             "start_line": 94,
             "end_line": 95,
@@ -3070,14 +3070,14 @@
         "recommended_action": "keep the named unit in one owner and call it from the other sites",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge.rs",
+            "path": "crates/jekko-runner/src/hero_judge.rs",
             "language": "rust",
             "start_line": 708,
             "end_line": 710,
             "unit_name": "default_evidence_max_bytes"
           },
           {
-            "path": "crates/jankurai-runner/src/port.rs",
+            "path": "crates/jekko-runner/src/port.rs",
             "language": "rust",
             "start_line": 260,
             "end_line": 262,
@@ -3105,7 +3105,7 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/port_runner.rs",
+            "path": "crates/jekko-runner/src/port_runner.rs",
             "language": "rust",
             "start_line": 282,
             "end_line": 283,
@@ -3429,14 +3429,14 @@
         "recommended_action": "choose one owner for the shared body or intentionally differentiate the behavior",
         "instances": [
           {
-            "path": "crates/jankurai-runner/src/hero_judge_eval_metrics.rs",
+            "path": "crates/jekko-runner/src/hero_judge_eval_metrics.rs",
             "language": "rust",
             "start_line": 496,
             "end_line": 497,
             "unit_name": "mean_metric"
           },
           {
-            "path": "crates/jankurai-runner/src/hero_judge_eval_metrics.rs",
+            "path": "crates/jekko-runner/src/hero_judge_eval_metrics.rs",
             "language": "rust",
             "start_line": 557,
             "end_line": 558,
@@ -3707,7 +3707,7 @@
       "problem": "`Code shape and semantic surface` scored 45 below the standard floor of 85",
       "agent_fix": "split large or ambiguous authored code into smaller semantic modules with focused tests",
       "evidence": [
-        "largest authored code file: crates/jankurai-runner/src/parity_lab.rs (1089 LOC)",
+        "largest authored code file: crates/jekko-runner/src/parity_lab.rs (1089 LOC)",
         "code file exceeds 500 LOC",
         "code file exceeds 1000 LOC",
         "most code files stay under 300 LOC"

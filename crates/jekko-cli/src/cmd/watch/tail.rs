@@ -5,7 +5,7 @@ use std::sync::mpsc::{channel, RecvTimeoutError};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use jankurai_runner::events::{Event, EventKind};
+use jekko_runner::events::{Event, EventKind};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 
 use super::{emit_tick, TickState, WatchArgs, WatchFormat, DEBOUNCE};
